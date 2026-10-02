@@ -8,6 +8,10 @@ x-backend-env: &backend-env
   CM_LOG_LEVEL: ${CM_LOG_LEVEL:-INFO}
   CM_DATABASE_URL: postgresql://cm_app:${CM_APP_PASSWORD:?set CM_APP_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-cloudmanager}
   CM_REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
+  CM_JWT_PRIVATE_KEY: ${CM_JWT_PRIVATE_KEY:-}
+  CM_COOKIE_SECURE: ${CM_COOKIE_SECURE:-false}
+  CM_SMTP_HOST: mailpit
+  CM_SMTP_PORT: "1025"
 
 services:
   traefik:
@@ -46,12 +50,34 @@ services:
     cap_drop: [ALL]
     restart: unless-stopped
 
+  # Alembic + seed do catálogo RBAC como cm_owner; api/worker só sobem depois dele.
+  # Bootstrap do admin: docker compose run --rm migrate python -m app.cli create-admin ...
+  migrate:
+    build: ./backend
+    image: cloud-manager-backend:dev
+    pull_policy: build
+    command: ["python", "-m", "app.cli", "migrate"]
+    environment:
+      <<: *backend-env
+      CM_MIGRATION_DATABASE_URL: postgresql://cm_owner:${CM_OWNER_PASSWORD:?set CM_OWNER_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-cloudmanager}
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      disable: true
+    networks: [internal]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: "no"
+
   api:
     build: ./backend
     image: cloud-manager-backend:dev
     pull_policy: build
     environment: *backend-env
     depends_on:
+      migrate: { condition: service_completed_successfully }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
     labels:
@@ -74,6 +100,7 @@ services:
     command: ["python", "-m", "app.worker.main"]
     environment: *backend-env
     depends_on:
+      migrate: { condition: service_completed_successfully }
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
     healthcheck:
@@ -117,6 +144,14 @@ services:
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     networks: [internal]
+    restart: unless-stopped
+
+  # SMTP de desenvolvimento: e-mails (reset de senha) em http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.31
+    ports:
+      - "127.0.0.1:8025:8025"
+    networks: [edge, internal]          # edge: rede não-internal, para publicar a UI
     restart: unless-stopped
 
 networks:

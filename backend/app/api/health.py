@@ -10,10 +10,10 @@ from collections.abc import Awaitable, Callable
 from typing import Annotated
 
 import asyncpg
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from redis.asyncio import Redis
 
-from app.core.config import Settings, get_settings
+from app.core.config import Settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["health"])
@@ -52,10 +52,12 @@ async def healthz() -> dict[str, str]:
 
 @router.get("/readyz")
 async def readyz(
+    request: Request,
     response: Response,
-    settings: Annotated[Settings, Depends(get_settings)],
     checks: Annotated[dict[str, Check], Depends(get_checks)],
 ) -> dict[str, object]:
+    settings: Settings = request.app.state.settings
+
     async def run(name: str, check: Check) -> tuple[str, str]:
         try:
             await asyncio.wait_for(check(settings), timeout=settings.readiness_timeout_seconds)

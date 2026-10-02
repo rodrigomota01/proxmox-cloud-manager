@@ -97,7 +97,7 @@ erDiagram
 
     users {
         uuid id PK
-        citext email UK
+        text email UK "normalizado em minúsculas (CHECK)"
         text display_name
         text password_hash "argon2id, null se só SSO"
         bool is_active

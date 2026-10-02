@@ -17,6 +17,8 @@ RUN useradd --system --uid 10001 --home-dir /app --shell /usr/sbin/nologin cm
 WORKDIR /app
 COPY --from=build /opt/venv /opt/venv
 COPY --chown=10001:10001 app ./app
+COPY --chown=10001:10001 alembic.ini ./
+COPY --chown=10001:10001 migrations ./migrations
 USER 10001
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=3s --retries=3 \

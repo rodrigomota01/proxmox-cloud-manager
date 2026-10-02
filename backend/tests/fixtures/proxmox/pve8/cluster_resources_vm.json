@@ -1,0 +1,46 @@
+{
+  "data": [
+    {
+      "id": "qemu/10001",
+      "cpu": 0,
+      "netin": 0,
+      "node": "tagima",
+      "mem": 0,
+      "diskwrite": 0,
+      "netout": 0,
+      "diskread": 0,
+      "maxdisk": 34359738368,
+      "pool": "cm-lab",
+      "disk": 0,
+      "vmid": 10001,
+      "type": "qemu",
+      "maxmem": 4294967296,
+      "template": 0,
+      "status": "stopped",
+      "uptime": 0,
+      "maxcpu": 2,
+      "name": "cm-test-1"
+    },
+    {
+      "maxmem": 4294967296,
+      "disk": 0,
+      "vmid": 10002,
+      "type": "qemu",
+      "name": "cm-test-2",
+      "maxcpu": 2,
+      "template": 0,
+      "status": "stopped",
+      "uptime": 0,
+      "mem": 0,
+      "cpu": 0,
+      "netin": 0,
+      "node": "tagima",
+      "id": "qemu/10002",
+      "diskread": 0,
+      "pool": "cm-lab",
+      "maxdisk": 34359738368,
+      "netout": 0,
+      "diskwrite": 0
+    }
+  ]
+}

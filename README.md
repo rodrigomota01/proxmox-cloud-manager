@@ -4,8 +4,9 @@ Plataforma de cloud management multi-tenant sobre **Proxmox VE**: tenants, proje
 RBAC, quotas, preço, catálogo de imagens, console/SSH no browser e auditoria — sem que
 o usuário final precise acessar o Proxmox.
 
-> **Status: Fase 0 (arquitetura).** O código atual é só o esqueleto executável
-> (health checks + compose). As funcionalidades entram fase a fase — ver
+> **Status: Fase 1 em andamento.** Pronto: banco com RLS, catálogo RBAC, autenticação
+> (login, refresh rotativo, logout, reset de senha) e auditoria. Próximo: IAM
+> (tenants/projetos/membros), provider Proxmox, inventário e jobs — ver
 > [roadmap](docs/roadmap.md).
 
 ## Documentação
@@ -20,7 +21,11 @@ Requisitos: Docker + Docker Compose v2.
 
 ```bash
 cp .env.example .env          # ajuste senhas locais
-docker compose up --build -d
+docker compose run --rm --no-deps migrate python -m app.cli gen-keys >> .env   # chave JWT
+docker compose up --build -d  # o serviço migrate aplica as migrations antes da API subir
+
+# primeiro administrador da plataforma (pede a senha, mín. 12 caracteres)
+docker compose run --rm migrate python -m app.cli create-admin --email voce@exemplo.com --name "Seu Nome"
 ```
 
 | URL | O quê |
@@ -30,6 +35,7 @@ docker compose up --build -d
 | http://localhost/api/readyz | Readiness (Postgres + Redis) |
 | http://localhost/api/docs | OpenAPI (só fora de produção) |
 | http://localhost:8080/ | Dashboard do Traefik (só dev) |
+| http://localhost:8025/ | Mailpit — e-mails de dev (reset de senha) |
 
 Testes e lint do backend:
 
@@ -37,6 +43,11 @@ Testes e lint do backend:
 cd backend && python3 -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]" && pytest -q && ruff check .
 ```
+
+Os testes em `tests/integration/` sobem PostgreSQL e Redis reais via testcontainers
+(precisam do Docker rodando; sem Docker são pulados). O Postgres de teste é
+inicializado com o mesmo `deploy/docker/postgres/init/01-roles.sh` do compose, então
+RLS e grants são testados exatamente como em produção.
 
 ## Estrutura
 
