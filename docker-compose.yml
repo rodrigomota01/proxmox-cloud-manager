@@ -11,7 +11,7 @@ x-backend-env: &backend-env
 
 services:
   traefik:
-    image: traefik:v3.5
+    image: traefik:v3.6   # >= v3.6.1: negocia a API do Docker Engine 29+ (mín. 1.44)
     command:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
