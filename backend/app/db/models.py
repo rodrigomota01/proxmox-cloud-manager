@@ -2,21 +2,29 @@
 
 from app.audit.models import AuditLog
 from app.auth.models import PasswordResetToken, RefreshToken, Session
+from app.compute.models import Instance
 from app.db.base import Base
 from app.iam.models import Permission, Role, RoleBinding, RolePermission, User
+from app.inventory.models import Node, ProviderCluster, ProviderCredential, StoragePool, SyncRun
 from app.tenancy.models import Project, Tenant, TenantMembership
 
 __all__ = [
     "AuditLog",
     "Base",
+    "Instance",
+    "Node",
     "PasswordResetToken",
     "Permission",
     "Project",
+    "ProviderCluster",
+    "ProviderCredential",
     "RefreshToken",
     "Role",
     "RoleBinding",
     "RolePermission",
     "Session",
+    "StoragePool",
+    "SyncRun",
     "Tenant",
     "TenantMembership",
     "User",

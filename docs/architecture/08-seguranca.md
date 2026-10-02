@@ -41,7 +41,7 @@
 **Transporte**
 - TLS 1.2+ na borda (Traefik + cert-manager/Let's Encrypt em produção).
 - HSTS, `Secure` cookies; HTTP só redireciona.
-- API → PVE com TLS verificado (CA ou fingerprint pinado).
+- API → PVE com TLS verificado (CAs do sistema ou CA própria do cluster).
 - PostgreSQL e Redis com TLS quando fora do mesmo host/namespace.
 
 **Em repouso**

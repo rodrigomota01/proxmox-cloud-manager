@@ -42,3 +42,35 @@ curl -s -H 'Authorization: PVEAPIToken=cloudmgr@pve!cm='"$PVE_SECRET" \
 ```
 
 Deve listar apenas os guests do pool.
+
+## Teste automatizado contra o lab
+
+Critério de saída da Fase 1. Os testes ficam pulados sem as variáveis:
+
+```bash
+cd backend
+export CM_LAB_PVE_URL=https://<host>:8006 CM_LAB_PVE_TOKEN_ID='cloudmgr@pve!cm'
+read -s CM_LAB_PVE_SECRET && export CM_LAB_PVE_SECRET
+# opcional: liga e desliga um guest descartável do pool
+export CM_LAB_POWER_VMID=10001
+.venv/bin/pytest -m lab -v -s
+```
+
+Verifica conexão/versão, que **todo** guest visível pertence ao pool (privilégio mínimo)
+e, com `CM_LAB_POWER_VMID`, um ciclo start → stop (recusa guests fora do pool).
+
+## Cadastro pela API
+
+```bash
+# token de um usuário com PLATFORM_ADMIN/SUPER_ADMIN
+curl -s -X POST localhost/api/v1/admin/clusters -H "Authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"name":"lab","api_url":"https://<host>:8006"}'
+curl -s -X PUT localhost/api/v1/admin/clusters/<id>/credentials -H "Authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"token_id":"cloudmgr@pve!cm","secret":"'"$PVE_SECRET"'"}'
+curl -s -X POST localhost/api/v1/admin/clusters/<id>/test -H "Authorization: Bearer $TOKEN"
+```
+
+Storage só aparece no inventário com `Datastore.Audit` no storage
+(`pveum acl modify /storage/<nome> ...`); com a ACL só no pool, a lista vem vazia.

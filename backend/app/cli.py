@@ -2,7 +2,7 @@
 
   migrate        alembic upgrade head + sync RBAC catalog   (CM_MIGRATION_DATABASE_URL)
   create-admin   create a SUPER_ADMIN user (bootstrap)        (CM_MIGRATION_DATABASE_URL)
-  gen-keys       print a new CM_JWT_PRIVATE_KEY for .env
+  gen-keys       print new keys for .env (CM_JWT_PRIVATE_KEY, CM_KEK; or --only one)
 """
 
 import argparse
@@ -22,6 +22,7 @@ from app.core.security import generate_private_key_pem, hash_password
 from app.db.session import create_engine, create_sessionmaker
 from app.iam.catalog import sync_catalog
 from app.iam.models import Role, RoleBinding, User
+from app.infra.secrets import generate_kek
 
 ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
 
@@ -83,7 +84,8 @@ def main(argv: list[str] | None = None) -> None:
     p_admin = sub.add_parser("create-admin")
     p_admin.add_argument("--email", required=True)
     p_admin.add_argument("--name", required=True)
-    sub.add_parser("gen-keys")
+    p_keys = sub.add_parser("gen-keys")
+    p_keys.add_argument("--only", choices=["jwt", "kek"])
     args = parser.parse_args(argv)
 
     if args.cmd == "migrate":
@@ -94,8 +96,12 @@ def main(argv: list[str] | None = None) -> None:
             raise SystemExit("password must have at least 12 characters")
         asyncio.run(create_admin(args.email, args.name, password))
     elif args.cmd == "gen-keys":
-        pem = generate_private_key_pem().strip().replace("\n", "\\n")
-        sys.stdout.write(f'CM_JWT_PRIVATE_KEY="{pem}"\n')
+        if args.only in (None, "jwt"):
+            pem = generate_private_key_pem().strip().replace("\n", "\\n")
+            sys.stdout.write(f'CM_JWT_PRIVATE_KEY="{pem}"\n')
+        if args.only in (None, "kek"):
+            # losing this key makes stored provider credentials unreadable: back it up
+            sys.stdout.write(f"CM_KEK={generate_kek()}\n")
 
 
 if __name__ == "__main__":

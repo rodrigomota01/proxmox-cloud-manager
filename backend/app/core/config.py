@@ -27,7 +27,6 @@ class Settings(BaseSettings):
     redis_url: RedisDsn = Field(default=RedisDsn("redis://redis:6379/0"))
 
     readiness_timeout_seconds: float = 2.0
-    worker_heartbeat_seconds: float = 30.0
 
     # Auth (docs/architecture/06-autenticacao.md)
     jwt_private_key: SecretStr | None = None  # Ed25519 PEM; `python -m app.cli gen-keys`
@@ -44,11 +43,20 @@ class Settings(BaseSettings):
     login_rate_limit_ip_per_minute: int = 10
     login_rate_limit_email_per_minute: int = 5
 
+    # Key-encryption key for provider secrets (base64, 32 bytes); `app.cli gen-keys`.
+    kek: SecretStr | None = None
+
+    # Proxmox
+    provider_timeout_seconds: float = 15.0
+    reconcile_interval_seconds: float = 15.0
+
     smtp_host: str | None = None  # unset -> e-mails are only logged (without the token)
     smtp_port: int = 1025
     smtp_from: str = "Cloud Manager <no-reply@cloud-manager.local>"
 
-    @field_validator("jwt_private_key", "smtp_host", "migration_database_url", mode="before")
+    @field_validator(
+        "jwt_private_key", "kek", "smtp_host", "migration_database_url", mode="before"
+    )
     @classmethod
     def _empty_is_unset(cls, value: object) -> object:
         # compose passes `${VAR:-}` as an empty string

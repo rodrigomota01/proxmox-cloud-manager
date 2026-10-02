@@ -134,7 +134,7 @@ erDiagram
         text provider "proxmox"
         text name
         text api_url
-        text tls_fingerprint
+        text ca_pem "null = CAs do sistema"
         text status
         jsonb settings "vmid_range, pool_prefix"
         timestamptz last_synced_at

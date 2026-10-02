@@ -13,15 +13,16 @@ dependencies = [
   "alembic>=1.20,<2.0",
   "argon2-cffi>=25.1,<26.0",
   "pyjwt[crypto]>=2.15,<3.0",
+  "httpx>=0.28,<1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
   "pytest>=8",
-  "httpx>=0.28",
   "anyio>=4",
   "ruff>=0.13",
   "testcontainers[postgres,redis]>=4.15",
+  "respx>=0.23",
 ]
 
 [build-system]
@@ -45,4 +46,7 @@ ignore = ["S101"]  # assert is fine in tests
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["integration: needs Docker (Postgres/Redis via testcontainers)"]
+markers = [
+  "integration: needs Docker (Postgres/Redis via testcontainers)",
+  "lab: talks to a real Proxmox (CM_LAB_PVE_* env vars); skipped otherwise",
+]

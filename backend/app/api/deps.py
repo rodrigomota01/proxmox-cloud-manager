@@ -14,8 +14,8 @@ from app.auth.service import revoked_sid_key
 from app.core.config import Settings
 from app.core.errors import NotFound, Unauthenticated
 from app.core.security import decode_access_token
-from app.db.session import get_session, set_tenant_scope, set_user_scope
-from app.iam.authz import PLATFORM, effective_permissions, is_member
+from app.db.session import get_session, set_platform_scope, set_tenant_scope, set_user_scope
+from app.iam.authz import PLATFORM, authorize, effective_permissions, is_member
 from app.infra.mailer import Mailer
 
 
@@ -112,3 +112,18 @@ async def get_tenant_context(
 
 
 CurrentTenant = Annotated[TenantContext, Depends(get_tenant_context)]
+
+
+def require_platform(permission: str):
+    """/admin/* guard: platform permission, then platform RLS scope (audited)."""
+
+    async def dependency(principal: CurrentPrincipal, db: DbSession) -> Principal:
+        await authorize(db, principal.user_id, permission, PLATFORM)
+        await set_platform_scope(db)
+        await audit.record(
+            db, "PLATFORM_SCOPE_ACCESS", actor_user_id=principal.user_id,
+            details={"permission": permission},
+        )
+        return principal
+
+    return Depends(dependency)

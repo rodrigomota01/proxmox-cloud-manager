@@ -14,7 +14,8 @@ A plataforma precisa de uma identidade técnica com acesso amplo ao cluster. Usa
   pela KEK. KEK em Vault Transit (prod) ou secret de ambiente (dev), atrás de
   `SecretsBackend`.
 - Endpoint de credencial é write-only; resposta mostra só `token_id` e `rotated_at`.
-- TLS para o PVE verificado por CA ou fingerprint pinado por cluster.
+- TLS para o PVE verificado pelas CAs do sistema ou pela CA própria do cluster (`ca_pem`).
+  Pin de fingerprint descartado na implementação (ver 04-integracao-proxmox).
 - Um registro de cluster/credencial por cluster → multi-cluster desde o schema.
 
 ## Alternativas

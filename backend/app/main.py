@@ -10,16 +10,19 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 from redis.asyncio import Redis
 
+from app.admin import router as admin
 from app.api import health
 from app.auth import router as auth
 from app.core.config import Settings, get_settings
-from app.core.errors import install_error_handlers
+from app.core.errors import install_error_handlers, problem
 from app.core.logging import configure_logging
 from app.core.request_id import RequestIdMiddleware
 from app.core.security import signing_key
 from app.db.session import create_engine, create_sessionmaker
 from app.iam import router as iam
 from app.infra.mailer import build_mailer
+from app.infra.secrets import SecretsError, build_secrets_backend
+from app.providers.registry import ProviderRegistry
 from app.tenancy import router as tenancy
 
 API_PREFIX = "/api"
@@ -34,6 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.sessionmaker = create_sessionmaker(engine)
     app.state.redis = Redis.from_url(str(settings.redis_url))
     app.state.mailer = build_mailer(settings)
+    app.state.providers = ProviderRegistry(settings, build_secrets_backend(settings))
     try:
         yield
     finally:
@@ -58,12 +62,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
     install_error_handlers(app)
 
+    @app.exception_handler(SecretsError)
+    async def _secrets_error(_: object, exc: SecretsError) -> object:
+        # e.g. CM_KEK missing: an operator problem, not the client's
+        return problem(503, "SECRETS_UNAVAILABLE", "Secrets backend unavailable", str(exc))
+
     app.include_router(health.router, prefix=API_PREFIX)
 
     v1 = APIRouter(prefix=API_V1_PREFIX)
     v1.include_router(auth.router)
     v1.include_router(tenancy.router)
     v1.include_router(iam.router)
+    v1.include_router(admin.router)
     app.include_router(v1)
 
     return app

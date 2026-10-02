@@ -38,10 +38,8 @@ class CloudProvider(Protocol):
 
     # inventário
     async def health(self) -> ProviderHealth: ...
-    async def list_nodes(self) -> list[NodeInfo]: ...
-    async def list_instances(self) -> list[InstanceObservation]: ...   # VM + LXC, 1 chamada
+    async def inventory(self) -> Inventory: ...   # nodes + VM + LXC + storage, 1 chamada
     async def get_instance(self, ref: ProviderRef) -> InstanceObservation: ...
-    async def list_storage(self) -> list[StorageObservation]: ...
     async def list_networks(self) -> list[NetworkObservation]: ...
     async def list_images(self) -> list[ImageObservation]: ...
 
@@ -100,7 +98,7 @@ pveum acl modify / --tokens 'cloudmgr@pve!cm' --roles CloudManager
 - Token salvo cifrado em `provider_credentials` ([ADR-0007](../adr/0007-credenciais-proxmox.md)).
   Header usado: `Authorization: PVEAPIToken=cloudmgr@pve!cm=<secret>`.
   API tokens não precisam de CSRF token nem de ticket.
-- TLS: CA própria do cluster ou **fingerprint SHA-256 pinado** por cluster.
+- TLS: CAs do sistema (ex.: Let's Encrypt via ACME) ou **CA própria do cluster** (`ca_pem`, ex.: `pve-root-ca.pem`). Pin de fingerprint foi descartado: o `ssl` do Python não oferece callback de verificação, então o pin só poderia ser checado depois do handshake — com o token já enviado — e quebraria a cada renovação ACME.
   `verify=False` é proibido fora de `ENV=dev`.
 
 ## Convenções no lado do Proxmox

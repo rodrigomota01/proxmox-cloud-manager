@@ -9,6 +9,7 @@ x-backend-env: &backend-env
   CM_DATABASE_URL: postgresql://cm_app:${CM_APP_PASSWORD:?set CM_APP_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-cloudmanager}
   CM_REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
   CM_JWT_PRIVATE_KEY: ${CM_JWT_PRIVATE_KEY:-}
+  CM_KEK: ${CM_KEK:-}
   CM_COOKIE_SECURE: ${CM_COOKIE_SECURE:-false}
   CM_SMTP_HOST: mailpit
   CM_SMTP_PORT: "1025"
@@ -105,7 +106,7 @@ services:
       redis: { condition: service_healthy }
     healthcheck:
       disable: true
-    networks: [internal]
+    networks: [internal, egress]        # egress: alcança a API do Proxmox
     read_only: true
     tmpfs: [/tmp]
     security_opt: [no-new-privileges:true]
@@ -156,6 +157,7 @@ services:
 
 networks:
   edge:
+  egress:                              # saída para clusters Proxmox (worker)
   internal:
     internal: true
 
