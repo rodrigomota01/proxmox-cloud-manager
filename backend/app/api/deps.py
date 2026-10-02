@@ -5,15 +5,17 @@ from dataclasses import dataclass
 from typing import Annotated
 
 import jwt
-from fastapi import Depends, Request
+from fastapi import Depends, Header, Request
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit import service as audit
 from app.auth.service import revoked_sid_key
 from app.core.config import Settings
-from app.core.errors import Unauthenticated
+from app.core.errors import NotFound, Unauthenticated
 from app.core.security import decode_access_token
-from app.db.session import get_session, set_user_scope
+from app.db.session import get_session, set_tenant_scope, set_user_scope
+from app.iam.authz import PLATFORM, effective_permissions, is_member
 from app.infra.mailer import Mailer
 
 
@@ -70,3 +72,43 @@ async def get_principal(
 
 
 CurrentPrincipal = Annotated[Principal, Depends(get_principal)]
+
+
+@dataclass(frozen=True)
+class TenantContext:
+    principal: Principal
+    tenant_id: uuid.UUID
+    via_platform: bool  # access granted by a platform binding, not a membership
+
+
+async def enter_tenant(
+    db: AsyncSession, principal: Principal, tenant_id: uuid.UUID
+) -> TenantContext:
+    """Validates access to the tenant and sets the RLS scope to it (and only it).
+
+    Members enter normally. Platform roles (bindings valid for every tenant) may enter
+    without membership; that access is audited as PLATFORM_SCOPE_ACCESS. Anyone else
+    gets 404, whether or not the tenant exists.
+    """
+    via_platform = False
+    if not await is_member(db, principal.user_id, tenant_id):
+        if not await effective_permissions(db, principal.user_id, PLATFORM):
+            raise NotFound()
+        via_platform = True
+    await set_tenant_scope(db, [tenant_id])
+    if via_platform:
+        await audit.record(
+            db, "PLATFORM_SCOPE_ACCESS", actor_user_id=principal.user_id, tenant_id=tenant_id
+        )
+    return TenantContext(principal, tenant_id, via_platform)
+
+
+async def get_tenant_context(
+    principal: CurrentPrincipal,
+    db: DbSession,
+    x_tenant_id: Annotated[uuid.UUID, Header(alias="X-Tenant-Id")],
+) -> TenantContext:
+    return await enter_tenant(db, principal, x_tenant_id)
+
+
+CurrentTenant = Annotated[TenantContext, Depends(get_tenant_context)]

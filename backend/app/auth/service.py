@@ -205,6 +205,39 @@ class AuthService:
         if user is None or not user.is_active:
             return None
 
+        token = await self._new_reset_token(user, self.settings.password_reset_ttl_seconds)
+        await audit.record(
+            self.db, "PASSWORD_RESET_REQUESTED", actor_user_id=user.id, source_ip=ip
+        )
+        minutes = self.settings.password_reset_ttl_seconds // 60
+        return Mail(
+            to=user.email,
+            subject="Cloud Manager — redefinição de senha",
+            body=(
+                f"Olá {user.display_name},\n\n"
+                f"Para redefinir sua senha, acesse:\n{self._reset_link(token)}\n\n"
+                f"O link vale por {minutes} minutos e pode ser usado uma vez.\n"
+                "Se você não pediu a redefinição, ignore este e-mail.\n"
+            ),
+        )
+
+    async def invite(self, user: User, *, tenant_name: str, invited_by: str) -> Mail:
+        """Invitation for a user created without a password: a long-lived reset link."""
+        token = await self._new_reset_token(user, self.settings.invite_ttl_seconds)
+        hours = self.settings.invite_ttl_seconds // 3600
+        return Mail(
+            to=user.email,
+            subject=f"Cloud Manager — convite para {tenant_name}",
+            body=(
+                f"Olá {user.display_name},\n\n"
+                f"{invited_by} convidou você para o tenant {tenant_name} no Cloud Manager.\n"
+                f"Defina sua senha em:\n{self._reset_link(token)}\n\n"
+                f"O link vale por {hours} horas e pode ser usado uma vez.\n"
+            ),
+        )
+
+    async def _new_reset_token(self, user: User, ttl_seconds: int) -> str:
+        """Invalidates pending tokens of the user and returns a new one (stored hashed)."""
         now = _now()
         await self.db.execute(
             update(PasswordResetToken)
@@ -215,25 +248,15 @@ class AuthService:
         self.db.add(
             PasswordResetToken(
                 user_id=user.id, token_hash=hash_token(token),
-                expires_at=now + timedelta(seconds=self.settings.password_reset_ttl_seconds),
+                expires_at=now + timedelta(seconds=ttl_seconds),
             )
         )
-        await audit.record(
-            self.db, "PASSWORD_RESET_REQUESTED", actor_user_id=user.id, source_ip=ip
-        )
-        minutes = self.settings.password_reset_ttl_seconds // 60
+        await self.db.flush()
+        return token
+
+    def _reset_link(self, token: str) -> str:
         # token in the URL fragment: never sent to servers or leaked via Referer
-        link = f"{self.settings.public_base_url}/reset-password#token={token}"
-        return Mail(
-            to=user.email,
-            subject="Cloud Manager — redefinição de senha",
-            body=(
-                f"Olá {user.display_name},\n\n"
-                f"Para redefinir sua senha, acesse:\n{link}\n\n"
-                f"O link vale por {minutes} minutos e pode ser usado uma vez.\n"
-                "Se você não pediu a redefinição, ignore este e-mail.\n"
-            ),
-        )
+        return f"{self.settings.public_base_url}/reset-password#token={token}"
 
     async def reset_password(self, raw_token: str, new_password: str, *, ip: str | None) -> None:
         now = _now()

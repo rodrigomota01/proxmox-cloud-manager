@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     refresh_idle_ttl_seconds: int = 12 * 3600
     refresh_absolute_ttl_seconds: int = 7 * 24 * 3600
     password_reset_ttl_seconds: int = 30 * 60
+    invite_ttl_seconds: int = 72 * 3600
     cookie_secure: bool = True
     allowed_origins: list[str] = ["http://localhost"]
     public_base_url: str = "http://localhost"

@@ -56,6 +56,8 @@ CREATE POLICY tenant_isolation ON instances
   rejeitado pela policy; DDL é negado.
 - `app.tenant_ids` recebe **só o tenant ativo da requisição** (header
   `X-Tenant-Id` validado contra as memberships), não todos os tenants do usuário.
+  Usuários com binding de plataforma (que valem para todos os tenants) podem entrar
+  num tenant sem membership; cada request assim gera audit `PLATFORM_SCOPE_ACCESS`.
 - `app.platform_scope = on` só é setado por endpoints `/api/v1/admin/*` após checagem
   de permissão de plataforma; toda request com esse escopo gera audit
   `PLATFORM_SCOPE_ACCESS`.

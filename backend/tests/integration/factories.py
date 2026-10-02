@@ -43,13 +43,22 @@ async def _role_id(db: AsyncSession, name: str) -> uuid.UUID:
 
 
 async def add_member(
-    db: AsyncSession, tenant: Tenant, user: User, role: str = "TENANT_ADMIN"
+    db: AsyncSession, tenant: Tenant, user: User, role: str = "TENANT_ADMIN",
+    project: Project | None = None,
 ) -> None:
-    db.add(TenantMembership(tenant_id=tenant.id, user_id=user.id))
+    """Membership (if missing) plus one binding at tenant or project scope."""
+    exists = await db.scalar(
+        select(TenantMembership.id).where(
+            TenantMembership.tenant_id == tenant.id, TenantMembership.user_id == user.id
+        )
+    )
+    if exists is None:
+        db.add(TenantMembership(tenant_id=tenant.id, user_id=user.id))
     db.add(
         RoleBinding(
-            user_id=user.id, role_id=await _role_id(db, role), scope_type="tenant",
-            scope_id=tenant.id, tenant_id=tenant.id,
+            user_id=user.id, role_id=await _role_id(db, role),
+            scope_type="project" if project else "tenant",
+            scope_id=project.id if project else tenant.id, tenant_id=tenant.id,
         )
     )
     await db.commit()

@@ -18,7 +18,9 @@ from app.core.logging import configure_logging
 from app.core.request_id import RequestIdMiddleware
 from app.core.security import signing_key
 from app.db.session import create_engine, create_sessionmaker
+from app.iam import router as iam
 from app.infra.mailer import build_mailer
+from app.tenancy import router as tenancy
 
 API_PREFIX = "/api"
 API_V1_PREFIX = f"{API_PREFIX}/v1"
@@ -60,6 +62,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     v1 = APIRouter(prefix=API_V1_PREFIX)
     v1.include_router(auth.router)
+    v1.include_router(tenancy.router)
+    v1.include_router(iam.router)
     app.include_router(v1)
 
     return app

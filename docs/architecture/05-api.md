@@ -91,18 +91,18 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | POST | `/auth/password/reset` | token de reset | token de uso único, 30 min |
 | POST | `/auth/mfa/*` | autenticado | Fase 1 só modelo; TOTP na Fase 5/6 |
 | GET | `/me` | autenticado | perfil + tenants |
-| GET | `/me/permissions?scope=project:<id>` | autenticado | para a UI esconder ações |
+| GET | `/me/permissions?scope=platform\|tenant:<id>\|project:<id>` | autenticado (escopo `project` exige `X-Tenant-Id`) | para a UI esconder ações |
 
 ### Tenancy & IAM (Fase 1)
 
 | Método | Rota | Permissão |
 |---|---|---|
-| GET/POST | `/tenants` | GET: memberships do usuário; POST: `tenant:create` |
-| GET/PATCH/DELETE | `/tenants/{tenantId}` | `tenant:manage` / `tenant:delete` |
-| GET/POST | `/tenants/{tenantId}/members` | `member:manage` |
-| DELETE | `/tenants/{tenantId}/members/{userId}` | `member:manage` |
-| GET/POST | `/projects` | `vm:view` / `project:create` |
-| GET/PATCH/DELETE | `/projects/{projectId}` | `project:*` |
+| GET/POST | `/tenants` | GET: memberships do usuário; POST: `tenant:create` (opcional `admin_email` → TENANT_ADMIN, convidado se novo) |
+| GET/PATCH/DELETE | `/tenants/{tenantId}` | GET: membro; PATCH: `tenant:manage`; DELETE: `tenant:delete` + confirm (slug), só sem projetos |
+| GET/POST | `/tenants/{tenantId}/members` | `member:manage` no escopo do binding (tenant ou projeto); e-mail desconhecido vira convite |
+| DELETE | `/tenants/{tenantId}/members/{userId}` | `member:manage` (tenant) |
+| GET/POST | `/projects` | GET: `vm:view` no tenant lista todos, senão só projetos com binding; POST: `project:create` |
+| GET/PATCH/DELETE | `/projects/{projectId}` | `vm:view` (projeto) / `project:create` / `project:delete` + confirm (slug), soft delete |
 | GET/POST/DELETE | `/role-bindings` | `member:manage` (+ regras anti-escalonamento) |
 | GET | `/roles` | autenticado |
 
