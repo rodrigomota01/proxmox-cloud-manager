@@ -1,0 +1,128 @@
+# Desenvolvimento local. Produção: Helm/OpenShift (Fase 6).
+# Tudo atrás do Traefik em http://localhost:  /  -> frontend   /api, /ws -> api
+
+name: cloud-manager
+
+x-backend-env: &backend-env
+  CM_ENV: ${CM_ENV:-dev}
+  CM_LOG_LEVEL: ${CM_LOG_LEVEL:-INFO}
+  CM_DATABASE_URL: postgresql://cm_app:${CM_APP_PASSWORD:?set CM_APP_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-cloudmanager}
+  CM_REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
+
+services:
+  traefik:
+    image: traefik:v3.5
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=cloud-manager_edge
+      - --entrypoints.web.address=:80
+      - --api.dashboard=true
+      - --api.insecure=true            # dashboard em :8080 — SOMENTE dev
+      - --accesslog=true
+      - --accesslog.format=json
+    ports:
+      - "80:80"
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [edge]
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    pull_policy: build
+    depends_on: [api]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.frontend.rule=PathPrefix(`/`)
+      - traefik.http.routers.frontend.priority=1
+      - traefik.http.routers.frontend.entrypoints=web
+      - traefik.http.services.frontend.loadbalancer.server.port=3000
+    networks: [edge]
+    read_only: true
+    tmpfs: [/tmp, /app/.next/cache]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    image: cloud-manager-backend:dev
+    pull_policy: build
+    environment: *backend-env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.api.rule=PathPrefix(`/api`) || PathPrefix(`/ws`)
+      - traefik.http.routers.api.priority=100
+      - traefik.http.routers.api.entrypoints=web
+      - traefik.http.services.api.loadbalancer.server.port=8000
+    networks: [edge, internal]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+
+  worker:
+    build: ./backend
+    image: cloud-manager-backend:dev      # mesma imagem da API, outro comando
+    pull_policy: build
+    command: ["python", "-m", "app.worker.main"]
+    environment: *backend-env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      disable: true
+    networks: [internal]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cloudmanager}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      CM_OWNER_PASSWORD: ${CM_OWNER_PASSWORD:?set CM_OWNER_PASSWORD in .env}
+      CM_APP_PASSWORD: ${CM_APP_PASSWORD:?set CM_APP_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:5432:5432"            # acesso local para debug/migrations
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [internal]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    networks: [internal]
+    restart: unless-stopped
+
+networks:
+  edge:
+  internal:
+    internal: true
+
+volumes:
+  pgdata:
