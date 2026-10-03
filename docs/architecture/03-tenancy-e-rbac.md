@@ -129,6 +129,7 @@ Legenda: ✅ concede · — não concede
 | `tenant:manage` | ✅ | ✅ | ✅ | — | — | — | — |
 | `cluster:manage` `cluster:sync` | ✅ | ✅ | — | — | — | — | — |
 | `node:view` | ✅ | ✅ | — | — | — | — | — |
+| `user:manage` (contas: dados, ativação, desbloqueio, reset) | ✅ | ✅ | — | — | — | — | — |
 | `platform:admin` (gerenciar admins) | ✅ | — | — | — | — | — | — |
 
 ¹ OPERATOR: `container:start|stop|restart|console`, sem create/delete/configure.
@@ -141,6 +142,10 @@ Legenda: ✅ concede · — não concede
 - Ninguém altera o próprio binding.
 - Remover o último `TENANT_ADMIN` de um tenant é bloqueado.
 - Bindings de `platform` só via `/api/v1/admin/*` com `platform:admin`.
+- Administração de contas (`user:manage`): ninguém edita/desativa a própria conta por lá
+  (usa o perfil); o admin precisa ter todas as permissões de plataforma da conta-alvo
+  (PLATFORM_ADMIN não mexe em SUPER_ADMIN); o último SUPER_ADMIN ativo não pode ser
+  desativado nem rebaixado; desativar encerra todas as sessões na hora.
 
 ### Onde o RBAC é aplicado
 

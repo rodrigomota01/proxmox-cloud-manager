@@ -16,6 +16,7 @@ const ADMIN_NAV = [
   { href: "/admin/clusters", label: "Clusters" },
   { href: "/admin/images", label: "Imagens" },
   { href: "/admin/tenants", label: "Tenants e quotas" },
+  { href: "/admin/users", label: "Usuários" },
 ];
 
 function NavLink({ href, label }: { href: string; label: string }) {
@@ -88,7 +89,9 @@ function Shell({ children }: { children: React.ReactNode }) {
             )}
           </div>
           <div className="flex items-center gap-3 text-sm">
-            <span className="text-slate-600 dark:text-slate-400">{me.display_name}</span>
+            <Link href="/perfil" className="text-slate-600 hover:underline dark:text-slate-400">
+              {me.display_name}
+            </Link>
             <Button variant="ghost" onClick={signOut}>
               Sair
             </Button>

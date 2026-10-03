@@ -27,6 +27,7 @@ from app.infra.secrets import SecretsError, build_secrets_backend
 from app.providers.registry import ProviderRegistry
 from app.sshkeys import router as sshkeys
 from app.tenancy import router as tenancy
+from app.users import router as users
 
 API_PREFIX = "/api"
 API_V1_PREFIX = f"{API_PREFIX}/v1"
@@ -85,6 +86,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     v1.include_router(compute.router)
     v1.include_router(images.router)
     v1.include_router(sshkeys.router)
+    v1.include_router(users.router)
     v1.include_router(admin.router)
     app.include_router(v1)
 

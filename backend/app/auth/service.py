@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.audit import service as audit
 from app.auth.models import PasswordResetToken, RefreshToken, Session
 from app.core.config import Settings
-from app.core.errors import Unauthenticated
+from app.core.errors import Forbidden, Unauthenticated
 from app.core.security import (
     hash_password,
     hash_token,
@@ -205,10 +205,14 @@ class AuthService:
         if user is None or not user.is_active:
             return None
 
-        token = await self._new_reset_token(user, self.settings.password_reset_ttl_seconds)
         await audit.record(
             self.db, "PASSWORD_RESET_REQUESTED", actor_user_id=user.id, source_ip=ip
         )
+        return await self.password_reset_mail(user)
+
+    async def password_reset_mail(self, user: User) -> Mail:
+        """New single-use reset link for `user` (also used when an admin sends one)."""
+        token = await self._new_reset_token(user, self.settings.password_reset_ttl_seconds)
         minutes = self.settings.password_reset_ttl_seconds // 60
         return Mail(
             to=user.email,
@@ -221,20 +225,61 @@ class AuthService:
             ),
         )
 
-    async def invite(self, user: User, *, tenant_name: str, invited_by: str) -> Mail:
+    async def invite(
+        self, user: User, *, invited_by: str, tenant_name: str | None = None
+    ) -> Mail:
         """Invitation for a user created without a password: a long-lived reset link."""
         token = await self._new_reset_token(user, self.settings.invite_ttl_seconds)
         hours = self.settings.invite_ttl_seconds // 3600
+        where = f"o tenant {tenant_name} no Cloud Manager" if tenant_name else "o Cloud Manager"
         return Mail(
             to=user.email,
-            subject=f"Cloud Manager — convite para {tenant_name}",
+            subject=f"Cloud Manager — convite{f' para {tenant_name}' if tenant_name else ''}",
             body=(
                 f"Olá {user.display_name},\n\n"
-                f"{invited_by} convidou você para o tenant {tenant_name} no Cloud Manager.\n"
+                f"{invited_by} convidou você para {where}.\n"
                 f"Defina sua senha em:\n{self._reset_link(token)}\n\n"
                 f"O link vale por {hours} horas e pode ser usado uma vez.\n"
             ),
         )
+
+    async def change_password(
+        self, user_id: uuid.UUID, current: str, new: str, *, keep_session: uuid.UUID,
+        ip: str | None,
+    ) -> int:
+        """Self-service change: proves the current password, then signs out every other
+        session (a stolen session should not survive the owner changing the password)."""
+        user = await self.db.get(User, user_id, with_for_update=True)
+        if user is None or not user.is_active:
+            raise Unauthenticated()
+        if not verify_password(user.password_hash, current):
+            await audit.record(
+                self.db, "PASSWORD_CHANGE", outcome="failure", actor_user_id=user_id,
+                source_ip=ip, details={"reason": "bad_current_password"},
+            )
+            await self.db.commit()
+            raise Forbidden("Current password is incorrect")
+        user.password_hash = hash_password(new)
+        user.password_changed_at = _now()
+        now = _now()
+        others = (
+            await self.db.execute(
+                select(Session).where(
+                    Session.user_id == user_id, Session.revoked_at.is_(None),
+                    Session.id != keep_session,
+                ).with_for_update()
+            )
+        ).scalars().all()
+        for sess in others:
+            await self._revoke_session(sess, "password_change", now)
+        await audit.record(
+            self.db, "PASSWORD_CHANGE", actor_user_id=user_id, source_ip=ip,
+            details={"sessions_revoked": len(others)},
+        )
+        return len(others)
+
+    async def revoke_session(self, sess: Session, reason: str) -> None:
+        await self._revoke_session(sess, reason, _now())
 
     async def _new_reset_token(self, user: User, ttl_seconds: int) -> str:
         """Invalidates pending tokens of the user and returns a new one (stored hashed)."""

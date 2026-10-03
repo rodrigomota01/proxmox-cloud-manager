@@ -92,6 +92,9 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | POST | `/auth/mfa/*` | autenticado | Fase 1 só modelo; TOTP na Fase 5/6 |
 | GET | `/me` | autenticado | perfil + tenants |
 | GET | `/me/permissions?scope=platform\|tenant:<id>\|project:<id>` | autenticado (escopo `project` exige `X-Tenant-Id`) | para a UI esconder ações |
+| PATCH | `/me` | autenticado | nome de exibição (e-mail só via admin) |
+| POST | `/me/password` | autenticado | exige a senha atual; encerra as outras sessões |
+| GET/DELETE | `/me/sessions` · `/me/sessions/{id}` | autenticado | sessões próprias |
 
 ### Tenancy & IAM (Fase 1)
 
@@ -170,6 +173,10 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | POST | `/admin/clusters/{id}/sync` | `cluster:sync` → 202 job (`cluster.sync`) |
 | GET | `/admin/clusters/{id}/sync-runs` | `cluster:manage` |
 | GET | `/admin/tenants` | `tenant:create` (todos os tenants; `/tenants` lista só memberships) |
+| GET/POST | `/admin/users` | `user:manage` (busca `?q=`; criar = convite por e-mail) |
+| GET/PATCH | `/admin/users/{id}` | `user:manage` (nome, e-mail, ativo; regras anti-escalonamento) |
+| POST | `/admin/users/{id}/unlock` · `/password-reset` · `/sessions/revoke` | `user:manage` |
+| PUT | `/admin/users/{id}/platform-roles` | `platform:admin` |
 | GET | `/admin/nodes` · `/admin/nodes/{id}` | `node:view` |
 | GET | `/admin/instances?managed=false` | `node:view` (descobertos) |
 | POST | `/admin/instances/{id}/adopt` | `cluster:manage` → atribui tenant/projeto |

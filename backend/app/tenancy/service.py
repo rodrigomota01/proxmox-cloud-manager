@@ -180,7 +180,7 @@ class MemberService:
             tenant = tenant or await self.db.get_one(Tenant, self.ctx.tenant_id)
             inviter = await self.db.get_one(User, self.actor)
             mail = await self.auth.invite(
-                user, tenant_name=tenant.name, invited_by=inviter.display_name
+                user, invited_by=inviter.display_name, tenant_name=tenant.name
             )
             await audit.record(
                 self.db, "USER_INVITE", actor_user_id=self.actor, tenant_id=self.ctx.tenant_id,

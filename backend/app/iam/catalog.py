@@ -40,6 +40,7 @@ PERMISSIONS: dict[str, str] = {
     "cluster:manage": "Manage provider clusters and credentials",
     "cluster:sync": "Trigger inventory sync",
     "node:view": "View hypervisor nodes",
+    "user:manage": "Manage user accounts (profile, status, password reset)",
     "platform:admin": "Manage platform administrators",
 }
 
