@@ -1,5 +1,25 @@
 # Identidade técnica no Proxmox
 
+## Servidor novo: `setup-node.sh` (recomendado)
+
+Prepara um servidor Proxmox independente de uma vez — pool, usuário, roles, token e
+ACLs de privilégio mínimo (leitura/energia/criação **só no pool**, clone **só** nos
+templates indicados, disco **só** no storage indicado, rede **só** na bridge indicada).
+Detecta a versão do PVE (privilégios do guest agent mudam do 8 para o 9), não toca em
+nenhuma VM existente e pode ser rodado de novo (não recria nada; o secret do token só
+aparece na criação).
+
+```bash
+# no node, como root (leia o script antes: less setup-node.sh)
+curl -fsSLO https://raw.githubusercontent.com/rodrigomota01/proxmox-cloud-manager/main/deploy/proxmox/setup-node.sh
+STORAGE=<storage> BRIDGE=<bridge> TEMPLATES="<vmid> <vmid>" bash setup-node.sh
+```
+
+`STORAGE`: `pvesm status`. `BRIDGE` e se o template tem cloud-init: `qm config <vmid>`
+(`net0: ...bridge=vmbr0`, `ide2: ...cloudinit`).
+
+As seções abaixo documentam o passo a passo manual equivalente (usado no primeiro lab).
+
 Referência de privilégios em
 [04-integracao-proxmox.md](../../docs/architecture/04-integracao-proxmox.md#identidade-técnica-e-permissões-no-proxmox).
 Validado em PVE 8.4.19 (node único).
