@@ -206,6 +206,16 @@ class StaticIPv4:
 
 
 @dataclass(frozen=True)
+class NicSpec:
+    """The first NIC of a new guest, when the network dictates it (IPAM): a failover IP's
+    virtual MAC, the VLAN of its range, the bridge. None fields keep the template's."""
+
+    mac: str | None = None
+    bridge: str | None = None
+    vlan: int | None = None
+
+
+@dataclass(frozen=True)
 class InstanceSpec:
     """Everything a new instance gets. The provider must set all of it explicitly:
     nothing identity- or access-related may be inherited from the template
@@ -220,6 +230,7 @@ class InstanceSpec:
     ipv4: StaticIPv4
     tags: tuple[str, ...] = ()
     description: str = ""
+    nic: NicSpec | None = None
 
 
 @dataclass(frozen=True)

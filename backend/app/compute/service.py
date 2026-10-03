@@ -5,6 +5,7 @@ otherwise only projects with a project-level binding granting it. Power actions 
 authorized against the instance loaded from the database and run as jobs.
 """
 
+import ipaddress
 import uuid
 
 from sqlalchemy import ColumnElement, Select, and_, false, func, or_, select
@@ -23,6 +24,9 @@ from app.iam.authz import Scope, authorize, effective_permissions, projects_with
 from app.iam.service import live_project
 from app.images.models import Image, ImageTemplate
 from app.inventory.models import Node, ProviderCluster
+from app.ipam.allocation import Offer
+from app.ipam.allocation import offers as ipam_offers
+from app.ipam.models import IpamAddress
 from app.jobs.models import ACTIVE, Job, JobEvent
 from app.jobs.queue import enqueue
 from app.providers.base import PowerAction
@@ -164,7 +168,13 @@ class ComputeService:
                 "field": "root_disk_gb",
                 "message": f"the image needs at least {image.min_disk_gb} GB",
             }])
-        cluster = await self._place(image, body.zone_id)
+        if body.ipam_address_id is not None:
+            offer = await self._ipam_offer(body.ipam_address_id, image, body.zone_id)
+            cluster = await self.db.get_one(ProviderCluster, offer.address.cluster_id)
+            network = offer.network(body.dns or ["8.8.8.8", "1.1.1.1"])
+        else:
+            cluster = await self._place(image, body.zone_id)
+            network = body.ipv4.model_dump() if body.ipv4 else {}
 
         keys = (
             await self.db.execute(
@@ -186,7 +196,7 @@ class ComputeService:
             kind="vm", name=body.name, provider_name=body.name, state="provisioning",
             power_state="stopped", vcpus=body.vcpus, memory_mb=body.memory_mb,
             root_disk_gb=body.root_disk_gb, tags=body.tags, managed=True, image_id=image.id,
-            ipv4=body.ipv4.address.split("/")[0], network=body.ipv4.model_dump(),
+            ipv4=network["address"].split("/")[0], network=network,
             provider_ref={},  # the job allocates the guest id
         )
         try:
@@ -210,7 +220,7 @@ class ComputeService:
             details={
                 "name": body.name, "image_id": str(image.id), "vcpus": body.vcpus,
                 "memory_mb": body.memory_mb, "root_disk_gb": body.root_disk_gb,
-                "ipv4": body.ipv4.address, "job_id": str(job.id),
+                "ipv4": network["address"], "job_id": str(job.id),
                 "ssh_keys": [k.fingerprint for k in keys],
             },
         )
@@ -223,14 +233,43 @@ class ComputeService:
                 "This instance is read-only: it lives outside the pool the platform manages"
             )
 
-    async def _place(self, image: Image, zone_id: uuid.UUID) -> ProviderCluster:
-        """ADR-0012: among the zone's servers that have a template of the image and a
-        target pool, the one with the smallest share of its RAM already allocated."""
+    async def _ipam_offer(
+        self, address_id: uuid.UUID, image: Image, zone_id: uuid.UUID
+    ) -> Offer:
+        """The address must still be offered, and its server must be able to take the
+        instance (in the zone, with the image and a target pool)."""
+        eligible = {c.id for c in await self._candidates(image, zone_id)}
+        address = await self.db.get(IpamAddress, address_id)
+        if address is None or address.cluster_id not in eligible:
+            raise ValidationError(errors=[{
+                "field": "ipam_address_id",
+                "message": "this address is not available for the image in this zone",
+            }])
+        for offer in await ipam_offers(self.db, address.cluster_id):
+            if offer.address.id == address_id:
+                return offer
+        raise Conflict(f"IP {address.address} is no longer free")
+
+    async def free_addresses(self, zone_id: uuid.UUID, image_id: uuid.UUID | None) -> list[Offer]:
+        image = await self.db.get(Image, image_id) if image_id else None
+        if image is not None:
+            clusters = await self._candidates(image, zone_id)
+        else:
+            clusters = list((await self.db.execute(
+                select(ProviderCluster).where(ProviderCluster.zone_id == zone_id)
+            )).scalars())
+        out: list[Offer] = []
+        for c in clusters:
+            if c.settings.get("pool"):
+                out.extend(await ipam_offers(self.db, c.id))
+        return sorted(out, key=lambda o: ipaddress.ip_address(str(o.address.address)))
+
+    async def _candidates(self, image: Image, zone_id: uuid.UUID) -> list[ProviderCluster]:
         zone = await self.db.get(Zone, zone_id)
         region = await self.db.get(Region, zone.region_id) if zone else None
         if zone is None or not zone.active or region is None or not region.active:
             raise ValidationError(errors=[{"field": "zone_id", "message": "unknown zone"}])
-        candidates = [
+        return [
             c for c in (
                 await self.db.execute(
                     select(ProviderCluster)
@@ -240,7 +279,13 @@ class ComputeService:
             ).scalars()
             if c.settings.get("pool")
         ]
+
+    async def _place(self, image: Image, zone_id: uuid.UUID) -> ProviderCluster:
+        """ADR-0012: among the zone's servers that have a template of the image and a
+        target pool, the one with the smallest share of its RAM already allocated."""
+        candidates = await self._candidates(image, zone_id)
         if not candidates:
+            zone = await self.db.get_one(Zone, zone_id)
             raise Conflict(f"Image '{image.name}' is not available in zone '{zone.name}'")
         ids = [c.id for c in candidates]
         allocated = dict((await self.db.execute(

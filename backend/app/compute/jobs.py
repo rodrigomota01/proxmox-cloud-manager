@@ -1,8 +1,10 @@
 """instance.* job handlers."""
 
+from collections.abc import Awaitable
 from datetime import UTC, datetime
 from typing import Any
 
+import aiomysql
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,10 +12,14 @@ from app.audit import service as audit
 from app.compute.models import Instance
 from app.images.models import Image, ImageTemplate
 from app.inventory.models import ProviderCluster
-from app.jobs.queue import JobContext, JobFailed, handler, on_failure
+from app.ipam.models import IpamAddress
+from app.ipam.service import source_for
+from app.ipam.source import IpamSource
+from app.jobs.queue import JobContext, JobFailed, RetryLater, handler, on_failure
 from app.providers.base import (
     CloudProvider,
     InstanceSpec,
+    NicSpec,
     OperationHandle,
     PowerAction,
     PowerState,
@@ -76,7 +82,79 @@ def _spec(instance: Instance, payload: dict[str, Any]) -> InstanceSpec:
         ipv4=StaticIPv4(net["address"], net["gateway"], tuple(net.get("dns", []))),
         tags=("cm-managed", f"cm-t-{str(instance.tenant_id)[:8]}"),
         description=f"managed-by: cloud-manager / instance: {instance.id}",
+        nic=(
+            NicSpec(net.get("mac"), net.get("bridge"), net.get("vlan"))
+            if any(net.get(k) for k in ("mac", "bridge", "vlan")) else None
+        ),
     )
+
+
+# --- IPAM (legacy MySQL awf_ip_pool; ADR-0014) ------------------------------------------
+
+
+def _ipam_source(ctx: JobContext) -> IpamSource:
+    source = source_for(ctx.providers.settings)
+    if source is None:
+        raise JobFailed("IPAM_NOT_CONFIGURED", "the address comes from the IPAM, which is off")
+    return source
+
+
+async def _ipam_call(coro: Awaitable[bool]) -> bool:
+    try:
+        return await coro
+    except (aiomysql.Error, OSError) as exc:  # MySQL unreachable: try again later
+        raise RetryLater(f"IPAM: {exc}") from exc
+
+
+async def _mirror(db: AsyncSession, external_id: int, **values: Any) -> None:
+    """Keep the local copy in step until the next sync confirms it."""
+    row = await db.scalar(select(IpamAddress).where(IpamAddress.external_id == external_id))
+    if row is not None:
+        for key, value in values.items():
+            setattr(row, key, value)
+
+
+async def _ipam_reserve(ctx: JobContext, db: AsyncSession, instance: Instance) -> None:
+    ipam = instance.network.get("ipam")
+    if not ipam or await ctx.events("ip_reserved"):
+        return
+    ok = await _ipam_call(
+        _ipam_source(ctx).reserve(ipam["external_id"], hostname=instance.name, mac=None)
+    )
+    if not ok:
+        raise JobFailed("IP_TAKEN", f"IP {instance.ipv4} was taken in the IPAM meanwhile")
+    await _mirror(db, ipam["external_id"], assigned=True, hostname=instance.name)
+    await ctx.checkpoint(db)
+    await ctx.event("ip_reserved", f"IP {instance.ipv4} reserved in the IPAM")
+
+
+async def _ipam_record_mac(
+    ctx: JobContext, provider: CloudProvider, ref: ProviderRef, instance: Instance
+) -> None:
+    """A row without a pre-assigned MAC learns the one the guest got (best effort)."""
+    ipam = instance.network.get("ipam")
+    if not ipam or ipam.get("mac_preassigned"):
+        return
+    nics = await provider.guest_nics(ref)
+    mac = nics[0].mac if nics else None
+    if mac:
+        await _ipam_call(
+            _ipam_source(ctx).set_mac(ipam["external_id"], hostname=instance.name, mac=mac)
+        )
+
+
+async def _ipam_release(ctx: JobContext, db: AsyncSession, instance: Instance) -> None:
+    ipam = instance.network.get("ipam")
+    if not ipam:
+        return
+    released = await _ipam_call(_ipam_source(ctx).release(
+        ipam["external_id"], hostname=instance.name, clear_mac=not ipam.get("mac_preassigned"),
+    ))
+    if released:
+        await _mirror(db, ipam["external_id"], assigned=False, hostname=None)
+        await ctx.event("ip_released", f"IP {instance.ipv4} released in the IPAM")
+    else:  # someone else changed the row since: leave it to them
+        await ctx.event("ip_not_released", f"IP {instance.ipv4} no longer carries this name")
 
 
 async def _allocate_guest_id(
@@ -141,6 +219,8 @@ async def instance_create(ctx: JobContext) -> dict[str, Any]:
                 await ctx.checkpoint(db)
                 await ctx.event("allocated", f"guest id {ref.key}")
             ref = ProviderRef(instance.provider_ref)
+            # 1b. the address, before anything exists that would use it
+            await _ipam_reserve(ctx, db, instance)
 
             # 2. clone (resumable: wait for a recorded task instead of cloning twice)
             recorded = await ctx.provider_task("clone")
@@ -156,6 +236,7 @@ async def instance_create(ctx: JobContext) -> dict[str, Any]:
             # 3-4. identity/access and size: idempotent, safe to repeat on resume
             await provider.configure_instance(ref, spec)
             await provider.grow_disk(ref, template, instance.root_disk_gb)
+            await _ipam_record_mac(ctx, provider, ref, instance)
             await ctx.event("configured")
 
             # 5. start
@@ -202,6 +283,11 @@ async def instance_create_failed(ctx: JobContext, code: str, message: str) -> No
                 await ctx.event("compensated", "partially created guest destroyed")
             except (ProviderError, JobFailed) as exc:
                 await ctx.event("compensation_failed", str(exc))
+        if await ctx.events("ip_reserved"):
+            try:
+                await _ipam_release(ctx, db, instance)
+            except (RetryLater, JobFailed) as exc:
+                await ctx.event("compensation_failed", f"IP not released: {exc}")
         await _lock_fresh(db, instance)
         instance.state, instance.deleted_at = "error", datetime.now(UTC)
         await audit.record(
@@ -255,6 +341,7 @@ async def instance_delete(ctx: JobContext) -> dict[str, Any]:
             cluster = await db.get_one(ProviderCluster, instance.cluster_id)
             async with ctx.providers.open(db, cluster) as provider:
                 await _destroy(provider, ProviderRef(instance.provider_ref), instance.provider_name)
+        await _ipam_release(ctx, db, instance)
         await _lock_fresh(db, instance)
         instance.state, instance.deleted_at = "deleted", datetime.now(UTC)
         instance.power_state = PowerState.UNKNOWN.value

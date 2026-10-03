@@ -142,6 +142,9 @@ class ProxmoxProvider:
             data["nameserver"] = " ".join(spec.ipv4.dns)
         if spec.tags:
             data["tags"] = ";".join(spec.tags)
+        if spec.nic is not None:
+            current = (await self.client.get(f"{self._path(ref)}/config") or {}).get("net0", "")
+            data["net0"] = mapper.net_with(str(current), spec.nic)
         await self.client.put(f"{self._path(ref)}/config", data)
 
     async def grow_disk(self, ref: ProviderRef, template: ProviderRef, size_gb: int) -> None:

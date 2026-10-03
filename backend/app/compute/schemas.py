@@ -17,7 +17,7 @@ class Input(BaseModel):
 
 
 class IPv4Config(Input):
-    """Static IPv4 typed by the user (no IPAM in the MVP)."""
+    """Static IPv4 typed by the user (servers whose addresses are not in the IPAM)."""
 
     address: str  # "203.0.113.10/28"
     gateway: str
@@ -52,8 +52,30 @@ class InstanceCreate(Input):
     memory_mb: Annotated[int, Field(ge=512, le=262_144, multiple_of=256)]
     root_disk_gb: Annotated[int, Field(ge=1, le=2048)]
     ssh_key_ids: Annotated[list[uuid.UUID], Field(min_length=1, max_length=10)]
-    ipv4: IPv4Config
+    # either an address from the IPAM (GET /zones/{id}/addresses), which also decides
+    # the server, or one typed by hand
+    ipam_address_id: uuid.UUID | None = None
+    dns: Annotated[list[str], Field(max_length=3)] = []  # with ipam_address_id
+    ipv4: IPv4Config | None = None
     tags: Annotated[list[Tag], Field(max_length=10)] = []
+
+    @model_validator(mode="after")
+    def _one_address(self) -> "InstanceCreate":
+        if (self.ipam_address_id is None) == (self.ipv4 is None):
+            raise ValueError("give either ipam_address_id or ipv4")
+        try:
+            self.dns = [str(ipaddress.IPv4Address(d)) for d in self.dns]
+        except ValueError as exc:
+            raise ValueError(f"invalid DNS server: {exc}") from exc
+        return self
+
+
+class FreeAddressOut(BaseModel):
+    """An IPAM address a new instance can take in this zone."""
+
+    id: uuid.UUID
+    address: str  # with prefix, as it will be configured
+    gateway: str
 
 
 class InstanceDelete(Input):

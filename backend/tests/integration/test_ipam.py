@@ -1,39 +1,16 @@
 """Legacy IPAM (awf_ip_pool) copy, matching against guest NICs, network profiles."""
 
-from dataclasses import dataclass, field
-
 import pytest
 
 from app.ipam import service as ipam_service
-from app.ipam.source import PoolRow
 from app.ipam.sync import parse_address
 from app.jobs import handlers  # noqa: F401 - registers job handlers
 from app.jobs.queue import run_one
 from app.providers.base import GuestNic
 from tests.integration.factories import PASSWORD, grant_platform, make_user
+from tests.integration.ipam_fakes import FakeIpamSource, row
 
 pytestmark = [pytest.mark.anyio, pytest.mark.integration]
-
-
-def row(id_, ip, *, assigned=False, mac=None, host=None, node="tagima"):
-    return PoolRow(id=id_, ip_addr=ip, assigned=assigned, mac=mac, host_owner=None,
-                   hostname=host, hypervisor="hv08.sp02.atena.io", node=node, ip_block=None)
-
-
-@dataclass
-class FakeSource:
-    rows: list[PoolRow] = field(default_factory=list)
-    reserved: list[tuple[int, str, str | None]] = field(default_factory=list)
-
-    async def fetch(self):
-        return list(self.rows)
-
-    async def reserve(self, row_id, *, hostname, mac):
-        self.reserved.append((row_id, hostname, mac))
-        return True
-
-    async def release(self, row_id, *, hostname, clear_mac):
-        return True
 
 
 @pytest.fixture
@@ -51,7 +28,7 @@ async def env(owner_db, client, app, registry, fake):
     await client.put(f"/api/v1/admin/clusters/{cid}/credentials", headers=h,
                      json={"token_id": "cloudmgr@pve!cm",
                            "secret": "8c1b7f2e-5a4d-4e8b-9f3c-2d6a1b0e7c55"})
-    source = FakeSource()
+    source = FakeIpamSource()
     ipam_service.configure(source)
 
     async def drain():

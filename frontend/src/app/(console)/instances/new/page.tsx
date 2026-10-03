@@ -52,6 +52,18 @@ export default function NewInstancePage() {
   const [disk, setDisk] = useState<number | "">("");
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const image = images.data?.find((i) => i.id === imageId);
+  // addresses from the IPAM for this zone/image; none -> the IP is typed by hand
+  const addresses = useQuery({
+    queryKey: ["zone-addresses", tenantId, zoneId, imageId],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/v1/zones/{zone_id}/addresses", {
+          params: { path: { zone_id: zoneId }, query: imageId ? { image_id: imageId } : {} },
+        }),
+      ),
+    enabled: tenantId !== null && zoneId !== "",
+  });
+  const fromIpam = (addresses.data?.length ?? 0) > 0;
   const diskGb = disk === "" ? (image?.min_disk_gb ?? 0) : disk;
 
   // what this request would use, against what is left
@@ -91,11 +103,15 @@ export default function NewInstancePage() {
         memory_mb: memoryGb * 1024,
         root_disk_gb: diskGb,
         ssh_key_ids: selectedKeys,
-        ipv4: {
-          address: String(form.get("address")).trim(),
-          gateway: String(form.get("gateway")).trim(),
-          dns,
-        },
+        ...(fromIpam
+          ? { ipam_address_id: String(form.get("ipam_address_id")), dns }
+          : {
+              ipv4: {
+                address: String(form.get("address")).trim(),
+                gateway: String(form.get("gateway")).trim(),
+                dns,
+              },
+            }),
       },
     });
   }
@@ -253,22 +269,50 @@ export default function NewInstancePage() {
         </Card>
 
         <Card title="Rede">
-          <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
-            IP fixo configurado pelo cloud-init. A plataforma impede IPs repetidos entre as
-            instâncias dela, mas <strong>não</strong> detecta IPs usados fora dela: confira com o
-            responsável pela rede.
-          </p>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Endereço/prefixo">
-              <Input name="address" required placeholder="203.0.113.10/28" />
-            </Field>
-            <Field label="Gateway">
-              <Input name="gateway" required placeholder="203.0.113.14" />
-            </Field>
-            <Field label="DNS (opcional)" hint="Até 3, separados por espaço.">
-              <Input name="dns" placeholder="1.1.1.1 8.8.8.8" />
-            </Field>
-          </div>
+          {fromIpam ? (
+            <>
+              <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
+                IPs livres no cadastro de IPs desta zona. O escolhido é reservado no cadastro ao
+                criar e liberado ao excluir a instância; gateway, máscara e VLAN vêm da rede dele.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="IP" hint={`${addresses.data!.length} livre(s)`}>
+                  <Select name="ipam_address_id" className="w-full" required defaultValue="" key={`${zoneId}-${imageId}`}>
+                    <option value="" disabled>
+                      Selecione…
+                    </option>
+                    {addresses.data!.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.address} (gw {a.gateway})
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="DNS (opcional)" hint="Padrão: 8.8.8.8 1.1.1.1">
+                  <Input name="dns" placeholder="8.8.8.8 1.1.1.1" />
+                </Field>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
+                IP fixo configurado pelo cloud-init. Os servidores desta zona não têm IPs no cadastro:
+                a plataforma impede IPs repetidos entre as instâncias dela, mas <strong>não</strong>{" "}
+                detecta IPs usados fora dela. Confira com o responsável pela rede.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Endereço/prefixo">
+                  <Input name="address" required placeholder="203.0.113.10/28" />
+                </Field>
+                <Field label="Gateway">
+                  <Input name="gateway" required placeholder="203.0.113.14" />
+                </Field>
+                <Field label="DNS (opcional)" hint="Até 3, separados por espaço.">
+                  <Input name="dns" placeholder="1.1.1.1 8.8.8.8" />
+                </Field>
+              </div>
+            </>
+          )}
         </Card>
 
         <Card title="Chaves SSH">

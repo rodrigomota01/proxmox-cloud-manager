@@ -15,6 +15,7 @@ from app.compute.schemas import (
     DashboardSummary,
     DiskUsageOut,
     FilesystemOut,
+    FreeAddressOut,
     InstanceAccepted,
     InstanceCreate,
     InstanceDelete,
@@ -225,6 +226,15 @@ def top_instance_out(e: TopEntry) -> TopInstanceOut:
         cpu_usage=i.cpu_usage, disk_usage=i.disk_usage,
         net_in_bps=i.net_in_bps, net_out_bps=i.net_out_bps,
     )
+
+
+@router.get("/zones/{zone_id}/addresses", tags=["instances"])
+async def free_addresses(
+    zone_id: uuid.UUID, ctx: CurrentTenant, db: DbSession, image_id: uuid.UUID | None = None
+) -> list[FreeAddressOut]:
+    """IPAM addresses a new instance can take in the zone (empty: type the IP by hand)."""
+    offers = await ComputeService(db, ctx).free_addresses(zone_id, image_id)
+    return [FreeAddressOut(id=o.address.id, address=o.cidr, gateway=o.gateway) for o in offers]
 
 
 @router.get("/dashboard/usage", tags=["dashboard"])

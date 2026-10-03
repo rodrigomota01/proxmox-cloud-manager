@@ -9,6 +9,7 @@ from app.providers.base import (
     InstanceObservation,
     Inventory,
     MetricPoint,
+    NicSpec,
     NodeInfo,
     NodeMetricPoint,
     PowerState,
@@ -254,3 +255,29 @@ def nics(config: dict[str, Any], pve_type: str) -> list[GuestNic]:
         out.append(GuestNic(key, mac.lower() if mac else None, fields.get("bridge"),
                             int(tag) if tag and tag.isdigit() else None, ip, gw))
     return out
+
+
+def net_with(current: str, nic: NicSpec) -> str:
+    """Rewrite a VM netN spec ('virtio=MAC,bridge=vmbr0,firewall=1') with the given MAC,
+    bridge and VLAN, keeping the model and every other option."""
+    parts = [p for p in current.split(",") if p]
+    out: list[str] = []
+    seen_model = False
+    for part in parts:
+        key = part.partition("=")[0]
+        if key in _NIC_MODELS and not seen_model:
+            seen_model = True
+            out.append(f"{key}={nic.mac.upper()}" if nic.mac else part)
+        elif key == "bridge" and nic.bridge:
+            out.append(f"bridge={nic.bridge}")
+        elif key == "tag" and nic.vlan:
+            continue  # re-added below
+        else:
+            out.append(part)
+    if not seen_model:
+        out.insert(0, f"virtio={nic.mac.upper()}" if nic.mac else "virtio")
+    if nic.bridge and not any(p.startswith("bridge=") for p in out):
+        out.append(f"bridge={nic.bridge}")
+    if nic.vlan:
+        out.append(f"tag={nic.vlan}")
+    return ",".join(out)

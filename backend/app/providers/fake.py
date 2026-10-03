@@ -181,6 +181,12 @@ class FakeProvider:
         self.instances[ref.key] = replace(
             obs, name=spec.name, vcpus=spec.vcpus, memory_mb=spec.memory_mb, tags=spec.tags
         )
+        generated = f"bc:24:11:00:{int(ref.key) % 256:02x}:01"  # like PVE's random MACs
+        mac = spec.nic.mac if spec.nic and spec.nic.mac else generated
+        self.nics[ref.key] = [GuestNic(
+            "net0", mac.lower(), spec.nic.bridge if spec.nic else "vmbr0",
+            spec.nic.vlan if spec.nic else None, spec.ipv4.address, spec.ipv4.gateway,
+        )]
 
     async def grow_disk(self, ref: ProviderRef, template: ProviderRef, size_gb: int) -> None:
         self._check()

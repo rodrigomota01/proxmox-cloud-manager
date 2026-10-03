@@ -2491,6 +2491,31 @@
         "title": "ForgotPasswordRequest",
         "type": "object"
       },
+      "FreeAddressOut": {
+        "description": "An IPAM address a new instance can take in this zone.",
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "gateway": {
+            "title": "Gateway",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "address",
+          "gateway"
+        ],
+        "title": "FreeAddressOut",
+        "type": "object"
+      },
       "GuestRef": {
         "properties": {
           "id": {
@@ -2530,7 +2555,7 @@
       },
       "IPv4Config": {
         "additionalProperties": false,
-        "description": "Static IPv4 typed by the user (no IPAM in the MVP).",
+        "description": "Static IPv4 typed by the user (servers whose addresses are not in the IPAM).",
         "properties": {
           "address": {
             "title": "Address",
@@ -2804,13 +2829,41 @@
       "InstanceCreate": {
         "additionalProperties": false,
         "properties": {
+          "dns": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Dns",
+            "type": "array"
+          },
           "image_id": {
             "format": "uuid",
             "title": "Image Id",
             "type": "string"
           },
+          "ipam_address_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ipam Address Id"
+          },
           "ipv4": {
-            "$ref": "#/components/schemas/IPv4Config"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IPv4Config"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "memory_mb": {
             "maximum": 262144.0,
@@ -2875,8 +2928,7 @@
           "vcpus",
           "memory_mb",
           "root_disk_gb",
-          "ssh_key_ids",
-          "ipv4"
+          "ssh_key_ids"
         ],
         "title": "InstanceCreate",
         "type": "object"
@@ -10870,6 +10922,71 @@
         "summary": "Remove Member",
         "tags": [
           "members"
+        ]
+      }
+    },
+    "/api/v1/zones/{zone_id}/addresses": {
+      "get": {
+        "description": "IPAM addresses a new instance can take in the zone (empty: type the IP by hand).",
+        "operationId": "free_addresses_api_v1_zones__zone_id__addresses_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "zone_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Zone Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "image_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Image Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FreeAddressOut"
+                  },
+                  "title": "Response Free Addresses Api V1 Zones  Zone Id  Addresses Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Free Addresses",
+        "tags": [
+          "instances"
         ]
       }
     }

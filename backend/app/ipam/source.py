@@ -33,6 +33,7 @@ class PoolRow:
 class IpamSource(Protocol):
     async def fetch(self) -> list[PoolRow]: ...
     async def reserve(self, row_id: int, *, hostname: str, mac: str | None) -> bool: ...
+    async def set_mac(self, row_id: int, *, hostname: str, mac: str) -> bool: ...
     async def release(self, row_id: int, *, hostname: str, clear_mac: bool) -> bool: ...
 
 
@@ -89,6 +90,15 @@ class MysqlIpamSource:
             "assigned_to_macaddr = COALESCE(NULLIF(assigned_to_macaddr, ''), %s) "
             "WHERE id = %s AND (assigned = 0 OR assigned IS NULL)",
             (hostname, mac, row_id),
+        )
+        return count == 1
+
+    async def set_mac(self, row_id: int, *, hostname: str, mac: str) -> bool:
+        """Record the MAC the new guest got, on a row we hold that had none."""
+        _, count = await self._execute(
+            "UPDATE awf_ip_pool SET assigned_to_macaddr = %s WHERE id = %s "
+            "AND hostname_lease = %s AND (assigned_to_macaddr IS NULL OR assigned_to_macaddr = '')",
+            (mac, row_id, hostname),
         )
         return count == 1
 

@@ -1543,6 +1543,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/zones/{zone_id}/addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Free Addresses
+         * @description IPAM addresses a new instance can take in the zone (empty: type the IP by hand).
+         */
+        get: operations["free_addresses_api_v1_zones__zone_id__addresses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2411,6 +2431,21 @@ export interface components {
             /** Email */
             email: string;
         };
+        /**
+         * FreeAddressOut
+         * @description An IPAM address a new instance can take in this zone.
+         */
+        FreeAddressOut: {
+            /** Address */
+            address: string;
+            /** Gateway */
+            gateway: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
         /** GuestRef */
         GuestRef: {
             /**
@@ -2430,7 +2465,7 @@ export interface components {
         };
         /**
          * IPv4Config
-         * @description Static IPv4 typed by the user (no IPAM in the MVP).
+         * @description Static IPv4 typed by the user (servers whose addresses are not in the IPAM).
          */
         IPv4Config: {
             /** Address */
@@ -2545,11 +2580,18 @@ export interface components {
         /** InstanceCreate */
         InstanceCreate: {
             /**
+             * Dns
+             * @default []
+             */
+            dns?: string[];
+            /**
              * Image Id
              * Format: uuid
              */
             image_id: string;
-            ipv4: components["schemas"]["IPv4Config"];
+            /** Ipam Address Id */
+            ipam_address_id?: string | null;
+            ipv4?: components["schemas"]["IPv4Config"] | null;
             /** Memory Mb */
             memory_mb: number;
             /** Name */
@@ -7075,6 +7117,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    free_addresses_api_v1_zones__zone_id__addresses_get: {
+        parameters: {
+            query?: {
+                image_id?: string | null;
+            };
+            header?: never;
+            path: {
+                zone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FreeAddressOut"][];
+                };
             };
             /** @description Validation Error */
             422: {

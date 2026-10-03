@@ -14,6 +14,8 @@ from sqlalchemy import select
 from app.audit.models import AuditLog
 from app.compute.models import Instance
 from app.infra.secrets import LocalKek
+from app.ipam import service as ipam_service
+from app.ipam.sync import sync_ipam
 from app.jobs import handlers  # noqa: F401 - registers job handlers
 from app.jobs.models import Job, JobEvent
 from app.jobs.queue import run_one
@@ -29,6 +31,7 @@ from tests.integration.factories import (
     make_tenant,
     make_user,
 )
+from tests.integration.ipam_fakes import FakeIpamSource, row
 
 pytestmark = [pytest.mark.anyio, pytest.mark.integration]
 
@@ -623,3 +626,112 @@ async def test_sync_during_a_power_operation_does_not_break_it(client, env, fake
     assert job.status == "succeeded", job.error_message
     row = await owner_db.get(Instance, iid, populate_existing=True)
     assert row.power_state == "stopped"
+
+
+# --- addresses from the IPAM (ADR-0014) ---------------------------------------------------
+
+
+@pytest.fixture
+async def ipam(env, app):
+    source = FakeIpamSource(rows=[
+        row(1, "152.236.18.25/31"),                                   # /31: own gateway
+        row(2, "177.54.151.133", mac="66:84:60:b8:38:61"),            # failover vMAC
+        row(3, "177.54.151.134"),
+        row(4, "198.51.100.7"),                                        # no network profile
+        row(5, "177.54.151.140", assigned=True, host="someone"),
+    ])
+    ipam_service.configure(source)
+    root = await env.h("root")
+    r = await env.client.post(f"/api/v1/admin/clusters/{env.cluster}/ipam/networks", headers=root,
+                              json={"cidr": "177.54.151.0/24", "gateway": "177.54.151.1",
+                                    "vlan": 151, "bridge": "vmbr0"})
+    assert r.status_code == 201, r.text
+    await env.client.post(f"/api/v1/admin/clusters/{env.cluster}/sync", headers=root)
+    await env.drain()  # nodes known: addresses get tied to the server by node name
+    await sync_ipam(app.state.sessionmaker, source)
+    yield source
+    ipam_service.configure(None)
+
+
+async def _free(env) -> dict[str, dict]:
+    r = await env.client.get(f"/api/v1/zones/{env.zone}/addresses?image_id={env.image}",
+                             headers=await env.h("alice", env.acme))
+    assert r.status_code == 200, r.text
+    return {a["address"]: a for a in r.json()}
+
+
+async def test_free_addresses_are_offered_configured(env, ipam):
+    free = await _free(env)
+    # 198.51.100.7 has no profile (cannot configure it); .140 is taken
+    assert sorted(free) == ["152.236.18.25/31", "177.54.151.133/24", "177.54.151.134/24"]
+    assert free["152.236.18.25/31"]["gateway"] == "152.236.18.24"
+    assert free["177.54.151.133/24"]["gateway"] == "177.54.151.1"
+
+
+async def test_create_with_ipam_address_reserves_configures_and_releases(
+    client, env, fake, ipam, owner_db
+):
+    key_id, _ = await env.add_key("alice")
+    free = await _free(env)
+    body = env.body(key_id, ipam_address_id=free["177.54.151.133/24"]["id"])
+    del body["ipv4"]
+    r = await env.create("alice", body)
+    assert r.status_code == 202, r.text
+    inst = r.json()["instance"]
+    assert inst["ipv4"] == "177.54.151.133/24" and inst["gateway"] == "177.54.151.1"
+    assert "177.54.151.133/24" not in await _free(env)  # held while provisioning
+
+    await env.drain()
+    h = await env.h("alice", env.acme)
+    job = (await client.get(f"/api/v1/jobs/{r.json()['job']['id']}", headers=h)).json()
+    assert job["status"] == "succeeded", job
+    assert ("reserve", 2, "web-01") in ipam.calls
+    spec = fake.configured["10000"]
+    assert (spec.nic.mac, spec.nic.vlan, spec.nic.bridge) == ("66:84:60:b8:38:61", 151, "vmbr0")
+    assert spec.ipv4.address == "177.54.151.133/24" and spec.ipv4.dns == ("8.8.8.8", "1.1.1.1")
+    assert not any(c[0] == "set_mac" for c in ipam.calls)  # the vMAC was already there
+
+    r = await client.request("DELETE", f"/api/v1/instances/{inst['id']}", headers=h,
+                             json={"confirm": "web-01"})
+    assert r.status_code == 202
+    await env.drain()
+    assert ("release", 2, False) in ipam.calls  # vMAC kept: it belongs to the IP
+    assert ipam.rows[1].assigned is False and ipam.rows[1].mac == "66:84:60:b8:38:61"
+
+
+async def test_slash31_address_learns_the_guest_mac(client, env, fake, ipam):
+    key_id, _ = await env.add_key("alice")
+    free = await _free(env)
+    body = {**env.body(key_id, ipam_address_id=free["152.236.18.25/31"]["id"])}
+    del body["ipv4"]
+    await env.create("alice", body)
+    await env.drain()
+    spec = fake.configured["10000"]
+    assert spec.ipv4.address == "152.236.18.25/31" and spec.ipv4.gateway == "152.236.18.24"
+    assert spec.nic is None  # nothing to force on the NIC
+    assert ("set_mac", 1, fake.nics["10000"][0].mac) in ipam.calls
+
+
+async def test_address_taken_elsewhere_fails_before_cloning(client, env, fake, ipam, owner_db):
+    key_id, _ = await env.add_key("alice")
+    free = await _free(env)
+    ipam.refuse = {3}  # another system wins the race in MySQL
+    body = env.body(key_id, ipam_address_id=free["177.54.151.134/24"]["id"])
+    del body["ipv4"]
+    r = await env.create("alice", body)
+    await env.drain()
+    job = (await client.get(f"/api/v1/jobs/{r.json()['job']['id']}",
+                            headers=await env.h("alice", env.acme))).json()
+    assert job["status"] == "failed" and job["error_code"] == "IP_TAKEN"
+    assert fake.instances == {}  # never cloned
+    assert not any(c[0] == "release" for c in ipam.calls)  # nothing of ours to free
+
+
+async def test_address_and_typed_ip_are_exclusive(env, ipam):
+    key_id, _ = await env.add_key("alice")
+    free = await _free(env)
+    both = env.body(key_id, ipam_address_id=free["177.54.151.134/24"]["id"])
+    assert (await env.create("alice", both)).status_code == 422
+    neither = env.body(key_id)
+    del neither["ipv4"]
+    assert (await env.create("alice", neither)).status_code == 422
