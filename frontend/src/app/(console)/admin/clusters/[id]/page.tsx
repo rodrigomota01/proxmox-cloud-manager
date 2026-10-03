@@ -225,7 +225,7 @@ export default function ClusterDetailPage() {
         </Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold">{c.name}</h1>
+            <NameEditor clusterId={c.id} name={c.name} />
             <ClusterStatus status={c.status} />
           </div>
           <div className="flex items-center gap-2">
@@ -334,6 +334,54 @@ export default function ClusterDetailPage() {
 
       <AdoptDialog instance={adopting} onClose={() => setAdopting(null)} />
     </div>
+  );
+}
+
+/** The cluster name is an admin label (tenants never see it); safe to change. */
+function NameEditor({ clusterId, name }: { clusterId: string; name: string }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(name);
+  const save = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.PATCH("/api/v1/admin/clusters/{cluster_id}", {
+          params: { path: { cluster_id: clusterId } },
+          body: { name: value.trim() },
+        }),
+      ),
+    onSuccess: () => {
+      setEditing(false);
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+  if (!editing) {
+    return (
+      <span className="flex items-center gap-2">
+        <h1 className="text-lg font-semibold">{name}</h1>
+        <Button variant="ghost" onClick={() => setEditing(true)}>
+          Renomear
+        </Button>
+      </span>
+    );
+  }
+  return (
+    <form
+      className="flex items-center gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      <Input aria-label="Nome do cluster" className="w-48" value={value} maxLength={64} required autoFocus onChange={(e) => setValue(e.target.value)} />
+      <Button type="submit" disabled={save.isPending || !value.trim() || value.trim() === name}>
+        Salvar
+      </Button>
+      <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
+        Cancelar
+      </Button>
+      {save.isError && <span className="text-xs text-rose-600">{errorMessage(save.error)}</span>}
+    </form>
   );
 }
 
