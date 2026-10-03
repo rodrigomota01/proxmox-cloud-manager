@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { Button, Select } from "@/components/ui";
 import { logout } from "@/lib/auth/session";
-import { SessionProvider, useSession } from "@/lib/session";
+import { SessionProvider, usePermissions, useSession } from "@/lib/session";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
@@ -18,7 +18,7 @@ const ADMIN_NAV = [
   { href: "/admin/regions", label: "Regiões e zonas" },
   { href: "/admin/clusters", label: "Clusters" },
   { href: "/admin/images", label: "Imagens" },
-  { href: "/admin/tenants", label: "Tenants e quotas" },
+  { href: "/admin/tenants", label: "Clientes e quotas" },
   { href: "/admin/users", label: "Usuários" },
 ];
 
@@ -42,6 +42,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
 function Shell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { me, tenants, tenantId, selectTenant, isPlatformAdmin } = useSession();
+  const tenantPerms = usePermissions(tenantId ? `tenant:${tenantId}` : null);
 
   async function signOut() {
     await logout();
@@ -57,6 +58,17 @@ function Shell({ children }: { children: React.ReactNode }) {
             <NavLink key={item.href} {...item} />
           ))}
         </nav>
+        {tenantId && (
+          <>
+            <div className="mt-6 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Organização
+            </div>
+            <nav className="space-y-1">
+              <NavLink href="/projects" label="Projetos" />
+              {tenantPerms.has("member:manage") && <NavLink href="/members" label="Membros" />}
+            </nav>
+          </>
+        )}
         {isPlatformAdmin && (
           <>
             <div className="mt-6 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -75,7 +87,9 @@ function Shell({ children }: { children: React.ReactNode }) {
         <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 py-3 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-slate-500">Tenant</span>
-            {tenants.length > 0 ? (
+            {tenants.length === 1 ? (
+              <span className="font-medium">{tenants[0].name}</span>
+            ) : tenants.length > 0 ? (
               <Select
                 aria-label="Tenant ativo"
                 value={tenantId ?? ""}
