@@ -173,3 +173,41 @@ class MetricPointOut(BaseModel):
 class MetricsOut(BaseModel):
     range: str
     points: list[MetricPointOut]
+
+
+class TopInstanceOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    kind: str
+    project_id: uuid.UUID | None
+    value: float  # cpu/memory/disk: 0..1; network: bytes/s (in + out)
+    vcpus: int
+    memory_mb: int
+    memory_used_mb: int
+    cpu_usage: float
+    disk_usage: float | None
+    net_in_bps: float
+    net_out_bps: float
+
+
+class TopInstancesOut(BaseModel):
+    cpu: list[TopInstanceOut]
+    memory: list[TopInstanceOut]
+    disk: list[TopInstanceOut]
+    network: list[TopInstanceOut]
+
+
+class UsageOut(BaseModel):
+    """Live usage of the running instances in view (as of the last sync)."""
+
+    instances_running: int
+    vcpus: int
+    cpu_used_vcpus: float  # busy vCPUs: sum of usage x size
+    memory_mb: int
+    memory_used_mb: int
+    disk_total_bytes: int  # only guests whose disk usage is known (see disk_known)
+    disk_used_bytes: int
+    disk_known: int
+    net_in_bps: float
+    net_out_bps: float
+    top: TopInstancesOut

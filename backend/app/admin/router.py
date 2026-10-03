@@ -8,9 +8,13 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import any_, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin.schemas import (
     AdminInstanceOut,
+    AdminTopInstanceOut,
+    AdminTopInstancesOut,
+    AdminUsageOut,
     AdoptRequest,
     BulkAdoptRequest,
     ClusterCreate,
@@ -20,10 +24,12 @@ from app.admin.schemas import (
     ConnectionTest,
     CredentialsOut,
     CredentialsPut,
+    InfraTotalsOut,
     NodeBase,
     NodeMetricPointOut,
     NodeMetricsOut,
     NodeOut,
+    OverviewOut,
     StorageOut,
     SyncRunOut,
 )
@@ -38,7 +44,9 @@ from app.api.deps import (
 )
 from app.audit import service as audit
 from app.compute.models import Instance, operable
+from app.compute.router import top_instance_out
 from app.compute.schemas import Accepted, JobOut, QuotaLineOut
+from app.compute.usage import TopEntry, tenant_ids, usage
 from app.core.errors import NotFound, ProviderUnavailableError
 from app.inventory.models import (
     Node,
@@ -293,6 +301,52 @@ async def node_metrics(
 async def list_storage(_: ClusterManager, db: DbSession) -> list[StorageOut]:
     pools = (await db.execute(select(StoragePool).order_by(StoragePool.name))).scalars()
     return [StorageOut.model_validate(p, from_attributes=True) for p in pools]
+
+
+@router.get("/overview")
+async def overview(
+    _: NodeViewer, db: DbSession, tenant_id: uuid.UUID | None = None
+) -> OverviewOut:
+    """Live usage of every guest (or one tenant's) and, platform-wide, the hosts."""
+    conditions = [Instance.tenant_id == tenant_id] if tenant_id else []
+    u = await usage(db, *conditions)
+    rows = await db.execute(
+        select(Tenant.id, Tenant.name).where(Tenant.id.in_(tenant_ids(u.top)))
+    )
+    names: dict[uuid.UUID, str] = {tid: name for tid, name in rows.all()}
+
+    def top_out(e: TopEntry) -> AdminTopInstanceOut:
+        i = e.instance
+        return AdminTopInstanceOut(
+            **top_instance_out(e).model_dump(), tenant_id=i.tenant_id,
+            tenant_name=names.get(i.tenant_id) if i.tenant_id else None,
+            node_id=i.node_id, managed=i.managed,
+        )
+
+    return OverviewOut(
+        usage=AdminUsageOut(
+            **u.totals(),
+            top=AdminTopInstancesOut(**{k: [top_out(e) for e in v] for k, v in u.top.items()}),
+        ),
+        infra=None if tenant_id else await _infra_totals(db),
+    )
+
+
+async def _infra_totals(db: AsyncSession) -> InfraTotalsOut:
+    nodes = list((await db.execute(select(Node))).scalars())
+    online = [n for n in nodes if n.status == "online"]
+    cores = sum(n.cpu_count for n in online)
+    storage: dict[tuple[uuid.UUID, str], StoragePool] = {}
+    for p in (await db.execute(select(StoragePool).where(StoragePool.active))).scalars():
+        storage[(p.cluster_id, p.name if p.shared else f"{p.node}/{p.name}")] = p
+    return InfraTotalsOut(
+        nodes_online=len(online), nodes_total=len(nodes), cores=cores,
+        cpu_usage=sum(n.cpu_usage * n.cpu_count for n in online) / cores if cores else 0.0,
+        memory_bytes=sum(n.memory_bytes for n in online),
+        memory_used_bytes=sum(n.memory_used_bytes for n in online),
+        storage_total_bytes=sum(p.total_bytes for p in storage.values()),
+        storage_used_bytes=sum(p.used_bytes for p in storage.values()),
+    )
 
 
 @router.get("/instances")

@@ -504,6 +504,235 @@
         "title": "AdminRegionOut",
         "type": "object"
       },
+      "AdminTopInstanceOut": {
+        "properties": {
+          "cpu_usage": {
+            "title": "Cpu Usage",
+            "type": "number"
+          },
+          "disk_usage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Usage"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "managed": {
+            "title": "Managed",
+            "type": "boolean"
+          },
+          "memory_mb": {
+            "title": "Memory Mb",
+            "type": "integer"
+          },
+          "memory_used_mb": {
+            "title": "Memory Used Mb",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "net_in_bps": {
+            "title": "Net In Bps",
+            "type": "number"
+          },
+          "net_out_bps": {
+            "title": "Net Out Bps",
+            "type": "number"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "tenant_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Name"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          },
+          "vcpus": {
+            "title": "Vcpus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "project_id",
+          "value",
+          "vcpus",
+          "memory_mb",
+          "memory_used_mb",
+          "cpu_usage",
+          "disk_usage",
+          "net_in_bps",
+          "net_out_bps",
+          "tenant_id",
+          "tenant_name",
+          "node_id",
+          "managed"
+        ],
+        "title": "AdminTopInstanceOut",
+        "type": "object"
+      },
+      "AdminTopInstancesOut": {
+        "properties": {
+          "cpu": {
+            "items": {
+              "$ref": "#/components/schemas/AdminTopInstanceOut"
+            },
+            "title": "Cpu",
+            "type": "array"
+          },
+          "disk": {
+            "items": {
+              "$ref": "#/components/schemas/AdminTopInstanceOut"
+            },
+            "title": "Disk",
+            "type": "array"
+          },
+          "memory": {
+            "items": {
+              "$ref": "#/components/schemas/AdminTopInstanceOut"
+            },
+            "title": "Memory",
+            "type": "array"
+          },
+          "network": {
+            "items": {
+              "$ref": "#/components/schemas/AdminTopInstanceOut"
+            },
+            "title": "Network",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cpu",
+          "memory",
+          "disk",
+          "network"
+        ],
+        "title": "AdminTopInstancesOut",
+        "type": "object"
+      },
+      "AdminUsageOut": {
+        "properties": {
+          "cpu_used_vcpus": {
+            "title": "Cpu Used Vcpus",
+            "type": "number"
+          },
+          "disk_known": {
+            "title": "Disk Known",
+            "type": "integer"
+          },
+          "disk_total_bytes": {
+            "title": "Disk Total Bytes",
+            "type": "integer"
+          },
+          "disk_used_bytes": {
+            "title": "Disk Used Bytes",
+            "type": "integer"
+          },
+          "instances_running": {
+            "title": "Instances Running",
+            "type": "integer"
+          },
+          "memory_mb": {
+            "title": "Memory Mb",
+            "type": "integer"
+          },
+          "memory_used_mb": {
+            "title": "Memory Used Mb",
+            "type": "integer"
+          },
+          "net_in_bps": {
+            "title": "Net In Bps",
+            "type": "number"
+          },
+          "net_out_bps": {
+            "title": "Net Out Bps",
+            "type": "number"
+          },
+          "top": {
+            "$ref": "#/components/schemas/AdminTopInstancesOut"
+          },
+          "vcpus": {
+            "title": "Vcpus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "instances_running",
+          "vcpus",
+          "cpu_used_vcpus",
+          "memory_mb",
+          "memory_used_mb",
+          "disk_total_bytes",
+          "disk_used_bytes",
+          "disk_known",
+          "net_in_bps",
+          "net_out_bps",
+          "top"
+        ],
+        "title": "AdminUsageOut",
+        "type": "object"
+      },
       "AdminUserDetail": {
         "properties": {
           "active_sessions": {
@@ -1657,6 +1886,55 @@
           }
         },
         "title": "ImageUpdate",
+        "type": "object"
+      },
+      "InfraTotalsOut": {
+        "description": "Physical capacity and what the hosts report as used (online nodes only).",
+        "properties": {
+          "cores": {
+            "title": "Cores",
+            "type": "integer"
+          },
+          "cpu_usage": {
+            "title": "Cpu Usage",
+            "type": "number"
+          },
+          "memory_bytes": {
+            "title": "Memory Bytes",
+            "type": "integer"
+          },
+          "memory_used_bytes": {
+            "title": "Memory Used Bytes",
+            "type": "integer"
+          },
+          "nodes_online": {
+            "title": "Nodes Online",
+            "type": "integer"
+          },
+          "nodes_total": {
+            "title": "Nodes Total",
+            "type": "integer"
+          },
+          "storage_total_bytes": {
+            "title": "Storage Total Bytes",
+            "type": "integer"
+          },
+          "storage_used_bytes": {
+            "title": "Storage Used Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "nodes_online",
+          "nodes_total",
+          "cores",
+          "cpu_usage",
+          "memory_bytes",
+          "memory_used_bytes",
+          "storage_total_bytes",
+          "storage_used_bytes"
+        ],
+        "title": "InfraTotalsOut",
         "type": "object"
       },
       "InstanceAccepted": {
@@ -2859,6 +3137,29 @@
         "title": "NodeOut",
         "type": "object"
       },
+      "OverviewOut": {
+        "properties": {
+          "infra": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InfraTotalsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "usage": {
+            "$ref": "#/components/schemas/AdminUsageOut"
+          }
+        },
+        "required": [
+          "usage",
+          "infra"
+        ],
+        "title": "OverviewOut",
+        "type": "object"
+      },
       "Page_AdminUserOut_": {
         "properties": {
           "items": {
@@ -3886,6 +4187,193 @@
           "expires_in"
         ],
         "title": "TokenResponse",
+        "type": "object"
+      },
+      "TopInstanceOut": {
+        "properties": {
+          "cpu_usage": {
+            "title": "Cpu Usage",
+            "type": "number"
+          },
+          "disk_usage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disk Usage"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "memory_mb": {
+            "title": "Memory Mb",
+            "type": "integer"
+          },
+          "memory_used_mb": {
+            "title": "Memory Used Mb",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "net_in_bps": {
+            "title": "Net In Bps",
+            "type": "number"
+          },
+          "net_out_bps": {
+            "title": "Net Out Bps",
+            "type": "number"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          },
+          "vcpus": {
+            "title": "Vcpus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "project_id",
+          "value",
+          "vcpus",
+          "memory_mb",
+          "memory_used_mb",
+          "cpu_usage",
+          "disk_usage",
+          "net_in_bps",
+          "net_out_bps"
+        ],
+        "title": "TopInstanceOut",
+        "type": "object"
+      },
+      "TopInstancesOut": {
+        "properties": {
+          "cpu": {
+            "items": {
+              "$ref": "#/components/schemas/TopInstanceOut"
+            },
+            "title": "Cpu",
+            "type": "array"
+          },
+          "disk": {
+            "items": {
+              "$ref": "#/components/schemas/TopInstanceOut"
+            },
+            "title": "Disk",
+            "type": "array"
+          },
+          "memory": {
+            "items": {
+              "$ref": "#/components/schemas/TopInstanceOut"
+            },
+            "title": "Memory",
+            "type": "array"
+          },
+          "network": {
+            "items": {
+              "$ref": "#/components/schemas/TopInstanceOut"
+            },
+            "title": "Network",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cpu",
+          "memory",
+          "disk",
+          "network"
+        ],
+        "title": "TopInstancesOut",
+        "type": "object"
+      },
+      "UsageOut": {
+        "description": "Live usage of the running instances in view (as of the last sync).",
+        "properties": {
+          "cpu_used_vcpus": {
+            "title": "Cpu Used Vcpus",
+            "type": "number"
+          },
+          "disk_known": {
+            "title": "Disk Known",
+            "type": "integer"
+          },
+          "disk_total_bytes": {
+            "title": "Disk Total Bytes",
+            "type": "integer"
+          },
+          "disk_used_bytes": {
+            "title": "Disk Used Bytes",
+            "type": "integer"
+          },
+          "instances_running": {
+            "title": "Instances Running",
+            "type": "integer"
+          },
+          "memory_mb": {
+            "title": "Memory Mb",
+            "type": "integer"
+          },
+          "memory_used_mb": {
+            "title": "Memory Used Mb",
+            "type": "integer"
+          },
+          "net_in_bps": {
+            "title": "Net In Bps",
+            "type": "number"
+          },
+          "net_out_bps": {
+            "title": "Net Out Bps",
+            "type": "number"
+          },
+          "top": {
+            "$ref": "#/components/schemas/TopInstancesOut"
+          },
+          "vcpus": {
+            "title": "Vcpus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "instances_running",
+          "vcpus",
+          "cpu_used_vcpus",
+          "memory_mb",
+          "memory_used_mb",
+          "disk_total_bytes",
+          "disk_used_bytes",
+          "disk_known",
+          "net_in_bps",
+          "net_out_bps",
+          "top"
+        ],
+        "title": "UsageOut",
         "type": "object"
       },
       "UserCreate": {
@@ -5287,6 +5775,57 @@
         ]
       }
     },
+    "/api/v1/admin/overview": {
+      "get": {
+        "description": "Live usage of every guest (or one tenant's) and, platform-wide, the hosts.",
+        "operationId": "overview_api_v1_admin_overview_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tenant_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tenant Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Overview",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/regions": {
       "get": {
         "operationId": "admin_list_regions_api_v1_admin_regions_get",
@@ -6341,6 +6880,37 @@
           }
         },
         "summary": "Dashboard",
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/api/v1/dashboard/usage": {
+      "get": {
+        "operationId": "dashboard_usage_api_v1_dashboard_usage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dashboard Usage",
         "tags": [
           "dashboard"
         ]

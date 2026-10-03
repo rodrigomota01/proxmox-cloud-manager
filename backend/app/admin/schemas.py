@@ -5,6 +5,8 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, field_validator
 
+from app.compute.schemas import TopInstanceOut
+
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64)]
 # user@realm!tokenid (Proxmox API token id)
 TokenId = Annotated[
@@ -232,3 +234,49 @@ class BulkAdoptRequest(Input):
 
 class Confirm(Input):
     confirm: str
+
+
+class AdminTopInstanceOut(TopInstanceOut):
+    tenant_id: uuid.UUID | None
+    tenant_name: str | None  # None: discovered, not adopted by any tenant yet
+    node_id: uuid.UUID | None
+    managed: bool
+
+
+class AdminTopInstancesOut(BaseModel):
+    cpu: list[AdminTopInstanceOut]
+    memory: list[AdminTopInstanceOut]
+    disk: list[AdminTopInstanceOut]
+    network: list[AdminTopInstanceOut]
+
+
+class AdminUsageOut(BaseModel):
+    instances_running: int
+    vcpus: int
+    cpu_used_vcpus: float
+    memory_mb: int
+    memory_used_mb: int
+    disk_total_bytes: int
+    disk_used_bytes: int
+    disk_known: int
+    net_in_bps: float
+    net_out_bps: float
+    top: AdminTopInstancesOut
+
+
+class InfraTotalsOut(BaseModel):
+    """Physical capacity and what the hosts report as used (online nodes only)."""
+
+    nodes_online: int
+    nodes_total: int
+    cores: int
+    cpu_usage: float  # 0..1, weighted by cores
+    memory_bytes: int
+    memory_used_bytes: int
+    storage_total_bytes: int  # active storages; a shared one counts once per cluster
+    storage_used_bytes: int
+
+
+class OverviewOut(BaseModel):
+    usage: AdminUsageOut
+    infra: InfraTotalsOut | None  # only for the whole platform (not per tenant)

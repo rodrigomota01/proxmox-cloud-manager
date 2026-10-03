@@ -368,6 +368,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Overview
+         * @description Live usage of every guest (or one tenant's) and, platform-wide, the hosts.
+         */
+        get: operations["overview_api_v1_admin_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/regions": {
         parameters: {
             query?: never;
@@ -724,6 +744,23 @@ export interface paths {
         };
         /** Dashboard */
         get: operations["dashboard_api_v1_dashboard_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboard Usage */
+        get: operations["dashboard_usage_api_v1_dashboard_usage_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1351,6 +1388,79 @@ export interface components {
             /** Zones */
             zones: components["schemas"]["AdminZoneOut"][];
         };
+        /** AdminTopInstanceOut */
+        AdminTopInstanceOut: {
+            /** Cpu Usage */
+            cpu_usage: number;
+            /** Disk Usage */
+            disk_usage: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Managed */
+            managed: boolean;
+            /** Memory Mb */
+            memory_mb: number;
+            /** Memory Used Mb */
+            memory_used_mb: number;
+            /** Name */
+            name: string;
+            /** Net In Bps */
+            net_in_bps: number;
+            /** Net Out Bps */
+            net_out_bps: number;
+            /** Node Id */
+            node_id: string | null;
+            /** Project Id */
+            project_id: string | null;
+            /** Tenant Id */
+            tenant_id: string | null;
+            /** Tenant Name */
+            tenant_name: string | null;
+            /** Value */
+            value: number;
+            /** Vcpus */
+            vcpus: number;
+        };
+        /** AdminTopInstancesOut */
+        AdminTopInstancesOut: {
+            /** Cpu */
+            cpu: components["schemas"]["AdminTopInstanceOut"][];
+            /** Disk */
+            disk: components["schemas"]["AdminTopInstanceOut"][];
+            /** Memory */
+            memory: components["schemas"]["AdminTopInstanceOut"][];
+            /** Network */
+            network: components["schemas"]["AdminTopInstanceOut"][];
+        };
+        /** AdminUsageOut */
+        AdminUsageOut: {
+            /** Cpu Used Vcpus */
+            cpu_used_vcpus: number;
+            /** Disk Known */
+            disk_known: number;
+            /** Disk Total Bytes */
+            disk_total_bytes: number;
+            /** Disk Used Bytes */
+            disk_used_bytes: number;
+            /** Instances Running */
+            instances_running: number;
+            /** Memory Mb */
+            memory_mb: number;
+            /** Memory Used Mb */
+            memory_used_mb: number;
+            /** Net In Bps */
+            net_in_bps: number;
+            /** Net Out Bps */
+            net_out_bps: number;
+            top: components["schemas"]["AdminTopInstancesOut"];
+            /** Vcpus */
+            vcpus: number;
+        };
         /** AdminUserDetail */
         AdminUserDetail: {
             /** Active Sessions */
@@ -1772,6 +1882,28 @@ export interface components {
             description?: string | null;
             /** Name */
             name?: string | null;
+        };
+        /**
+         * InfraTotalsOut
+         * @description Physical capacity and what the hosts report as used (online nodes only).
+         */
+        InfraTotalsOut: {
+            /** Cores */
+            cores: number;
+            /** Cpu Usage */
+            cpu_usage: number;
+            /** Memory Bytes */
+            memory_bytes: number;
+            /** Memory Used Bytes */
+            memory_used_bytes: number;
+            /** Nodes Online */
+            nodes_online: number;
+            /** Nodes Total */
+            nodes_total: number;
+            /** Storage Total Bytes */
+            storage_total_bytes: number;
+            /** Storage Used Bytes */
+            storage_used_bytes: number;
         };
         /** InstanceAccepted */
         InstanceAccepted: {
@@ -2196,6 +2328,11 @@ export interface components {
             /** Zone Name */
             zone_name: string | null;
         };
+        /** OverviewOut */
+        OverviewOut: {
+            infra: components["schemas"]["InfraTotalsOut"] | null;
+            usage: components["schemas"]["AdminUsageOut"];
+        };
         /** Page[AdminUserOut] */
         Page_AdminUserOut_: {
             /** Items */
@@ -2575,6 +2712,74 @@ export interface components {
              * @constant
              */
             token_type?: "Bearer";
+        };
+        /** TopInstanceOut */
+        TopInstanceOut: {
+            /** Cpu Usage */
+            cpu_usage: number;
+            /** Disk Usage */
+            disk_usage: number | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Memory Mb */
+            memory_mb: number;
+            /** Memory Used Mb */
+            memory_used_mb: number;
+            /** Name */
+            name: string;
+            /** Net In Bps */
+            net_in_bps: number;
+            /** Net Out Bps */
+            net_out_bps: number;
+            /** Project Id */
+            project_id: string | null;
+            /** Value */
+            value: number;
+            /** Vcpus */
+            vcpus: number;
+        };
+        /** TopInstancesOut */
+        TopInstancesOut: {
+            /** Cpu */
+            cpu: components["schemas"]["TopInstanceOut"][];
+            /** Disk */
+            disk: components["schemas"]["TopInstanceOut"][];
+            /** Memory */
+            memory: components["schemas"]["TopInstanceOut"][];
+            /** Network */
+            network: components["schemas"]["TopInstanceOut"][];
+        };
+        /**
+         * UsageOut
+         * @description Live usage of the running instances in view (as of the last sync).
+         */
+        UsageOut: {
+            /** Cpu Used Vcpus */
+            cpu_used_vcpus: number;
+            /** Disk Known */
+            disk_known: number;
+            /** Disk Total Bytes */
+            disk_total_bytes: number;
+            /** Disk Used Bytes */
+            disk_used_bytes: number;
+            /** Instances Running */
+            instances_running: number;
+            /** Memory Mb */
+            memory_mb: number;
+            /** Memory Used Mb */
+            memory_used_mb: number;
+            /** Net In Bps */
+            net_in_bps: number;
+            /** Net Out Bps */
+            net_out_bps: number;
+            top: components["schemas"]["TopInstancesOut"];
+            /** Vcpus */
+            vcpus: number;
         };
         /** UserCreate */
         UserCreate: {
@@ -3434,6 +3639,37 @@ export interface operations {
             };
         };
     };
+    overview_api_v1_admin_overview_get: {
+        parameters: {
+            query?: {
+                tenant_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     admin_list_regions_api_v1_admin_regions_get: {
         parameters: {
             query?: never;
@@ -4177,6 +4413,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dashboard_usage_api_v1_dashboard_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageOut"];
                 };
             };
             /** @description Validation Error */

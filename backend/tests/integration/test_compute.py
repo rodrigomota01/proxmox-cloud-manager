@@ -336,6 +336,7 @@ async def test_cross_tenant_compute_matrix(client, env, owner_db):
         (env.acme, "POST", f"/api/v1/instances/{env.vm}/stop"),
         (env.acme, "GET", "/api/v1/jobs"),
         (env.acme, "GET", "/api/v1/dashboard/summary"),
+        (env.acme, "GET", "/api/v1/dashboard/usage"),
         (env.globex, "GET", f"/api/v1/instances/{env.vm}"),
         (env.globex, "POST", f"/api/v1/instances/{env.vm}/start"),
     ]
@@ -395,3 +396,51 @@ async def test_guests_outside_the_managed_pool_are_read_only(client, env, fake, 
     own = next(i for i in (await client.get("/api/v1/instances", headers=h)).json()["items"]
                if i["id"] == env.vm)
     assert own["read_only"] is False
+
+
+async def _set_usage(owner_db, instance_id, **values):
+    await owner_db.execute(
+        Instance.__table__.update().where(Instance.id == instance_id)
+        .values(power_state="running", **values)
+    )
+    await owner_db.commit()
+
+
+async def test_dashboard_usage_respects_project_visibility(client, env, owner_db):
+    await _set_usage(owner_db, env.vm, cpu_usage=0.5, memory_used_mb=1024, disk_usage=0.9,
+                     disk_used_bytes=9, disk_total_bytes=10, net_in_bps=100.0, net_out_bps=20.0)
+    await _set_usage(owner_db, env.ct, cpu_usage=0.25, memory_used_mb=1536, net_in_bps=1.0)
+
+    alice = (await client.get("/api/v1/dashboard/usage",
+                              headers=await env.h("alice", env.acme))).json()
+    assert alice["instances_running"] == 2 and alice["vcpus"] == 4
+    assert alice["cpu_used_vcpus"] == 1.5  # 0.5 x 2 + 0.25 x 2
+    assert alice["memory_used_mb"] == 2560 and alice["disk_known"] == 1
+    assert [t["id"] for t in alice["top"]["cpu"]] == [env.vm, env.ct]
+    assert [t["id"] for t in alice["top"]["memory"]] == [env.ct, env.vm]  # 75% > 50%
+    assert [t["id"] for t in alice["top"]["disk"]] == [env.vm]
+    assert alice["top"]["network"][0]["value"] == 120.0
+    assert "node_id" not in alice["top"]["cpu"][0]  # no provider details for tenants
+
+    # carol only sees project web (the VM)
+    carol = (await client.get("/api/v1/dashboard/usage",
+                              headers=await env.h("carol", env.acme))).json()
+    assert carol["instances_running"] == 1
+    assert [t["id"] for t in carol["top"]["memory"]] == [env.vm]
+
+
+async def test_admin_overview_all_and_per_tenant(client, env, owner_db):
+    await _set_usage(owner_db, env.vm, cpu_usage=0.5)
+    root = await env.h("root")
+    everything = (await client.get("/api/v1/admin/overview", headers=root)).json()
+    assert everything["infra"]["nodes_online"] == 1
+    assert everything["usage"]["top"]["cpu"][0]["tenant_name"] == "Acme"
+
+    acme = (await client.get(f"/api/v1/admin/overview?tenant_id={env.acme.id}", headers=root))
+    assert acme.json()["infra"] is None and acme.json()["usage"]["instances_running"] == 2
+    globex = (await client.get(f"/api/v1/admin/overview?tenant_id={env.globex.id}",
+                               headers=root)).json()
+    assert globex["usage"]["instances_running"] == 0 and globex["usage"]["top"]["cpu"] == []
+
+    r = await client.get("/api/v1/admin/overview", headers=await env.h("alice"))
+    assert r.status_code == 403

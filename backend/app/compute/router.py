@@ -25,8 +25,12 @@ from app.compute.schemas import (
     MetricPointOut,
     MetricsOut,
     QuotaLineOut,
+    TopInstanceOut,
+    TopInstancesOut,
+    UsageOut,
 )
 from app.compute.service import ComputeService
+from app.compute.usage import TopEntry
 from app.core.errors import ProviderUnavailableError
 from app.core.pagination import PageParams, page_params
 from app.inventory.models import ProviderCluster
@@ -210,6 +214,25 @@ async def get_job(job_id: uuid.UUID, ctx: CurrentTenant, db: DbSession) -> JobDe
         # event data (provider task ids, node names) stays admin-only
         events=[JobEventOut(kind=e.kind, message=e.message, occurred_at=e.occurred_at)
                 for e in events],
+    )
+
+
+def top_instance_out(e: TopEntry) -> TopInstanceOut:
+    i = e.instance
+    return TopInstanceOut(
+        id=i.id, name=i.name, kind=i.kind, project_id=i.project_id, value=e.value,
+        vcpus=i.vcpus, memory_mb=i.memory_mb, memory_used_mb=i.memory_used_mb,
+        cpu_usage=i.cpu_usage, disk_usage=i.disk_usage,
+        net_in_bps=i.net_in_bps, net_out_bps=i.net_out_bps,
+    )
+
+
+@router.get("/dashboard/usage", tags=["dashboard"])
+async def dashboard_usage(ctx: CurrentTenant, db: DbSession) -> UsageOut:
+    u = await ComputeService(db, ctx).usage()
+    return UsageOut(
+        **u.totals(),
+        top=TopInstancesOut(**{k: [top_instance_out(e) for e in v] for k, v in u.top.items()}),
     )
 
 

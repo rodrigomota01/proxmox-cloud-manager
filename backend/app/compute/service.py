@@ -15,6 +15,7 @@ from app.api.deps import TenantContext
 from app.audit import service as audit
 from app.compute.models import Instance, operable
 from app.compute.schemas import InstanceCreate
+from app.compute.usage import Usage, usage
 from app.core.config import Settings
 from app.core.errors import Conflict, NotFound, ValidationError
 from app.core.pagination import PageParams, paginate
@@ -337,6 +338,9 @@ class ComputeService:
         return job, list(events.scalars())
 
     # --- dashboard -------------------------------------------------------------------------
+
+    async def usage(self) -> Usage:
+        return await usage(self.db, *self._live_conditions(), await self._visible())
 
     async def summary(self) -> tuple[int, dict[str, dict[str, int]], int, list[Job]]:
         rows = await self.db.execute(
