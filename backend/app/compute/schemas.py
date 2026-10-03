@@ -29,6 +29,7 @@ class JobOut(BaseModel):
     project_id: uuid.UUID | None
     resource_type: str | None
     resource_id: uuid.UUID | None
+    payload: dict[str, Any]  # request parameters (e.g. {"action": "start"}); no provider ids
     result: dict[str, Any] | None
     error_code: str | None
     error_message: str | None

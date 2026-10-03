@@ -54,6 +54,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="Cloud Manager API",
         version="0.0.1",
+        description=(
+            "Tenant-scoped routes (projects, instances, jobs, role bindings, dashboard) "
+            "require the header `X-Tenant-Id: <tenant uuid>`; it is validated against the "
+            "caller's memberships. It is omitted from each operation so generated clients "
+            "can inject it once."
+        ),
         docs_url=f"{API_PREFIX}/docs" if docs_enabled else None,
         redoc_url=None,
         openapi_url=f"{API_V1_PREFIX}/openapi.json" if docs_enabled else None,

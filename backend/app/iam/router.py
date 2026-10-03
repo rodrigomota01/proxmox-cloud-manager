@@ -82,7 +82,9 @@ async def my_permissions(
     principal: CurrentPrincipal,
     db: DbSession,
     scope: Annotated[str, Query(description="platform | tenant:<id> | project:<id>")],
-    x_tenant_id: Annotated[uuid.UUID | None, Header(alias="X-Tenant-Id")] = None,
+    x_tenant_id: Annotated[
+        uuid.UUID | None, Header(alias="X-Tenant-Id", include_in_schema=False)
+    ] = None,
 ) -> PermissionsOut:
     """For the UI to hide actions — never an access control by itself."""
     kind, _, raw_id = scope.partition(":")

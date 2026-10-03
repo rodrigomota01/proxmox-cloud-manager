@@ -3,6 +3,7 @@
   migrate        alembic upgrade head + sync RBAC catalog   (CM_MIGRATION_DATABASE_URL)
   create-admin   create a SUPER_ADMIN user (bootstrap)        (CM_MIGRATION_DATABASE_URL)
   gen-keys       print new keys for .env (CM_JWT_PRIVATE_KEY, CM_KEK; or --only one)
+  openapi        print the OpenAPI document (committed as docs/api/openapi.json)
 """
 
 import argparse
@@ -68,6 +69,16 @@ async def create_admin(email: str, display_name: str, password: str) -> None:
         await engine.dispose()
 
 
+def openapi_document() -> str:
+    import json
+
+    from app.core.config import Settings
+    from app.main import create_app
+
+    spec = create_app(Settings(env="dev")).openapi()
+    return json.dumps(spec, indent=2, sort_keys=True, ensure_ascii=False)
+
+
 def _read_password() -> str:
     if pw := os.environ.get("CM_ADMIN_PASSWORD"):
         return pw
@@ -86,6 +97,7 @@ def main(argv: list[str] | None = None) -> None:
     p_admin.add_argument("--name", required=True)
     p_keys = sub.add_parser("gen-keys")
     p_keys.add_argument("--only", choices=["jwt", "kek"])
+    sub.add_parser("openapi")
     args = parser.parse_args(argv)
 
     if args.cmd == "migrate":
@@ -95,6 +107,8 @@ def main(argv: list[str] | None = None) -> None:
         if len(password) < 12:
             raise SystemExit("password must have at least 12 characters")
         asyncio.run(create_admin(args.email, args.name, password))
+    elif args.cmd == "openapi":
+        sys.stdout.write(openapi_document() + "\n")
     elif args.cmd == "gen-keys":
         if args.only in (None, "jwt"):
             pem = generate_private_key_pem().strip().replace("\n", "\\n")

@@ -106,7 +106,7 @@ async def enter_tenant(
 async def get_tenant_context(
     principal: CurrentPrincipal,
     db: DbSession,
-    x_tenant_id: Annotated[uuid.UUID, Header(alias="X-Tenant-Id")],
+    x_tenant_id: Annotated[uuid.UUID, Header(alias="X-Tenant-Id", include_in_schema=False)],
 ) -> TenantContext:
     return await enter_tenant(db, principal, x_tenant_id)
 

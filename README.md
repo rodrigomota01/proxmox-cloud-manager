@@ -4,11 +4,11 @@ Plataforma de cloud management multi-tenant sobre **Proxmox VE**: tenants, proje
 RBAC, quotas, preço, catálogo de imagens, console/SSH no browser e auditoria — sem que
 o usuário final precise acessar o Proxmox.
 
-> **Status: Fase 1 — backend pronto.** Banco com RLS, autenticação, auditoria, IAM
-> (tenants, projetos, membros, RBAC), provider Proxmox, clusters com credencial
-> cifrada, inventário (reconciliador + adoção), fila de jobs em Postgres e instâncias
-> (listar, detalhar, power). Próximo: frontend — ver [roadmap](docs/roadmap.md).
-> Validação ponta a ponta contra um Proxmox real: `scripts/e2e-lab.sh`.
+> **Status: Fase 1 — pronta para validação final.** Backend (RLS, auth, auditoria,
+> IAM, provider Proxmox, inventário, jobs, instâncias) e frontend (login, seletor de
+> tenant, dashboard, instâncias com ações de energia, admin de clusters). Validação
+> ponta a ponta contra um Proxmox real: `scripts/e2e-lab.sh`. Próximo: Fase 2 —
+> ver [roadmap](docs/roadmap.md).
 
 ## Documentação
 
@@ -43,6 +43,14 @@ Testes e lint do backend:
 ```bash
 cd backend && python3 -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]" && pytest -q && ruff check .
+```
+
+O contrato da API fica em `docs/api/openapi.json` e os tipos do frontend são gerados
+dele. Ao mudar a API:
+
+```bash
+cd backend && .venv/bin/python -m app.cli openapi > ../docs/api/openapi.json
+cd ../frontend && npm run gen:api && npm run typecheck
 ```
 
 Os testes em `tests/integration/` sobem PostgreSQL e Redis reais via testcontainers
