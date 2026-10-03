@@ -32,7 +32,6 @@ from app.api.deps import (
 )
 from app.audit import service as audit
 from app.compute.models import Instance
-from app.compute.router import job_out
 from app.compute.schemas import Accepted, JobOut, QuotaLineOut
 from app.core.errors import NotFound
 from app.inventory.models import (
@@ -43,6 +42,7 @@ from app.inventory.models import (
     SyncRun,
 )
 from app.jobs.models import Job, JobEvent
+from app.jobs.presenter import job_out, jobs_out
 from app.providers.registry import ProviderRegistry
 from app.tenancy import quota
 from app.tenancy.models import Tenant, TenantQuota
@@ -171,7 +171,7 @@ async def sync_cluster(
     job = await svc.sync(cluster_id)
     await db.refresh(job)
     response.headers["Location"] = f"/api/v1/admin/jobs/{job.id}"
-    return Accepted(job=job_out(job))
+    return Accepted(job=await job_out(db, job))
 
 
 @router.get("/clusters/{cluster_id}/sync-runs")
@@ -314,7 +314,7 @@ async def list_jobs(
     stmt = select(Job).order_by(Job.id.desc()).limit(limit)
     if status_filter:
         stmt = stmt.where(Job.status == status_filter)
-    return [job_out(j) for j in (await db.execute(stmt)).scalars()]
+    return await jobs_out(db, list((await db.execute(stmt)).scalars()))
 
 
 @router.get("/jobs/{job_id}")
@@ -326,7 +326,8 @@ async def get_job(job_id: uuid.UUID, _: ClusterManager, db: DbSession) -> AdminJ
         select(JobEvent).where(JobEvent.job_id == job.id).order_by(JobEvent.id)
     )
     return AdminJobDetail(
-        **job_out(job).model_dump(), tenant_id=job.tenant_id, requested_by=job.requested_by,
+        **(await job_out(db, job)).model_dump(), tenant_id=job.tenant_id,
+        requested_by=job.requested_by,
         events=[
             AdminJobEvent(kind=e.kind, message=e.message, occurred_at=e.occurred_at, data=e.data)
             for e in events.scalars()

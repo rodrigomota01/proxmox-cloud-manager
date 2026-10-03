@@ -10,6 +10,7 @@ import { SessionProvider, useSession } from "@/lib/session";
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/instances", label: "Instâncias" },
+  { href: "/history", label: "Histórico" },
   { href: "/ssh-keys", label: "Chaves SSH" },
 ];
 const ADMIN_NAV = [

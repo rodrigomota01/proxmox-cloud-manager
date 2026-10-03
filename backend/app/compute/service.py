@@ -265,11 +265,13 @@ class ComputeService:
 
     async def list_jobs(
         self, params: PageParams, *, status: str | None = None,
-        resource_id: uuid.UUID | None = None,
+        resource_id: uuid.UUID | None = None, job_type: str | None = None,
     ) -> tuple[list[Job], str | None]:
         stmt = select(Job).where(Job.tenant_id == self.ctx.tenant_id, await self._jobs_visible())
         if status:
             stmt = stmt.where(Job.status == status)
+        if job_type:
+            stmt = stmt.where(Job.type == job_type)
         if resource_id:
             stmt = stmt.where(Job.resource_id == resource_id)
         # newest first: UUIDv7 ids are time-ordered, so paginate on id descending

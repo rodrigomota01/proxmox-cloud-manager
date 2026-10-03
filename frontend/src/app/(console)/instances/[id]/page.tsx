@@ -7,21 +7,12 @@ import { useParams } from "next/navigation";
 import { NoTenant } from "@/components/no-tenant";
 import { PowerActions } from "@/components/power-actions";
 import { DeleteInstance } from "@/components/delete-instance";
-import { Badge, Card, Empty, ErrorBox, JobBadge, PowerBadge, StateBadge, formatDate } from "@/components/ui";
+import { ActivityRow } from "@/components/activity";
+import { Badge, Card, Empty, ErrorBox, PowerBadge, StateBadge, formatDate } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
 import { useProjectNames } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 
-const ACTION_LABEL: Record<string, string> = {
-  start: "Ligar",
-  stop: "Forçar desligamento",
-  shutdown: "Desligar",
-  reboot: "Reiniciar",
-};
-const JOB_LABEL: Record<string, string> = {
-  "instance.create": "Criação",
-  "instance.delete": "Exclusão",
-};
 const BUSY = ["provisioning", "deleting"];
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -118,27 +109,19 @@ export default function InstanceDetailPage() {
           </dl>
         </Card>
 
-        <Card title="Operações">
+        <Card
+          title="Histórico"
+          actions={
+            <Link href="/history" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+              Ver tudo
+            </Link>
+          }
+        >
           {jobs.data?.length === 0 && <Empty>Nenhuma operação nesta instância.</Empty>}
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-            {jobs.data?.map((job) => {
-              const action = String(job.payload.action ?? "");
-              const label = JOB_LABEL[job.type] ?? ACTION_LABEL[action] ?? "Energia";
-              return (
-                <li key={job.id} className="flex items-start justify-between gap-4 py-2 text-sm">
-                  <div>
-                    <div className="font-medium">
-                      {label}
-                    </div>
-                    <div className="text-xs text-slate-500">{formatDate(job.created_at)}</div>
-                    {job.error_message && (
-                      <div className="text-xs text-rose-600 dark:text-rose-400">{job.error_message}</div>
-                    )}
-                  </div>
-                  <JobBadge status={job.status} />
-                </li>
-              );
-            })}
+            {jobs.data?.map((job) => (
+              <ActivityRow key={job.id} job={job} showResource={false} />
+            ))}
           </ul>
         </Card>
       </div>

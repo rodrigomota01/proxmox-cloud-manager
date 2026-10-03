@@ -149,6 +149,9 @@ async def test_power_action_runs_as_job(client, env, fake, owner_db):
     assert fake.calls == [("10001", "start")]
     detail = (await client.get(f"/api/v1/jobs/{job['id']}", headers=h)).json()
     assert detail["status"] == "succeeded" and detail["result"] == {"power_state": "running"}
+    # history reads as "who did what to which instance"
+    assert detail["resource_name"] == "cm-test-1" and detail["requested_by_name"] == "carol"
+    assert detail["payload"] == {"action": "start"}
     assert [e["kind"] for e in detail["events"]] == ["started", "provider_task", "succeeded"]
     assert all("data" not in e for e in detail["events"])  # provider ids stay admin-only
     inst = (await client.get(f"/api/v1/instances/{env.vm}", headers=h)).json()
@@ -252,6 +255,17 @@ async def test_job_resumes_recorded_provider_task(client, env, fake, owner_db):
 
 
 # --- jobs API --------------------------------------------------------------------------
+
+
+async def test_jobs_filter_by_type(client, env):
+    h = await env.h("alice", env.acme)
+    await client.post(f"/api/v1/instances/{env.vm}/start", headers=h)
+    power = await client.get("/api/v1/jobs", params={"type": "instance.power"}, headers=h)
+    create = await client.get("/api/v1/jobs", params={"type": "instance.create"}, headers=h)
+    assert [j["resource_name"] for j in power.json()["items"]] == ["cm-test-1"]
+    assert create.json()["items"] == []
+    bad = await client.get("/api/v1/jobs", params={"type": "cluster.sync"}, headers=h)
+    assert bad.status_code == 422  # platform jobs are not a tenant filter
 
 
 async def test_job_visibility(client, env):

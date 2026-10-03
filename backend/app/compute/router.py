@@ -3,7 +3,7 @@
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Header, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Response, status
 
 from app.api.deps import AppSettings, CurrentTenant, DbSession
 from app.compute.models import Instance
@@ -21,7 +21,7 @@ from app.compute.schemas import (
 )
 from app.compute.service import ComputeService
 from app.core.pagination import PageParams, page_params
-from app.jobs.models import Job
+from app.jobs.presenter import job_out, jobs_out
 from app.tenancy import quota
 from app.tenancy.schemas import Page
 
@@ -41,10 +41,6 @@ def instance_out(i: Instance) -> InstanceOut:
         ipv4=i.network.get("address"), gateway=i.network.get("gateway"),
         created_at=i.created_at, last_seen_at=i.last_seen_at,
     )
-
-
-def job_out(j: Job) -> JobOut:
-    return JobOut.model_validate(j, from_attributes=True)
 
 
 @router.get("/instances", tags=["instances"])
@@ -74,7 +70,7 @@ async def create_instance(
     await db.refresh(instance)
     await db.refresh(job)
     response.headers["Location"] = f"/api/v1/jobs/{job.id}"
-    return InstanceAccepted(instance=instance_out(instance), job=job_out(job))
+    return InstanceAccepted(instance=instance_out(instance), job=await job_out(db, job))
 
 
 @router.delete(
@@ -87,7 +83,7 @@ async def delete_instance(
     job = await ComputeService(db, ctx).delete(instance_id, body.confirm, idempotency_key)
     await db.refresh(job)
     response.headers["Location"] = f"/api/v1/jobs/{job.id}"
-    return Accepted(job=job_out(job))
+    return Accepted(job=await job_out(db, job))
 
 
 @router.get("/quotas", tags=["quotas"])
@@ -117,7 +113,7 @@ async def power_action(
     job = await ComputeService(db, ctx).power(instance_id, action, idempotency_key)
     await db.refresh(job)
     response.headers["Location"] = f"/api/v1/jobs/{job.id}"
-    return Accepted(job=job_out(job))
+    return Accepted(job=await job_out(db, job))
 
 
 @router.get("/jobs", tags=["jobs"])
@@ -125,18 +121,22 @@ async def list_jobs(
     ctx: CurrentTenant, db: DbSession, page: Pagination,
     status: Literal["pending", "running", "succeeded", "failed", "cancelled"] | None = None,
     resource_id: uuid.UUID | None = None,
+    job_type: Annotated[
+        Literal["instance.power", "instance.create", "instance.delete"] | None,
+        Query(alias="type"),
+    ] = None,
 ) -> Page[JobOut]:
     items, cursor = await ComputeService(db, ctx).list_jobs(
-        page, status=status, resource_id=resource_id
+        page, status=status, resource_id=resource_id, job_type=job_type
     )
-    return Page(items=[job_out(j) for j in items], next_cursor=cursor)
+    return Page(items=await jobs_out(db, items), next_cursor=cursor)
 
 
 @router.get("/jobs/{job_id}", tags=["jobs"])
 async def get_job(job_id: uuid.UUID, ctx: CurrentTenant, db: DbSession) -> JobDetail:
     job, events = await ComputeService(db, ctx).get_job(job_id)
     return JobDetail(
-        **job_out(job).model_dump(),
+        **(await job_out(db, job)).model_dump(),
         # event data (provider task ids, node names) stays admin-only
         events=[JobEventOut(kind=e.kind, message=e.message, occurred_at=e.occurred_at)
                 for e in events],
@@ -148,5 +148,5 @@ async def dashboard(ctx: CurrentTenant, db: DbSession) -> DashboardSummary:
     projects, instances, active, recent = await ComputeService(db, ctx).summary()
     return DashboardSummary(
         projects=projects, instances=instances, active_jobs=active,
-        recent_jobs=[job_out(j) for j in recent],
+        recent_jobs=await jobs_out(db, recent),
     )

@@ -301,6 +301,17 @@
             ],
             "title": "Requested By"
           },
+          "requested_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By Name"
+          },
           "resource_id": {
             "anyOf": [
               {
@@ -312,6 +323,17 @@
               }
             ],
             "title": "Resource Id"
+          },
+          "resource_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Name"
           },
           "resource_type": {
             "anyOf": [
@@ -1612,6 +1634,17 @@
             ],
             "title": "Project Id"
           },
+          "requested_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By Name"
+          },
           "resource_id": {
             "anyOf": [
               {
@@ -1623,6 +1656,17 @@
               }
             ],
             "title": "Resource Id"
+          },
+          "resource_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Name"
           },
           "resource_type": {
             "anyOf": [
@@ -1779,6 +1823,17 @@
             ],
             "title": "Project Id"
           },
+          "requested_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By Name"
+          },
           "resource_id": {
             "anyOf": [
               {
@@ -1790,6 +1845,17 @@
               }
             ],
             "title": "Resource Id"
+          },
+          "resource_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Name"
           },
           "resource_type": {
             "anyOf": [
@@ -5334,6 +5400,27 @@
                 }
               ],
               "title": "Resource Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "instance.power",
+                    "instance.create",
+                    "instance.delete"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
             }
           },
           {

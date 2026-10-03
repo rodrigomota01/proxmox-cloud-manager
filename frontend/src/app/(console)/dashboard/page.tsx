@@ -4,14 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
 import { NoTenant } from "@/components/no-tenant";
-import { Card, Empty, ErrorBox, JobBadge, formatDate } from "@/components/ui";
+import { ActivityRow } from "@/components/activity";
+import { Card, Empty, ErrorBox } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
 import { useSession } from "@/lib/session";
-
-const JOB_LABEL: Record<string, string> = {
-  "instance.power": "Energia da instância",
-  "cluster.sync": "Sincronização",
-};
 
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
@@ -56,34 +52,15 @@ export default function DashboardPage() {
       <Card
         title="Operações recentes"
         actions={
-          <Link href="/instances" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
-            Ver instâncias
+          <Link href="/history" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+            Ver histórico completo
           </Link>
         }
       >
         {data && data.recent_jobs.length === 0 && <Empty>Nenhuma operação ainda.</Empty>}
         <ul className="divide-y divide-slate-100 dark:divide-slate-800">
           {data?.recent_jobs.map((job) => (
-            <li key={job.id} className="flex items-center justify-between gap-4 py-2 text-sm">
-              <div>
-                <span className="font-medium">{JOB_LABEL[job.type] ?? job.type}</span>
-                {job.resource_type === "instance" && job.resource_id && (
-                  <Link
-                    href={`/instances/${job.resource_id}`}
-                    className="ml-2 text-indigo-600 hover:underline dark:text-indigo-400"
-                  >
-                    abrir
-                  </Link>
-                )}
-                {job.error_message && (
-                  <div className="text-xs text-rose-600 dark:text-rose-400">{job.error_message}</div>
-                )}
-              </div>
-              <div className="flex items-center gap-3 text-slate-500">
-                <span className="text-xs">{formatDate(job.created_at)}</span>
-                <JobBadge status={job.status} />
-              </div>
-            </li>
+            <ActivityRow key={job.id} job={job} />
           ))}
         </ul>
       </Card>

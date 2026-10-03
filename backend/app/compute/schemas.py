@@ -94,6 +94,8 @@ class JobOut(BaseModel):
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    resource_name: str | None = None  # e.g. the instance name (kept after deletion)
+    requested_by_name: str | None = None
 
 
 class JobEventOut(BaseModel):

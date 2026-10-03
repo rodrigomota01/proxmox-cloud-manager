@@ -1104,8 +1104,12 @@ export interface components {
             project_id: string | null;
             /** Requested By */
             requested_by: string | null;
+            /** Requested By Name */
+            requested_by_name?: string | null;
             /** Resource Id */
             resource_id: string | null;
+            /** Resource Name */
+            resource_name?: string | null;
             /** Resource Type */
             resource_type: string | null;
             /** Result */
@@ -1587,8 +1591,12 @@ export interface components {
             };
             /** Project Id */
             project_id: string | null;
+            /** Requested By Name */
+            requested_by_name?: string | null;
             /** Resource Id */
             resource_id: string | null;
+            /** Resource Name */
+            resource_name?: string | null;
             /** Resource Type */
             resource_type: string | null;
             /** Result */
@@ -1640,8 +1648,12 @@ export interface components {
             };
             /** Project Id */
             project_id: string | null;
+            /** Requested By Name */
+            requested_by_name?: string | null;
             /** Resource Id */
             resource_id: string | null;
+            /** Resource Name */
+            resource_name?: string | null;
             /** Resource Type */
             resource_type: string | null;
             /** Result */
@@ -3564,6 +3576,7 @@ export interface operations {
             query?: {
                 status?: ("pending" | "running" | "succeeded" | "failed" | "cancelled") | null;
                 resource_id?: string | null;
+                type?: ("instance.power" | "instance.create" | "instance.delete") | null;
                 limit?: number;
                 cursor?: string | null;
             };
