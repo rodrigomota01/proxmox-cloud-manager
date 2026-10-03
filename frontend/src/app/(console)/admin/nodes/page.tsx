@@ -3,7 +3,9 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
-import { Badge, Card, Empty, ErrorBox, formatBytes } from "@/components/ui";
+import { useState } from "react";
+
+import { Badge, Card, Empty, ErrorBox, Select, formatBytes } from "@/components/ui";
 import { Meter, SortHeader, mib, uptime, useSorted } from "@/components/viz";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 
@@ -56,8 +58,11 @@ export default function NodesPage() {
     queryFn: async () => unwrap(await api.GET("/api/v1/admin/storage")),
     refetchInterval: 60_000,
   });
+  const [region, setRegion] = useState("");
+  const regionNames = [...new Set((nodes.data ?? []).map((n) => n.region_name ?? "Sem região"))].sort();
+  const visible = (nodes.data ?? []).filter((n) => !region || (n.region_name ?? "Sem região") === region);
   const { sorted, sort, toggle } = useSorted<Node, SortKey>(
-    nodes.data ?? [],
+    visible,
     {
       name: (n) => n.name,
       cpu: (n) => n.cpu_usage,
@@ -71,9 +76,19 @@ export default function NodesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold">Hypervisors</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-lg font-semibold">Hypervisors</h1>
+        <Select aria-label="Região" value={region} onChange={(e) => setRegion(e.target.value)}>
+          <option value="">Todas as regiões</option>
+          {regionNames.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </Select>
+      </div>
       <ErrorBox message={nodes.isError ? errorMessage(nodes.error) : null} />
-      {nodes.data && <Totals nodes={nodes.data} />}
+      {nodes.data && <Totals nodes={visible} />}
 
       <Card title="Nodes">
         {nodes.data?.length === 0 && <Empty>Nenhum node sincronizado ainda.</Empty>}
@@ -102,7 +117,8 @@ export default function NodesPage() {
                           {n.name}
                         </Link>
                         <div className="text-xs text-slate-500">
-                          {n.cluster_name} · {n.cpu_count} núcleos · {formatBytes(n.memory_bytes)}
+                          {n.region_name ? `${n.region_name} · ${n.zone_name}` : "sem zona"} · {n.cluster_name} ·{" "}
+                          {n.cpu_count} núcleos · {formatBytes(n.memory_bytes)}
                         </div>
                       </td>
                       <td className="py-2.5 pr-4">

@@ -20,11 +20,12 @@ from app.core.errors import Conflict, NotFound, ValidationError
 from app.core.pagination import PageParams, paginate
 from app.iam.authz import Scope, authorize, effective_permissions, projects_with_permission
 from app.iam.service import live_project
-from app.images.models import Image
-from app.inventory.models import ProviderCluster
+from app.images.models import Image, ImageTemplate
+from app.inventory.models import Node, ProviderCluster
 from app.jobs.models import ACTIVE, Job, JobEvent
 from app.jobs.queue import enqueue
 from app.providers.base import PowerAction
+from app.regions.models import Region, Zone
 from app.sshkeys.models import SshPublicKey
 from app.tenancy import quota
 from app.tenancy.models import Project
@@ -161,9 +162,7 @@ class ComputeService:
                 "field": "root_disk_gb",
                 "message": f"the image needs at least {image.min_disk_gb} GB",
             }])
-        cluster = await self.db.get(ProviderCluster, image.cluster_id)
-        if cluster is None or not cluster.settings.get("pool"):
-            raise Conflict("The image's cluster is not ready for new instances (no target pool)")
+        cluster = await self._place(image, body.zone_id)
 
         keys = (
             await self.db.execute(
@@ -214,6 +213,43 @@ class ComputeService:
             },
         )
         return instance, job
+
+    async def _place(self, image: Image, zone_id: uuid.UUID) -> ProviderCluster:
+        """ADR-0012: among the zone's servers that have a template of the image and a
+        target pool, the one with the smallest share of its RAM already allocated."""
+        zone = await self.db.get(Zone, zone_id)
+        region = await self.db.get(Region, zone.region_id) if zone else None
+        if zone is None or not zone.active or region is None or not region.active:
+            raise ValidationError(errors=[{"field": "zone_id", "message": "unknown zone"}])
+        candidates = [
+            c for c in (
+                await self.db.execute(
+                    select(ProviderCluster)
+                    .join(ImageTemplate, ImageTemplate.cluster_id == ProviderCluster.id)
+                    .where(ProviderCluster.zone_id == zone.id, ImageTemplate.image_id == image.id)
+                )
+            ).scalars()
+            if c.settings.get("pool")
+        ]
+        if not candidates:
+            raise Conflict(f"Image '{image.name}' is not available in zone '{zone.name}'")
+        ids = [c.id for c in candidates]
+        allocated = dict((await self.db.execute(
+            select(Instance.cluster_id, func.coalesce(func.sum(Instance.memory_mb), 0))
+            .where(Instance.cluster_id.in_(ids), Instance.deleted_at.is_(None))
+            .group_by(Instance.cluster_id)
+        )).all())
+        capacity = dict((await self.db.execute(
+            select(Node.cluster_id, func.coalesce(func.sum(Node.memory_bytes), 0))
+            .where(Node.cluster_id.in_(ids), Node.status == "online")
+            .group_by(Node.cluster_id)
+        )).all())
+
+        def load(c: ProviderCluster) -> float:
+            total_mb = capacity.get(c.id, 0) / 1024**2
+            return allocated.get(c.id, 0) / total_mb if total_mb else float("inf")
+
+        return min(candidates, key=lambda c: (load(c), c.name))
 
     async def delete(
         self, instance_id: uuid.UUID, confirm: str, idempotency_key: str | None

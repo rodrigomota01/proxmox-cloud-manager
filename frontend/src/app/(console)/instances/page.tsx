@@ -103,6 +103,7 @@ export default function InstancesPage() {
               <thead className="text-xs text-slate-500">
                 <tr>
                   <SortHeader label="Nome" k="name" sort={sort} toggle={toggle} />
+                  <th className="py-2 pr-4 font-medium uppercase tracking-wide">Zona</th>
                   <th className="py-2 pr-4 font-medium uppercase tracking-wide">Estado</th>
                   <SortHeader label="CPU" k="cpu" sort={sort} toggle={toggle} />
                   <SortHeader label="Memória" k="memory" sort={sort} toggle={toggle} />
@@ -128,6 +129,10 @@ export default function InstancesPage() {
                           {i.kind === "vm" ? "VM" : "Container"} · {projectNames.get(i.project_id) ?? "—"} ·{" "}
                           {i.vcpus} vCPU
                         </div>
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        {i.zone_name ?? "—"}
+                        {i.region_name && <div className="text-xs text-slate-500">{i.region_name}</div>}
                       </td>
                       <td className="py-2.5 pr-4">
                         {i.state === "active" ? <PowerBadge state={i.power_state} /> : <StateBadge state={i.state} />}

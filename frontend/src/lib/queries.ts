@@ -21,3 +21,15 @@ export function useProjectNames(): Map<string, string> {
   const projects = useProjects();
   return new Map((projects.data ?? []).map((p) => [p.id, p.name]));
 }
+
+/** Admin: every zone, labelled "Region · Zone", for select inputs. */
+export function useAdminZones() {
+  const q = useQuery({
+    queryKey: ["admin", "regions"],
+    queryFn: async () => unwrap(await api.GET("/api/v1/admin/regions")),
+    staleTime: 60_000,
+  });
+  return (q.data ?? []).flatMap((r) =>
+    r.zones.map((z) => ({ id: z.id, label: `${r.name} · ${z.name}`, active: r.active && z.active })),
+  );
+}

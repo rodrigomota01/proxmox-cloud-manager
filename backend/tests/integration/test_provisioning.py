@@ -94,6 +94,7 @@ class Env:
     def body(self, key_id: str, **over) -> dict:
         return {
             "project_id": str(self.web.id), "name": "web-01", "image_id": self.image,
+            "zone_id": self.zone,
             "vcpus": 2, "memory_mb": 2048, "root_disk_gb": 40, "ssh_key_ids": [key_id],
             "ipv4": NET, **over,
         }
@@ -122,8 +123,18 @@ async def env(owner_db, client, app, prov_registry):
 
     root = await e.h("root")
     r = await client.post(
+        "/api/v1/admin/regions",
+        json={"slug": "br-sp", "name": "Brasil - São Paulo", "country_code": "br"},
+        headers=root,
+    )
+    e.region = r.json()["id"]
+    r = await client.post(f"/api/v1/admin/regions/{e.region}/zones",
+                          json={"slug": "sp02-hv08", "name": "SP02 HV08"}, headers=root)
+    e.zone = r.json()["zones"][0]["id"]
+    r = await client.post(
         "/api/v1/admin/clusters",
-        json={"name": "lab", "api_url": "https://pve.test:8006", "pool": "cm-lab"},
+        json={"name": "lab", "api_url": "https://pve.test:8006", "pool": "cm-lab",
+              "zone_id": e.zone},
         headers=root,
     )
     e.cluster = r.json()["id"]
@@ -218,6 +229,7 @@ async def test_create_instance_from_template(client, env, fake, owner_db):
     assert r.status_code == 202, r.text
     inst, job = r.json()["instance"], r.json()["job"]
     assert inst["state"] == "provisioning" and inst["ipv4"] == "203.0.113.10/28"
+    assert (inst["zone_name"], inst["region_name"]) == ("SP02 HV08", "Brasil - São Paulo")
     assert "vmid" not in inst and "ssh_keys" in job["payload"]
 
     await env.drain()
@@ -284,7 +296,7 @@ async def test_create_needs_target_pool(client, env):
                        headers=await env.h("root"))
     key_id, _ = await env.add_key("carol")
     r = await env.create("carol", env.body(key_id))
-    assert r.status_code == 409 and "pool" in r.text
+    assert r.status_code == 409 and "not available" in r.text
 
 
 async def test_duplicate_ip_is_refused_and_freed_on_delete(client, env):
@@ -435,3 +447,113 @@ async def test_delete_when_guest_already_gone(client, env, fake):
     await env.drain()
     status = (await client.get(f"/api/v1/jobs/{job['id']}", headers=h)).json()["status"]
     assert status == "succeeded"
+
+
+# --- regions and zones (ADR-0012) ------------------------------------------------------
+
+
+async def test_tenants_see_only_usable_zones(client, env):
+    root = await env.h("root")
+    # a zone without servers is not offered
+    await client.post(f"/api/v1/admin/regions/{env.region}/zones",
+                      json={"slug": "sp02-empty", "name": "Empty"}, headers=root)
+    r = await client.post("/api/v1/admin/regions",
+                          json={"slug": "us-east", "name": "EUA", "country_code": "US"},
+                          headers=root)
+    assert r.status_code == 201
+    dup = await client.post("/api/v1/admin/regions",
+                            json={"slug": "us-east", "name": "x", "country_code": "US"},
+                            headers=root)
+    assert dup.status_code == 409
+    regions = (await client.get("/api/v1/regions", headers=await env.h("carol"))).json()
+    assert [(r["slug"], [z["slug"] for z in r["zones"]]) for r in regions] == [
+        ("br-sp", ["sp02-hv08"])
+    ]
+    admin = (await client.get("/api/v1/admin/regions", headers=root)).json()
+    br = next(r for r in admin if r["slug"] == "br-sp")
+    assert {z["slug"]: (z["usable"], z["clusters"]) for z in br["zones"]} == {
+        "sp02-hv08": (True, ["lab"]), "sp02-empty": (False, []),
+    }
+    denied = await client.get("/api/v1/admin/regions", headers=await env.h("alice"))
+    assert denied.status_code == 403
+
+
+async def _second_server(client, env, zone_id):
+    root = await env.h("root")
+    r = await client.post(
+        "/api/v1/admin/clusters",
+        json={"name": "hv07", "api_url": "https://hv07.test:8006", "pool": "cm-lab",
+              "zone_id": zone_id},
+        headers=root,
+    )
+    cid = r.json()["id"]
+    await client.put(f"/api/v1/admin/clusters/{cid}/credentials",
+                     json={"token_id": "cloudmgr@pve!cm", "secret": SECRET}, headers=root)
+    return cid
+
+
+@pytest.fixture
+def two_servers(app, settings, fake):
+    """'lab' -> fake (tagima), 'hv07' -> fake2 (suhr)."""
+    fake2 = FakeProvider()
+    fake2.add_node("suhr")
+    fake2.add_template(9998, "debian13-base", node="suhr", disk_gb=32)
+    servers = {"lab": fake, "hv07": fake2}
+    # same KEK as the env's registry: 'lab' credentials were sealed with it
+    app.state.providers = ProviderRegistry(
+        settings, app.state.providers.secrets, factory=lambda c, *_: servers[c.name]
+    )
+    return fake2
+
+
+async def test_image_in_two_zones_and_placement(client, env, fake, two_servers):
+    root = await env.h("root")
+    r = await client.post(f"/api/v1/admin/regions/{env.region}/zones",
+                          json={"slug": "sp02-hv07", "name": "SP02 HV07"}, headers=root)
+    zone2 = next(z["id"] for z in r.json()["zones"] if z["slug"] == "sp02-hv07")
+    hv07 = await _second_server(client, env, zone2)
+
+    key_id, _ = await env.add_key("alice")
+    # not yet available in the new zone
+    r = await env.create("alice", env.body(key_id, zone_id=zone2))
+    assert r.status_code == 409 and "not available" in r.text
+    images = (await client.get("/api/v1/images", headers=await env.h("alice", env.acme))).json()
+    assert images[0]["zone_ids"] == [env.zone]
+
+    # same logical image gets its template on the second server
+    r = await client.post(f"/api/v1/admin/images/{env.image}/templates",
+                          json={"cluster_id": hv07, "template_vmid": 9998}, headers=root)
+    assert r.status_code == 201
+    assert sorted(t["cluster_name"] for t in r.json()["templates"]) == ["hv07", "lab"]
+    again = await client.post(f"/api/v1/admin/images/{env.image}/templates",
+                              json={"cluster_id": hv07, "template_vmid": 9998}, headers=root)
+    assert again.status_code == 409
+    filtered = (await client.get("/api/v1/images", params={"zone_id": zone2},
+                                 headers=await env.h("alice", env.acme))).json()
+    assert [i["id"] for i in filtered] == [env.image]
+
+    r = await env.create("alice", env.body(key_id, zone_id=zone2))
+    assert r.status_code == 202 and r.json()["instance"]["zone_name"] == "SP02 HV07"
+    await env.drain()
+    assert list(two_servers.instances) == ["10000"]  # created on hv07, not on lab
+    assert fake.instances == {}
+
+
+async def test_placement_prefers_the_least_loaded_server_in_a_zone(client, env, fake, two_servers):
+    root = await env.h("root")
+    hv07 = await _second_server(client, env, env.zone)  # same zone
+    await client.post(f"/api/v1/admin/images/{env.image}/templates",
+                      json={"cluster_id": hv07, "template_vmid": 9998}, headers=root)
+    for cid in (env.cluster, hv07):  # nodes (capacity) come from the sync
+        await client.post(f"/api/v1/admin/clusters/{cid}/sync", headers=root)
+    await env.drain()
+
+    key_id, _ = await env.add_key("alice")
+    ips = iter(f"203.0.113.{n}/28" for n in range(2, 12))
+    for n in range(4):
+        r = await env.create("alice", env.body(key_id, name=f"vm{n}", memory_mb=2048,
+                                               ipv4={**NET, "address": next(ips)}))
+        assert r.status_code == 202, r.text
+        await env.drain()
+    # equal capacity: allocations alternate between the two servers
+    assert len(fake.instances) == 2 and len(two_servers.instances) == 2

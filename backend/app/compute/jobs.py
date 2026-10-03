@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit import service as audit
 from app.compute.models import Instance
-from app.images.models import Image
+from app.images.models import Image, ImageTemplate
 from app.inventory.models import ProviderCluster
 from app.jobs.queue import JobContext, JobFailed, handler, on_failure
 from app.providers.base import (
@@ -114,7 +114,14 @@ async def instance_create(ctx: JobContext) -> dict[str, Any]:
         cluster = await db.get_one(ProviderCluster, instance.cluster_id)
         if not cluster.settings.get("pool"):
             raise JobFailed("CLUSTER_NOT_READY", "cluster has no target pool")
-        template = ProviderRef(image.provider_ref)
+        image_template = await db.scalar(
+            select(ImageTemplate).where(
+                ImageTemplate.image_id == image.id, ImageTemplate.cluster_id == cluster.id
+            )
+        )
+        if image_template is None:
+            raise JobFailed("IMAGE_NOT_FOUND", "the image has no template on the chosen server")
+        template = ProviderRef(image_template.provider_ref)
         spec = _spec(instance, ctx.job.payload)
 
         async with ctx.providers.open(db, cluster) as provider:

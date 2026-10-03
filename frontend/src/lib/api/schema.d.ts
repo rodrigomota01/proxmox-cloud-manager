@@ -173,8 +173,8 @@ export interface paths {
         /** Admin List Images */
         get: operations["admin_list_images_api_v1_admin_images_get"];
         put?: never;
-        /** Register Image */
-        post: operations["register_image_api_v1_admin_images_post"];
+        /** Create Image */
+        post: operations["create_image_api_v1_admin_images_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -196,6 +196,40 @@ export interface paths {
         head?: never;
         /** Update Image */
         patch: operations["update_image_api_v1_admin_images__image_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/images/{image_id}/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Template */
+        post: operations["add_template_api_v1_admin_images__image_id__templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/images/{image_id}/templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Template */
+        delete: operations["remove_template_api_v1_admin_images__image_id__templates__template_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/instances": {
@@ -311,6 +345,58 @@ export interface paths {
         get: operations["node_metrics_api_v1_admin_nodes__node_id__metrics_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/regions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin List Regions */
+        get: operations["admin_list_regions_api_v1_admin_regions_get"];
+        put?: never;
+        /** Create Region */
+        post: operations["create_region_api_v1_admin_regions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/regions/{region_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Region */
+        patch: operations["update_region_api_v1_admin_regions__region_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/regions/{region_id}/zones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Zone */
+        post: operations["create_zone_api_v1_admin_regions__region_id__zones_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -474,6 +560,23 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/zones/{zone_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Zone */
+        patch: operations["update_zone_api_v1_admin_zones__zone_id__patch"];
         trace?: never;
     };
     "/api/v1/auth/.well-known/jwks.json": {
@@ -876,6 +979,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/regions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Regions
+         * @description Only what can receive instances: active regions with usable zones.
+         */
+        get: operations["list_regions_api_v1_regions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/role-bindings": {
         parameters: {
             query?: never;
@@ -1048,11 +1171,6 @@ export interface components {
             /** Active */
             active: boolean;
             /**
-             * Cluster Id
-             * Format: uuid
-             */
-            cluster_id: string;
-            /**
              * Created At
              * Format: date-time
              */
@@ -1072,8 +1190,8 @@ export interface components {
             name: string;
             /** Os Family */
             os_family: string;
-            /** Template Vmid */
-            template_vmid: number;
+            /** Templates */
+            templates: components["schemas"]["TemplateRefOut"][];
             /** Tenant Id */
             tenant_id: string | null;
             /** Visibility */
@@ -1192,6 +1310,26 @@ export interface components {
              */
             occurred_at: string;
         };
+        /** AdminRegionOut */
+        AdminRegionOut: {
+            /** Active */
+            active: boolean;
+            /** Country Code */
+            country_code: string;
+            /** Description */
+            description: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Zones */
+            zones: components["schemas"]["AdminZoneOut"][];
+        };
         /** AdminUserDetail */
         AdminUserDetail: {
             /** Active Sessions */
@@ -1247,6 +1385,31 @@ export interface components {
             last_login_at: string | null;
             /** Locked */
             locked: boolean;
+        };
+        /** AdminZoneOut */
+        AdminZoneOut: {
+            /** Active */
+            active: boolean;
+            /** Clusters */
+            clusters: string[];
+            /** Description */
+            description: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Region Id
+             * Format: uuid
+             */
+            region_id: string;
+            /** Slug */
+            slug: string;
+            /** Usable */
+            usable: boolean;
         };
         /** AdoptRequest */
         AdoptRequest: {
@@ -1324,6 +1487,8 @@ export interface components {
              *     }
              */
             vmid_range?: components["schemas"]["VmidRange"];
+            /** Zone Id */
+            zone_id?: string | null;
         };
         /** ClusterOut */
         ClusterOut: {
@@ -1355,6 +1520,8 @@ export interface components {
             name: string;
             /** Provider */
             provider: string;
+            /** Region Name */
+            region_name: string | null;
             /** Settings */
             settings: {
                 [key: string]: unknown;
@@ -1365,6 +1532,10 @@ export interface components {
             token_id: string | null;
             /** Version */
             version: string | null;
+            /** Zone Id */
+            zone_id: string | null;
+            /** Zone Name */
+            zone_name: string | null;
         };
         /** ClusterUpdate */
         ClusterUpdate: {
@@ -1379,6 +1550,8 @@ export interface components {
             /** Pool */
             pool?: string | null;
             vmid_range?: components["schemas"]["VmidRange"] | null;
+            /** Zone Id */
+            zone_id?: string | null;
         };
         /** Confirm */
         Confirm: {
@@ -1498,7 +1671,7 @@ export interface components {
         };
         /**
          * ImageOut
-         * @description Tenant view: no provider identifiers.
+         * @description Tenant view: no servers, templates or provider identifiers.
          */
         ImageOut: {
             /** Default User */
@@ -1518,6 +1691,8 @@ export interface components {
             os_family: string;
             /** Visibility */
             visibility: string;
+            /** Zone Ids */
+            zone_ids: string[];
         };
         /** ImageUpdate */
         ImageUpdate: {
@@ -1563,6 +1738,11 @@ export interface components {
             tags?: string[];
             /** Vcpus */
             vcpus: number;
+            /**
+             * Zone Id
+             * Format: uuid
+             */
+            zone_id: string;
         };
         /** InstanceDelete */
         InstanceDelete: {
@@ -1609,6 +1789,8 @@ export interface components {
              * Format: uuid
              */
             project_id: string;
+            /** Region Name */
+            region_name: string | null;
             /** Root Disk Gb */
             root_disk_gb: number;
             /** State */
@@ -1619,6 +1801,10 @@ export interface components {
             uptime_seconds: number;
             /** Vcpus */
             vcpus: number;
+            /** Zone Id */
+            zone_id: string | null;
+            /** Zone Name */
+            zone_name: string | null;
         };
         /** JobDetail */
         JobDetail: {
@@ -1920,12 +2106,16 @@ export interface components {
             memory_used_bytes: number;
             /** Name */
             name: string;
+            /** Region Name */
+            region_name: string | null;
             /** Status */
             status: string;
             /** Uptime Seconds */
             uptime_seconds: number;
             /** Vcpus Allocated */
             vcpus_allocated: number;
+            /** Zone Name */
+            zone_name: string | null;
         };
         /** Page[AdminUserOut] */
         Page_AdminUserOut_: {
@@ -2054,6 +2244,49 @@ export interface components {
             /** Vcpus */
             vcpus?: number | null;
         };
+        /** RegionCreate */
+        RegionCreate: {
+            /** Country Code */
+            country_code: string;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+        };
+        /** RegionOut */
+        RegionOut: {
+            /** Country Code */
+            country_code: string;
+            /** Description */
+            description: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+            /** Zones */
+            zones: components["schemas"]["ZoneOut"][];
+        };
+        /** RegionUpdate */
+        RegionUpdate: {
+            /** Active */
+            active?: boolean | null;
+            /** Country Code */
+            country_code?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name?: string | null;
+        };
         /** ResetPasswordRequest */
         ResetPasswordRequest: {
             /** New Password */
@@ -2160,6 +2393,16 @@ export interface components {
             /** Trigger */
             trigger: string;
         };
+        /** TemplateAdd */
+        TemplateAdd: {
+            /**
+             * Cluster Id
+             * Format: uuid
+             */
+            cluster_id: string;
+            /** Template Vmid */
+            template_vmid: number;
+        };
         /** TemplateOut */
         TemplateOut: {
             /** Disk Gb */
@@ -2172,6 +2415,27 @@ export interface components {
             node: string;
             /** Vmid */
             vmid: number;
+        };
+        /** TemplateRefOut */
+        TemplateRefOut: {
+            /**
+             * Cluster Id
+             * Format: uuid
+             */
+            cluster_id: string;
+            /** Cluster Name */
+            cluster_name: string;
+            /** Disk Gb */
+            disk_gb: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Template Vmid */
+            template_vmid: number;
+            /** Zone Name */
+            zone_name: string | null;
         };
         /** TenantCreate */
         TenantCreate: {
@@ -2286,6 +2550,41 @@ export interface components {
              * @default 10000
              */
             start?: number;
+        };
+        /** ZoneCreate */
+        ZoneCreate: {
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+        };
+        /** ZoneOut */
+        ZoneOut: {
+            /** Description */
+            description: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Slug */
+            slug: string;
+        };
+        /** ZoneUpdate */
+        ZoneUpdate: {
+            /** Active */
+            active?: boolean | null;
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name?: string | null;
         };
     };
     responses: never;
@@ -2673,7 +2972,7 @@ export interface operations {
             };
         };
     };
-    register_image_api_v1_admin_images_post: {
+    create_image_api_v1_admin_images_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2720,6 +3019,73 @@ export interface operations {
                 "application/json": components["schemas"]["ImageUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminImageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_template_api_v1_admin_images__image_id__templates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateAdd"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminImageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_template_api_v1_admin_images__image_id__templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_id: string;
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -2942,6 +3308,129 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NodeMetricsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_list_regions_api_v1_admin_regions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRegionOut"][];
+                };
+            };
+        };
+    };
+    create_region_api_v1_admin_regions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRegionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_region_api_v1_admin_regions__region_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                region_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRegionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_zone_api_v1_admin_regions__region_id__zones_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                region_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZoneCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRegionOut"];
                 };
             };
             /** @description Validation Error */
@@ -3325,6 +3814,41 @@ export interface operations {
             };
         };
     };
+    update_zone_api_v1_admin_zones__zone_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                zone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZoneUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRegionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     jwks_api_v1_auth__well_known_jwks_json_get: {
         parameters: {
             query?: never;
@@ -3555,7 +4079,9 @@ export interface operations {
     };
     list_images_api_v1_images_get: {
         parameters: {
-            query?: never;
+            query?: {
+                zone_id?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4209,6 +4735,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_regions_api_v1_regions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegionOut"][];
                 };
             };
         };

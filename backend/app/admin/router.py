@@ -50,6 +50,7 @@ from app.jobs.models import Job, JobEvent
 from app.jobs.presenter import job_out, jobs_out
 from app.providers.base import ProviderError
 from app.providers.registry import ProviderRegistry
+from app.regions.models import Region, Zone
 from app.tenancy import quota
 from app.tenancy.models import Tenant, TenantQuota
 from app.tenancy.router import tenant_out
@@ -83,10 +84,14 @@ Admin = Annotated[AdminService, Depends(_admin_service)]
 
 async def cluster_out(db: DbSession, c: ProviderCluster) -> ClusterOut:
     cred = await db.get(ProviderCredential, c.id)
+    zone = await db.get(Zone, c.zone_id) if c.zone_id else None
+    region = await db.get(Region, zone.region_id) if zone else None
     return ClusterOut(
         id=c.id, name=c.name, provider=c.provider, api_url=c.api_url,
         has_custom_ca=bool(c.ca_pem), insecure_skip_verify=c.insecure_skip_verify,
         status=c.status, version=c.version, settings=c.settings,
+        zone_id=c.zone_id, zone_name=zone.name if zone else None,
+        region_name=region.name if region else None,
         has_credentials=cred is not None, token_id=cred.token_id if cred else None,
         credentials_rotated_at=cred.rotated_at if cred else None,
         last_synced_at=c.last_synced_at, last_error=c.last_error, created_at=c.created_at,
@@ -213,13 +218,22 @@ async def nodes_out(db: DbSession, nodes: list[Node]) -> list[NodeOut]:
         .group_by(Instance.node_id)
     )
     alloc = {node_id: rest for node_id, *rest in rows}
-    clusters = dict((await db.execute(select(ProviderCluster.id, ProviderCluster.name))).all())
+    clusters = {
+        cid: (name, zone, region)
+        for cid, name, zone, region in await db.execute(
+            select(ProviderCluster.id, ProviderCluster.name, Zone.name, Region.name)
+            .outerjoin(Zone, Zone.id == ProviderCluster.zone_id)
+            .outerjoin(Region, Region.id == Zone.region_id)
+        )
+    }
     out = []
     for n in nodes:
         total, running, vcpus, memory = alloc.get(n.id, (0, 0, 0, 0))
         out.append(NodeOut(
             **NodeBase.model_validate(n, from_attributes=True).model_dump(),
-            cluster_name=clusters.get(n.cluster_id, ""),
+            cluster_name=clusters.get(n.cluster_id, ("", None, None))[0],
+            zone_name=clusters.get(n.cluster_id, ("", None, None))[1],
+            region_name=clusters.get(n.cluster_id, ("", None, None))[2],
             instances_total=total, instances_running=running,
             vcpus_allocated=vcpus, memory_allocated_mb=memory,
         ))

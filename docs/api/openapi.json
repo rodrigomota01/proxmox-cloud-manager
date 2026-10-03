@@ -19,11 +19,6 @@
             "title": "Active",
             "type": "boolean"
           },
-          "cluster_id": {
-            "format": "uuid",
-            "title": "Cluster Id",
-            "type": "string"
-          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -54,9 +49,12 @@
             "title": "Os Family",
             "type": "string"
           },
-          "template_vmid": {
-            "title": "Template Vmid",
-            "type": "integer"
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateRefOut"
+            },
+            "title": "Templates",
+            "type": "array"
           },
           "tenant_id": {
             "anyOf": [
@@ -83,11 +81,10 @@
           "default_user",
           "min_disk_gb",
           "visibility",
-          "cluster_id",
-          "template_vmid",
           "tenant_id",
           "active",
-          "created_at"
+          "created_at",
+          "templates"
         ],
         "title": "AdminImageOut",
         "type": "object"
@@ -443,6 +440,53 @@
         "title": "AdminJobEvent",
         "type": "object"
       },
+      "AdminRegionOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "country_code": {
+            "title": "Country Code",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "zones": {
+            "items": {
+              "$ref": "#/components/schemas/AdminZoneOut"
+            },
+            "title": "Zones",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "country_code",
+          "description",
+          "active",
+          "zones"
+        ],
+        "title": "AdminRegionOut",
+        "type": "object"
+      },
       "AdminUserDetail": {
         "properties": {
           "active_sessions": {
@@ -578,6 +622,59 @@
           "created_at"
         ],
         "title": "AdminUserOut",
+        "type": "object"
+      },
+      "AdminZoneOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "clusters": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Clusters",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "region_id": {
+            "format": "uuid",
+            "title": "Region Id",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "usable": {
+            "title": "Usable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "description",
+          "region_id",
+          "active",
+          "clusters",
+          "usable"
+        ],
+        "title": "AdminZoneOut",
         "type": "object"
       },
       "AdoptRequest": {
@@ -737,6 +834,18 @@
               "end": 19999,
               "start": 10000
             }
+          },
+          "zone_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone Id"
           }
         },
         "required": [
@@ -817,6 +926,17 @@
             "title": "Provider",
             "type": "string"
           },
+          "region_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region Name"
+          },
           "settings": {
             "additionalProperties": true,
             "title": "Settings",
@@ -847,6 +967,29 @@
               }
             ],
             "title": "Version"
+          },
+          "zone_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone Id"
+          },
+          "zone_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone Name"
           }
         },
         "required": [
@@ -859,6 +1002,9 @@
           "status",
           "version",
           "settings",
+          "zone_id",
+          "zone_name",
+          "region_name",
           "has_credentials",
           "token_id",
           "credentials_rotated_at",
@@ -941,6 +1087,18 @@
                 "type": "null"
               }
             ]
+          },
+          "zone_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone Id"
           }
         },
         "title": "ClusterUpdate",
@@ -1237,7 +1395,7 @@
         "type": "object"
       },
       "ImageOut": {
-        "description": "Tenant view: no provider identifiers.",
+        "description": "Tenant view: no servers, templates or provider identifiers.",
         "properties": {
           "default_user": {
             "title": "Default User",
@@ -1267,6 +1425,14 @@
           "visibility": {
             "title": "Visibility",
             "type": "string"
+          },
+          "zone_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Zone Ids",
+            "type": "array"
           }
         },
         "required": [
@@ -1276,7 +1442,8 @@
           "os_family",
           "default_user",
           "min_disk_gb",
-          "visibility"
+          "visibility",
+          "zone_ids"
         ],
         "title": "ImageOut",
         "type": "object"
@@ -1411,12 +1578,18 @@
             "minimum": 1.0,
             "title": "Vcpus",
             "type": "integer"
+          },
+          "zone_id": {
+            "format": "uuid",
+            "title": "Zone Id",
+            "type": "string"
           }
         },
         "required": [
           "project_id",
           "name",
           "image_id",
+          "zone_id",
           "vcpus",
           "memory_mb",
           "root_disk_gb",
@@ -1528,6 +1701,17 @@
             "title": "Project Id",
             "type": "string"
           },
+          "region_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region Name"
+          },
           "root_disk_gb": {
             "title": "Root Disk Gb",
             "type": "integer"
@@ -1550,6 +1734,29 @@
           "vcpus": {
             "title": "Vcpus",
             "type": "integer"
+          },
+          "zone_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone Id"
+          },
+          "zone_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone Name"
           }
         },
         "required": [
@@ -1564,6 +1771,9 @@
           "root_disk_gb",
           "tags",
           "image_id",
+          "zone_id",
+          "zone_name",
+          "region_name",
           "cpu_usage",
           "memory_used_mb",
           "uptime_seconds",
@@ -2407,6 +2617,17 @@
             "title": "Name",
             "type": "string"
           },
+          "region_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region Name"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -2418,6 +2639,17 @@
           "vcpus_allocated": {
             "title": "Vcpus Allocated",
             "type": "integer"
+          },
+          "zone_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone Name"
           }
         },
         "required": [
@@ -2432,6 +2664,8 @@
           "uptime_seconds",
           "last_seen_at",
           "cluster_name",
+          "zone_name",
+          "region_name",
           "instances_total",
           "instances_running",
           "vcpus_allocated",
@@ -2842,6 +3076,137 @@
         "title": "QuotaUpdate",
         "type": "object"
       },
+      "RegionCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "country_code": {
+            "pattern": "^[A-Za-z]{2}$",
+            "title": "Country Code",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "pattern": "^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$",
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "country_code"
+        ],
+        "title": "RegionCreate",
+        "type": "object"
+      },
+      "RegionOut": {
+        "properties": {
+          "country_code": {
+            "title": "Country Code",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "zones": {
+            "items": {
+              "$ref": "#/components/schemas/ZoneOut"
+            },
+            "title": "Zones",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "country_code",
+          "description",
+          "zones"
+        ],
+        "title": "RegionOut",
+        "type": "object"
+      },
+      "RegionUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          },
+          "country_code": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z]{2}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Code"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "RegionUpdate",
+        "type": "object"
+      },
       "ResetPasswordRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3090,6 +3455,27 @@
         "title": "SyncRunOut",
         "type": "object"
       },
+      "TemplateAdd": {
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "format": "uuid",
+            "title": "Cluster Id",
+            "type": "string"
+          },
+          "template_vmid": {
+            "minimum": 100.0,
+            "title": "Template Vmid",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cluster_id",
+          "template_vmid"
+        ],
+        "title": "TemplateAdd",
+        "type": "object"
+      },
       "TemplateOut": {
         "properties": {
           "disk_gb": {
@@ -3129,6 +3515,53 @@
           "image_id"
         ],
         "title": "TemplateOut",
+        "type": "object"
+      },
+      "TemplateRefOut": {
+        "properties": {
+          "cluster_id": {
+            "format": "uuid",
+            "title": "Cluster Id",
+            "type": "string"
+          },
+          "cluster_name": {
+            "title": "Cluster Name",
+            "type": "string"
+          },
+          "disk_gb": {
+            "title": "Disk Gb",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "template_vmid": {
+            "title": "Template Vmid",
+            "type": "integer"
+          },
+          "zone_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zone Name"
+          }
+        },
+        "required": [
+          "id",
+          "cluster_id",
+          "cluster_name",
+          "zone_name",
+          "template_vmid",
+          "disk_gb"
+        ],
+        "title": "TemplateRefOut",
         "type": "object"
       },
       "TenantCreate": {
@@ -3420,6 +3853,106 @@
           }
         },
         "title": "VmidRange",
+        "type": "object"
+      },
+      "ZoneCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "pattern": "^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$",
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name"
+        ],
+        "title": "ZoneCreate",
+        "type": "object"
+      },
+      "ZoneOut": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "description"
+        ],
+        "title": "ZoneOut",
+        "type": "object"
+      },
+      "ZoneUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "ZoneUpdate",
         "type": "object"
       }
     }
@@ -3952,7 +4485,7 @@
         ]
       },
       "post": {
-        "operationId": "register_image_api_v1_admin_images_post",
+        "operationId": "create_image_api_v1_admin_images_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3985,7 +4518,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Register Image",
+        "summary": "Create Image",
         "tags": [
           "admin"
         ]
@@ -4039,6 +4572,112 @@
           }
         },
         "summary": "Update Image",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/images/{image_id}/templates": {
+      "post": {
+        "operationId": "add_template_api_v1_admin_images__image_id__templates_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Image Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateAdd"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminImageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Template",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/images/{image_id}/templates/{template_id}": {
+      "delete": {
+        "operationId": "remove_template_api_v1_admin_images__image_id__templates__template_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Image Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminImageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Template",
         "tags": [
           "admin"
         ]
@@ -4396,6 +5035,176 @@
           }
         },
         "summary": "Node Metrics",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/regions": {
+      "get": {
+        "operationId": "admin_list_regions_api_v1_admin_regions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminRegionOut"
+                  },
+                  "title": "Response Admin List Regions Api V1 Admin Regions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Admin List Regions",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "create_region_api_v1_admin_regions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRegionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Region",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/regions/{region_id}": {
+      "patch": {
+        "operationId": "update_region_api_v1_admin_regions__region_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "region_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Region Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRegionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Region",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/regions/{region_id}/zones": {
+      "post": {
+        "operationId": "create_zone_api_v1_admin_regions__region_id__zones_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "region_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Region Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZoneCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRegionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Zone",
         "tags": [
           "admin"
         ]
@@ -4956,6 +5765,59 @@
         ]
       }
     },
+    "/api/v1/admin/zones/{zone_id}": {
+      "patch": {
+        "operationId": "update_zone_api_v1_admin_zones__zone_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "zone_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Zone Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZoneUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRegionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Zone",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/auth/.well-known/jwks.json": {
       "get": {
         "operationId": "jwks_api_v1_auth__well_known_jwks_json_get",
@@ -5240,6 +6102,25 @@
     "/api/v1/images": {
       "get": {
         "operationId": "list_images_api_v1_images_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "zone_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Zone Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -6337,6 +7218,32 @@
         "summary": "Tenant Quotas",
         "tags": [
           "quotas"
+        ]
+      }
+    },
+    "/api/v1/regions": {
+      "get": {
+        "description": "Only what can receive instances: active regions with usable zones.",
+        "operationId": "list_regions_api_v1_regions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RegionOut"
+                  },
+                  "title": "Response List Regions Api V1 Regions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Regions",
+        "tags": [
+          "regions"
         ]
       }
     },

@@ -27,6 +27,7 @@ from app.jobs.models import Job
 from app.jobs.queue import enqueue
 from app.providers.base import ProviderAuthError, ProviderError
 from app.providers.registry import ProviderRegistry
+from app.regions.models import Zone
 from app.tenancy.models import Project
 
 
@@ -64,11 +65,17 @@ class AdminService:
             raise NotFound()
         return cluster
 
+    async def _check_zone(self, zone_id: uuid.UUID | None) -> None:
+        if zone_id is not None and await self.db.get(Zone, zone_id) is None:
+            raise ValidationError(errors=[{"field": "zone_id", "message": "unknown zone"}])
+
     async def create_cluster(self, body: ClusterCreate) -> ProviderCluster:
         self._check_tls(body.insecure_skip_verify, body.api_url)
+        await self._check_zone(body.zone_id)
         cluster = ProviderCluster(
             id=uuid7(), name=body.name, provider="proxmox", api_url=body.api_url,
             ca_pem=body.ca_pem, insecure_skip_verify=body.insecure_skip_verify,
+            zone_id=body.zone_id,
             settings={
                 "vmid_range": body.vmid_range.model_dump(),
                 **({"pool": body.pool} if body.pool else {}),
@@ -89,6 +96,8 @@ class AdminService:
     async def update_cluster(self, cluster_id: uuid.UUID, body: ClusterUpdate) -> ProviderCluster:
         cluster = await self.get_cluster(cluster_id)
         changes = body.model_dump(exclude_unset=True)
+        if "zone_id" in changes:
+            await self._check_zone(changes["zone_id"])
         for key in ("vmid_range", "pool"):  # these live in settings
             if key in changes:
                 cluster.settings = {**cluster.settings, key: changes.pop(key)}

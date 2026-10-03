@@ -6,14 +6,16 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ClusterStatus } from "@/components/cluster-status";
-import { Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Textarea, formatDate } from "@/components/ui";
-import { api, errorMessage, unwrap } from "@/lib/api/client";
+import { Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Select, Textarea, formatDate } from "@/components/ui";
+import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useAdminZones } from "@/lib/queries";
 
 function CreateClusterDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
+  const zones = useAdminZones();
   const queryClient = useQueryClient();
   const create = useMutation({
-    mutationFn: async (body: { name: string; api_url: string; ca_pem?: string; pool?: string }) =>
+    mutationFn: async (body: Schemas["ClusterCreate"]) =>
       unwrap(await api.POST("/api/v1/admin/clusters", { body })),
     onSuccess: (cluster) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "clusters"] });
@@ -26,11 +28,13 @@ function CreateClusterDialog({ open, onClose }: { open: boolean; onClose: () => 
     const form = new FormData(e.currentTarget);
     const ca = String(form.get("ca_pem") ?? "").trim();
     const pool = String(form.get("pool") ?? "").trim();
+    const zone = String(form.get("zone_id") ?? "");
     create.mutate({
       name: String(form.get("name")),
       api_url: String(form.get("api_url")),
       ...(ca ? { ca_pem: ca } : {}),
       ...(pool ? { pool } : {}),
+      ...(zone ? { zone_id: zone } : {}),
     });
   }
 
@@ -42,6 +46,16 @@ function CreateClusterDialog({ open, onClose }: { open: boolean; onClose: () => 
         </Field>
         <Field label="URL da API" hint="Ex.: https://hv08.exemplo.com:8006">
           <Input name="api_url" type="url" required placeholder="https://host:8006" />
+        </Field>
+        <Field label="Zona" hint="Onde este servidor fica. Sem zona, ele é monitorado mas não recebe VMs novas.">
+          <Select name="zone_id" className="w-full" defaultValue="">
+            <option value="">Sem zona</option>
+            {zones.map((z) => (
+              <option key={z.id} value={z.id}>
+                {z.label}
+              </option>
+            ))}
+          </Select>
         </Field>
         <Field
           label="Pool de destino"
@@ -91,6 +105,7 @@ export default function ClustersPage() {
             <thead className="text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="py-2 pr-4 font-medium">Nome</th>
+                <th className="py-2 pr-4 font-medium">Zona</th>
                 <th className="py-2 pr-4 font-medium">URL</th>
                 <th className="py-2 pr-4 font-medium">Status</th>
                 <th className="py-2 pr-4 font-medium">Versão</th>
@@ -111,6 +126,15 @@ export default function ClustersPage() {
                       <span className="ml-2">
                         <Badge tone="amber">sem credencial</Badge>
                       </span>
+                    )}
+                  </td>
+                  <td className="py-2 pr-4">
+                    {c.zone_name ? (
+                      <>
+                        {c.zone_name} <span className="text-xs text-slate-500">· {c.region_name}</span>
+                      </>
+                    ) : (
+                      <Badge tone="amber">sem zona</Badge>
                     )}
                   </td>
                   <td className="py-2 pr-4 text-slate-600 dark:text-slate-400">{c.api_url}</td>

@@ -22,6 +22,7 @@ import {
 } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { useJob } from "@/lib/jobs";
+import { useAdminZones } from "@/lib/queries";
 
 type AdminInstance = Schemas["AdminInstanceOut"];
 
@@ -264,6 +265,12 @@ export default function ClusterDetailPage() {
               <dd>{c.insecure_skip_verify ? "sem verificação (dev)" : c.has_custom_ca ? "CA própria" : "CAs do sistema"}</dd>
             </div>
             <div className="flex items-center justify-between gap-4">
+              <dt className="text-slate-500">Zona</dt>
+              <dd>
+                <ZoneEditor clusterId={c.id} zoneId={c.zone_id ?? ""} />
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-4">
               <dt className="text-slate-500">Pool de destino</dt>
               <dd>
                 <PoolEditor clusterId={c.id} pool={(c.settings.pool as string | undefined) ?? ""} />
@@ -327,6 +334,41 @@ export default function ClusterDetailPage() {
 
       <AdoptDialog instance={adopting} onClose={() => setAdopting(null)} />
     </div>
+  );
+}
+
+function ZoneEditor({ clusterId, zoneId }: { clusterId: string; zoneId: string }) {
+  const queryClient = useQueryClient();
+  const zones = useAdminZones();
+  const [value, setValue] = useState(zoneId);
+  const save = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.PATCH("/api/v1/admin/clusters/{cluster_id}", {
+          params: { path: { cluster_id: clusterId } },
+          body: { zone_id: value || null },
+        }),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "cluster", clusterId] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "regions"] });
+    },
+  });
+  return (
+    <span className="flex items-center gap-2">
+      <Select aria-label="Zona" value={value} onChange={(e) => setValue(e.target.value)}>
+        <option value="">Sem zona</option>
+        {zones.map((z) => (
+          <option key={z.id} value={z.id}>
+            {z.label}
+          </option>
+        ))}
+      </Select>
+      <Button variant="secondary" disabled={save.isPending || value === zoneId} onClick={() => save.mutate()}>
+        Salvar
+      </Button>
+      {save.isError && <span className="text-xs text-rose-600">{errorMessage(save.error)}</span>}
+    </span>
   );
 }
 

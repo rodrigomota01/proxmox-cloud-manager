@@ -28,6 +28,10 @@ export default function NewInstancePage() {
     queryFn: async () => unwrap(await api.GET("/api/v1/images")),
     enabled: tenantId !== null,
   });
+  const regions = useQuery({
+    queryKey: ["regions"],
+    queryFn: async () => unwrap(await api.GET("/api/v1/regions")),
+  });
   const keys = useQuery({
     queryKey: ["ssh-keys"],
     queryFn: async () => unwrap(await api.GET("/api/v1/ssh-keys")),
@@ -38,7 +42,11 @@ export default function NewInstancePage() {
     enabled: tenantId !== null,
   });
 
+  const [regionId, setRegionId] = useState("");
+  const [zoneId, setZoneId] = useState("");
   const [imageId, setImageId] = useState("");
+  const region = regions.data?.find((r) => r.id === regionId);
+  const zoneImages = (images.data ?? []).filter((i) => zoneId && i.zone_ids.includes(zoneId));
   const [vcpus, setVcpus] = useState(2);
   const [memoryGb, setMemoryGb] = useState(2);
   const [disk, setDisk] = useState<number | "">("");
@@ -78,6 +86,7 @@ export default function NewInstancePage() {
         project_id: String(form.get("project_id")),
         name: String(form.get("name")).trim(),
         image_id: imageId,
+        zone_id: zoneId,
         vcpus,
         memory_mb: memoryGb * 1024,
         root_disk_gb: diskGb,
@@ -99,6 +108,60 @@ export default function NewInstancePage() {
       <h1 className="text-lg font-semibold">Nova instância</h1>
 
       <form onSubmit={submit} className="space-y-4">
+        <Card title="Localização">
+          {regions.data?.length === 0 ? (
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              Nenhuma região disponível para criar instâncias. Peça a um administrador.
+            </p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Região">
+                <Select
+                  className="w-full"
+                  required
+                  value={regionId}
+                  onChange={(e) => {
+                    setRegionId(e.target.value);
+                    const only = regions.data?.find((r) => r.id === e.target.value)?.zones;
+                    setZoneId(only?.length === 1 ? only[0].id : "");
+                    setImageId("");
+                  }}
+                >
+                  <option value="" disabled>
+                    Selecione…
+                  </option>
+                  {regions.data?.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name} ({r.slug})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Zona" hint="A plataforma escolhe o servidor dentro da zona.">
+                <Select
+                  className="w-full"
+                  required
+                  disabled={!region}
+                  value={zoneId}
+                  onChange={(e) => {
+                    setZoneId(e.target.value);
+                    setImageId("");
+                  }}
+                >
+                  <option value="" disabled>
+                    {region ? "Selecione…" : "Escolha a região primeiro"}
+                  </option>
+                  {region?.zones.map((z) => (
+                    <option key={z.id} value={z.id}>
+                      {z.name} ({z.slug})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+          )}
+        </Card>
+
         <Card title="Básico">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Projeto">
@@ -117,11 +180,17 @@ export default function NewInstancePage() {
               <Input name="name" required pattern="[a-z]([a-z0-9\-]{0,61}[a-z0-9])?" placeholder="web-01" />
             </Field>
             <Field label="Imagem">
-              <Select className="w-full" required value={imageId} onChange={(e) => setImageId(e.target.value)}>
+              <Select
+                className="w-full"
+                required
+                disabled={!zoneId}
+                value={imageId}
+                onChange={(e) => setImageId(e.target.value)}
+              >
                 <option value="" disabled>
-                  Selecione…
+                  {!zoneId ? "Escolha a zona primeiro" : zoneImages.length ? "Selecione…" : "Nenhuma imagem nesta zona"}
                 </option>
-                {images.data?.map((i) => (
+                {zoneImages.map((i) => (
                   <option key={i.id} value={i.id}>
                     {i.name}
                   </option>
@@ -248,7 +317,7 @@ export default function NewInstancePage() {
           </Link>
           <Button
             type="submit"
-            disabled={create.isPending || selectedKeys.length === 0 || !imageId || overQuota.length > 0}
+            disabled={create.isPending || selectedKeys.length === 0 || !imageId || !zoneId || overQuota.length > 0}
           >
             Criar instância
           </Button>

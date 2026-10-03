@@ -7,89 +7,137 @@ import { Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Select } fr
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 
 type Template = Schemas["TemplateOut"];
+type AdminImage = Schemas["AdminImageOut"];
 
+function useInvalidate(clusterId: string) {
+  const queryClient = useQueryClient();
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ["admin", "images"] });
+    queryClient.invalidateQueries({ queryKey: ["admin", "templates", clusterId] });
+  };
+}
+
+/** Register a server's template: as a new catalog image, or as another zone of an
+ * existing image (e.g. "Debian 13" on hv07 and on hv08). */
 function RegisterDialog({
   clusterId,
   template,
+  images,
   onClose,
 }: {
   clusterId: string;
   template: Template | null;
+  images: AdminImage[];
   onClose: () => void;
 }) {
-  const queryClient = useQueryClient();
+  const invalidate = useInvalidate(clusterId);
+  const [mode, setMode] = useState<"existing" | "new">(images.length ? "existing" : "new");
   const [visibility, setVisibility] = useState<"public" | "tenant">("public");
   const tenants = useQuery({
     queryKey: ["admin", "tenants"],
     queryFn: async () => unwrap(await api.GET("/api/v1/admin/tenants")),
-    enabled: template !== null,
+    enabled: template !== null && mode === "new",
   });
-  const register = useMutation({
-    mutationFn: async (body: Schemas["ImageCreate"]) =>
-      unwrap(await api.POST("/api/v1/admin/images", { body })),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "images"] });
-      queryClient.invalidateQueries({ queryKey: ["admin", "templates", clusterId] });
-      onClose();
-    },
+  const done = { onSuccess: () => { invalidate(); onClose(); } };
+  const create = useMutation({
+    mutationFn: async (body: Schemas["ImageCreate"]) => unwrap(await api.POST("/api/v1/admin/images", { body })),
+    ...done,
   });
+  const attach = useMutation({
+    mutationFn: async (imageId: string) =>
+      unwrap(
+        await api.POST("/api/v1/admin/images/{image_id}/templates", {
+          params: { path: { image_id: imageId } },
+          body: { cluster_id: clusterId, template_vmid: template!.vmid },
+        }),
+      ),
+    ...done,
+  });
+  const error = create.error ?? attach.error;
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    register.mutate({
+    const f = new FormData(e.currentTarget);
+    if (mode === "existing") {
+      attach.mutate(String(f.get("image_id")));
+      return;
+    }
+    create.mutate({
       cluster_id: clusterId,
       template_vmid: template!.vmid,
-      name: String(form.get("name")),
-      description: String(form.get("description") ?? ""),
-      default_user: String(form.get("default_user")),
+      name: String(f.get("name")),
+      description: String(f.get("description") ?? ""),
+      default_user: String(f.get("default_user")),
       visibility,
-      tenant_id: visibility === "tenant" ? String(form.get("tenant_id")) : null,
+      tenant_id: visibility === "tenant" ? String(f.get("tenant_id")) : null,
     });
   }
 
   return (
-    <Dialog open={template !== null} onClose={onClose} title={`Registrar ${template?.name ?? ""}`}>
+    <Dialog open={template !== null} onClose={onClose} title={`Registrar ${template?.name ?? ""} (${template?.vmid ?? ""})`}>
       <form onSubmit={submit} className="space-y-3">
-        <Field label="Nome no catálogo">
-          <Input name="name" required maxLength={100} defaultValue={template?.name} />
-        </Field>
-        <Field label="Descrição">
-          <Input name="description" maxLength={1000} />
-        </Field>
-        <Field label="Usuário padrão" hint="Usuário que o cloud-init cria e que recebe as chaves SSH.">
-          <Input name="default_user" required defaultValue="debian" pattern="[a-z_][a-z0-9_\-]{0,31}" />
-        </Field>
-        <Field label="Visibilidade">
-          <Select
-            className="w-full"
-            value={visibility}
-            onChange={(e) => setVisibility(e.target.value as "public" | "tenant")}
-          >
-            <option value="public">Pública (todos os tenants)</option>
-            <option value="tenant">Só um tenant</option>
-          </Select>
-        </Field>
-        {visibility === "tenant" && (
-          <Field label="Tenant">
-            <Select name="tenant_id" className="w-full" required defaultValue="">
+        <div role="radiogroup" className="flex gap-4 text-sm">
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={mode === "existing"} disabled={!images.length} onChange={() => setMode("existing")} />
+            Adicionar a uma imagem existente
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={mode === "new"} onChange={() => setMode("new")} />
+            Nova imagem
+          </label>
+        </div>
+        {mode === "existing" ? (
+          <Field label="Imagem" hint="A imagem passa a estar disponível também na zona deste servidor.">
+            <Select name="image_id" className="w-full" required defaultValue="">
               <option value="" disabled>
                 Selecione…
               </option>
-              {tenants.data?.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
+              {images.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.name}
                 </option>
               ))}
             </Select>
           </Field>
+        ) : (
+          <>
+            <Field label="Nome no catálogo" hint="Sem o nome do servidor: a mesma imagem pode existir em várias zonas.">
+              <Input name="name" required maxLength={100} defaultValue={template?.name} />
+            </Field>
+            <Field label="Descrição">
+              <Input name="description" maxLength={1000} />
+            </Field>
+            <Field label="Usuário padrão" hint="Usuário que o cloud-init cria e que recebe as chaves SSH.">
+              <Input name="default_user" required defaultValue="debian" pattern="[a-z_][a-z0-9_\-]{0,31}" />
+            </Field>
+            <Field label="Visibilidade">
+              <Select className="w-full" value={visibility} onChange={(e) => setVisibility(e.target.value as "public" | "tenant")}>
+                <option value="public">Pública (todos os tenants)</option>
+                <option value="tenant">Só um tenant</option>
+              </Select>
+            </Field>
+            {visibility === "tenant" && (
+              <Field label="Tenant">
+                <Select name="tenant_id" className="w-full" required defaultValue="">
+                  <option value="" disabled>
+                    Selecione…
+                  </option>
+                  {tenants.data?.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+          </>
         )}
-        <ErrorBox message={register.isError ? errorMessage(register.error) : null} />
+        <ErrorBox message={error ? errorMessage(error) : null} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={register.isPending}>
+          <Button type="submit" disabled={create.isPending || attach.isPending}>
             Registrar
           </Button>
         </div>
@@ -121,17 +169,25 @@ export default function AdminImagesPage() {
       ),
     enabled: clusterId !== "",
   });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["admin", "images"] });
   const toggle = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) =>
+      unwrap(await api.PATCH("/api/v1/admin/images/{image_id}", { params: { path: { image_id: id } }, body: { active } })),
+    onSuccess: refresh,
+  });
+  const detach = useMutation({
+    mutationFn: async ({ image, template }: { image: string; template: string }) =>
       unwrap(
-        await api.PATCH("/api/v1/admin/images/{image_id}", {
-          params: { path: { image_id: id } },
-          body: { active },
+        await api.DELETE("/api/v1/admin/images/{image_id}/templates/{template_id}", {
+          params: { path: { image_id: image, template_id: template } },
         }),
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "images"] }),
+    onSuccess: () => {
+      refresh();
+      queryClient.invalidateQueries({ queryKey: ["admin", "templates"] });
+    },
   });
-  const clusterName = new Map((clusters.data ?? []).map((c) => [c.id, c.name]));
+  const imageName = new Map((images.data ?? []).map((i) => [i.id, i.name]));
 
   return (
     <div className="space-y-4">
@@ -139,65 +195,70 @@ export default function AdminImagesPage() {
 
       <Card title="Catálogo">
         {images.data?.length === 0 && <Empty>Nenhuma imagem registrada.</Empty>}
-        {!!images.data?.length && (
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="py-2 pr-4 font-medium">Nome</th>
-                <th className="py-2 pr-4 font-medium">Cluster / template</th>
-                <th className="py-2 pr-4 font-medium">Disco mín.</th>
-                <th className="py-2 pr-4 font-medium">Visibilidade</th>
-                <th className="py-2 font-medium" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {images.data.map((i) => (
-                <tr key={i.id} className={i.active ? "" : "opacity-50"}>
-                  <td className="py-2 pr-4 font-medium">{i.name}</td>
-                  <td className="py-2 pr-4">
-                    {clusterName.get(i.cluster_id) ?? "—"} · {i.template_vmid}
-                  </td>
-                  <td className="py-2 pr-4">{i.min_disk_gb} GiB</td>
-                  <td className="py-2 pr-4">
-                    <Badge tone={i.visibility === "public" ? "blue" : "gray"}>
-                      {i.visibility === "public" ? "Pública" : "Tenant"}
-                    </Badge>
-                  </td>
-                  <td className="py-2 text-right">
-                    <Button
-                      variant="ghost"
-                      disabled={toggle.isPending}
-                      onClick={() => toggle.mutate({ id: i.id, active: !i.active })}
+        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+          {images.data?.map((i) => (
+            <li key={i.id} className={`py-3 ${i.active ? "" : "opacity-50"}`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{i.name}</span>
+                  <Badge tone={i.visibility === "public" ? "blue" : "gray"}>
+                    {i.visibility === "public" ? "Pública" : "Tenant"}
+                  </Badge>
+                  <span className="text-xs text-slate-500">
+                    usuário {i.default_user} · disco mín. {i.min_disk_gb} GiB
+                  </span>
+                </div>
+                <Button variant="ghost" disabled={toggle.isPending} onClick={() => toggle.mutate({ id: i.id, active: !i.active })}>
+                  {i.active ? "Desativar" : "Reativar"}
+                </Button>
+              </div>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {i.templates.length === 0 && (
+                  <li className="text-xs text-amber-700 dark:text-amber-300">Sem template em nenhum servidor: indisponível.</li>
+                )}
+                {i.templates.map((t) => (
+                  <li
+                    key={t.id}
+                    className="flex items-center gap-2 rounded-md border border-slate-200 px-2 py-1 text-xs dark:border-slate-700"
+                  >
+                    <span>
+                      {t.zone_name ?? <span className="text-amber-700 dark:text-amber-300">sem zona</span>} ·{" "}
+                      {t.cluster_name} · template {t.template_vmid}
+                    </span>
+                    <button
+                      aria-label={`Remover template de ${t.cluster_name}`}
+                      className="text-slate-400 hover:text-rose-600"
+                      disabled={detach.isPending}
+                      onClick={() => detach.mutate({ image: i.id, template: t.id })}
                     >
-                      {i.active ? "Desativar" : "Reativar"}
-                    </Button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        <ErrorBox message={toggle.isError ? errorMessage(toggle.error) : null} />
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+        <ErrorBox message={toggle.isError ? errorMessage(toggle.error) : detach.isError ? errorMessage(detach.error) : null} />
       </Card>
 
       <Card
-        title="Templates disponíveis"
+        title="Templates nos servidores"
         actions={
-          <Select aria-label="Cluster" value={clusterId} onChange={(e) => setClusterId(e.target.value)}>
-            <option value="">Escolha um cluster…</option>
+          <Select aria-label="Servidor" value={clusterId} onChange={(e) => setClusterId(e.target.value)}>
+            <option value="">Escolha um servidor…</option>
             {clusters.data?.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
+                {c.zone_name ? ` (${c.zone_name})` : " (sem zona)"}
               </option>
             ))}
           </Select>
         }
       >
-        {!clusterId && <Empty>Escolha um cluster para ver os templates que o token enxerga.</Empty>}
+        {!clusterId && <Empty>Escolha um servidor para ver os templates que o token enxerga.</Empty>}
         <ErrorBox message={templates.isError ? errorMessage(templates.error) : null} />
-        {templates.data?.length === 0 && (
-          <Empty>Nenhum template visível. Dê ao token acesso de leitura/clone no template.</Empty>
-        )}
+        {templates.data?.length === 0 && <Empty>Nenhum template visível. Dê ao token acesso de leitura/clone no template.</Empty>}
         <ul className="divide-y divide-slate-100 dark:divide-slate-800">
           {templates.data?.map((t) => (
             <li key={t.vmid} className="flex items-center justify-between gap-4 py-2 text-sm">
@@ -208,10 +269,10 @@ export default function AdminImagesPage() {
                 </span>
               </span>
               {t.image_id ? (
-                <Badge tone="green">registrado</Badge>
+                <Badge tone="green">em “{imageName.get(t.image_id) ?? "imagem"}”</Badge>
               ) : (
                 <Button variant="secondary" onClick={() => setRegistering(t)}>
-                  Registrar como imagem
+                  Registrar
                 </Button>
               )}
             </li>
@@ -219,7 +280,13 @@ export default function AdminImagesPage() {
         </ul>
       </Card>
 
-      <RegisterDialog clusterId={clusterId} template={registering} onClose={() => setRegistering(null)} />
+      <RegisterDialog
+        key={registering?.vmid ?? "none"}
+        clusterId={clusterId}
+        template={registering}
+        images={images.data ?? []}
+        onClose={() => setRegistering(null)}
+      />
     </div>
   );
 }

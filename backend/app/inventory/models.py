@@ -29,6 +29,10 @@ class ProviderCluster(UUIDPk, Timestamps, Base):
 
     name: Mapped[str] = mapped_column(Text, unique=True)
     provider: Mapped[str] = mapped_column(Text, server_default="proxmox")
+    # no zone: synced and monitored, but never chosen for new instances
+    zone_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("zones.id", ondelete="SET NULL"), index=True
+    )
     api_url: Mapped[str] = mapped_column(Text)
     ca_pem: Mapped[str | None] = mapped_column(Text)  # None -> system CAs
     insecure_skip_verify: Mapped[bool] = mapped_column(Boolean, server_default="false")

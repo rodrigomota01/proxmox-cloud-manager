@@ -5,6 +5,8 @@ from dataclasses import asdict
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AppSettings, CurrentTenant, DbSession, RedisClient
 from app.compute.models import Instance
@@ -28,6 +30,7 @@ from app.core.pagination import PageParams, page_params
 from app.inventory.models import ProviderCluster
 from app.jobs.presenter import job_out, jobs_out
 from app.providers.base import ProviderError, ProviderRef
+from app.regions.models import Region, Zone
 from app.tenancy import quota
 from app.tenancy.schemas import Page
 
@@ -39,13 +42,28 @@ IdempotencyKey = Annotated[str | None, Header(alias="Idempotency-Key", max_lengt
 METRICS_TTL = {"hour": 30, "day": 300, "week": 300}
 
 
-def instance_out(i: Instance) -> InstanceOut:
+Places = dict[uuid.UUID, tuple[uuid.UUID | None, str | None, str | None]]
+
+
+async def places(db: AsyncSession) -> Places:
+    """cluster id -> (zone id, zone name, region name); servers themselves stay hidden."""
+    rows = await db.execute(
+        select(ProviderCluster.id, Zone.id, Zone.name, Region.name)
+        .outerjoin(Zone, Zone.id == ProviderCluster.zone_id)
+        .outerjoin(Region, Region.id == Zone.region_id)
+    )
+    return {cid: (zid, zname, rname) for cid, zid, zname, rname in rows}
+
+
+def instance_out(i: Instance, where: Places) -> InstanceOut:
+    zone_id, zone_name, region_name = where.get(i.cluster_id, (None, None, None))
     if i.project_id is None:  # DB constraint: managed instances always have a project
         raise RuntimeError(f"managed instance {i.id} without project")
     return InstanceOut(
         id=i.id, project_id=i.project_id, kind=i.kind, name=i.name, state=i.state,
         power_state=i.power_state, vcpus=i.vcpus, memory_mb=i.memory_mb,
         root_disk_gb=i.root_disk_gb, tags=i.tags, image_id=i.image_id,
+        zone_id=zone_id, zone_name=zone_name, region_name=region_name,
         cpu_usage=i.cpu_usage, memory_used_mb=i.memory_used_mb,
         uptime_seconds=i.uptime_seconds,
         ipv4=i.network.get("address"), gateway=i.network.get("gateway"),
@@ -63,12 +81,13 @@ async def list_instances(
     items, cursor = await ComputeService(db, ctx).list_instances(
         page, project_id=project_id, kind=kind, power_state=power_state
     )
-    return Page(items=[instance_out(i) for i in items], next_cursor=cursor)
+    where = await places(db)
+    return Page(items=[instance_out(i, where) for i in items], next_cursor=cursor)
 
 
 @router.get("/instances/{instance_id}", tags=["instances"])
 async def get_instance(instance_id: uuid.UUID, ctx: CurrentTenant, db: DbSession) -> InstanceOut:
-    return instance_out(await ComputeService(db, ctx).get(instance_id))
+    return instance_out(await ComputeService(db, ctx).get(instance_id), await places(db))
 
 
 @router.get("/instances/{instance_id}/metrics", tags=["instances"])
@@ -107,7 +126,9 @@ async def create_instance(
     await db.refresh(instance)
     await db.refresh(job)
     response.headers["Location"] = f"/api/v1/jobs/{job.id}"
-    return InstanceAccepted(instance=instance_out(instance), job=await job_out(db, job))
+    return InstanceAccepted(
+        instance=instance_out(instance, await places(db)), job=await job_out(db, job)
+    )
 
 
 @router.delete(

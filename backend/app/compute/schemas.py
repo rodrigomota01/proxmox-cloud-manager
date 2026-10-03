@@ -47,6 +47,7 @@ class InstanceCreate(Input):
     project_id: uuid.UUID
     name: Hostname
     image_id: uuid.UUID
+    zone_id: uuid.UUID  # the platform picks the server inside the zone
     vcpus: Annotated[int, Field(ge=1, le=32)]
     memory_mb: Annotated[int, Field(ge=512, le=262_144, multiple_of=256)]
     root_disk_gb: Annotated[int, Field(ge=1, le=2048)]
@@ -73,6 +74,9 @@ class InstanceOut(BaseModel):
     root_disk_gb: int
     tags: list[str]
     image_id: uuid.UUID | None
+    zone_id: uuid.UUID | None  # from the server it runs on (ADR-0012)
+    zone_name: str | None
+    region_name: str | None
     cpu_usage: float  # 0..1 of the allocated vCPUs, as of last_seen_at
     memory_used_mb: int
     uptime_seconds: int

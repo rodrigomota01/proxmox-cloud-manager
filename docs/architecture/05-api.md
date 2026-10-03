@@ -173,6 +173,9 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | POST | `/admin/clusters/{id}/sync` | `cluster:sync` → 202 job (`cluster.sync`) |
 | GET | `/admin/clusters/{id}/sync-runs` | `cluster:manage` |
 | GET | `/admin/tenants` | `tenant:create` (todos os tenants; `/tenants` lista só memberships) |
+| GET | `/regions` | autenticado (regiões ativas com zonas utilizáveis; sem servidores) |
+| GET/POST/PATCH | `/admin/regions` · `/admin/regions/{id}` · `/admin/regions/{id}/zones` · `/admin/zones/{id}` | `cluster:manage` (ADR-0012) |
+| POST/DELETE | `/admin/images/{id}/templates` · `/admin/images/{id}/templates/{tid}` | `template:publish` (template da imagem em cada servidor) |
 | GET/POST | `/admin/users` | `user:manage` (busca `?q=`; criar = convite por e-mail) |
 | GET/PATCH | `/admin/users/{id}` | `user:manage` (nome, e-mail, ativo; regras anti-escalonamento) |
 | POST | `/admin/users/{id}/unlock` · `/password-reset` · `/sessions/revoke` | `user:manage` |

@@ -66,7 +66,7 @@ export function Meter({
       >
         <div className="h-full rounded-full transition-[width]" style={{ width: `${clamped * 100}%`, background: fill }} />
       </div>
-      <span className="w-20 shrink-0 text-right text-xs tabular-nums text-slate-700 dark:text-slate-300">
+      <span className="min-w-[3.5rem] shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-slate-700 dark:text-slate-300">
         {level && (
           <span aria-label={level === "critical" ? "crítico" : "alto"} className="mr-0.5">
             ⚠

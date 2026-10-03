@@ -44,6 +44,7 @@ class ClusterCreate(Input):
     name: Name
     api_url: Annotated[str, Field(max_length=255)]
     pool: Pool | None = None
+    zone_id: uuid.UUID | None = None
     ca_pem: Annotated[str | None, Field(max_length=65_536)] = None
     insecure_skip_verify: bool = False
     vmid_range: VmidRange = VmidRange()
@@ -55,6 +56,7 @@ class ClusterCreate(Input):
 class ClusterUpdate(Input):
     name: Name | None = None
     pool: Pool | None = None
+    zone_id: uuid.UUID | None = None
     api_url: Annotated[str | None, Field(max_length=255)] = None
     ca_pem: Annotated[str | None, Field(max_length=65_536)] = None
     insecure_skip_verify: bool | None = None
@@ -98,6 +100,9 @@ class ClusterOut(BaseModel):
     status: str
     version: str | None
     settings: dict[str, Any]
+    zone_id: uuid.UUID | None
+    zone_name: str | None
+    region_name: str | None
     has_credentials: bool
     token_id: str | None  # the id is not secret; the secret is never returned
     credentials_rotated_at: datetime | None
@@ -147,6 +152,8 @@ class NodeBase(BaseModel):
 class NodeOut(NodeBase):
     # capacity planning: what guests on this node were given vs what it physically has
     cluster_name: str
+    zone_name: str | None
+    region_name: str | None
     instances_total: int
     instances_running: int
     vcpus_allocated: int

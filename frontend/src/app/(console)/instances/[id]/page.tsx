@@ -84,6 +84,9 @@ export default function InstanceDetailPage() {
           <dl className="divide-y divide-slate-100 dark:divide-slate-800">
             <Row label="Tipo">{i.kind === "vm" ? "Máquina virtual" : "Container"}</Row>
             <Row label="Projeto">{projectNames.get(i.project_id) ?? "—"}</Row>
+            <Row label="Região / zona">
+              {i.region_name ? `${i.region_name} · ${i.zone_name}` : "—"}
+            </Row>
             <Row label="vCPUs">{i.vcpus}</Row>
             {i.power_state === "running" && i.state === "active" && (
               <>
