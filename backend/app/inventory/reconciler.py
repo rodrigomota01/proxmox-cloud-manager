@@ -101,13 +101,15 @@ async def reconcile(
     offline = {name for name, n in existing_nodes.items() if n.status != "online"}
 
     # instances
+    # FOR UPDATE: a job finishing an operation on one of these rows waits for this sync
+    # to commit (and then re-reads it) instead of both writing over each other
     live = {
         i.provider_ref["vmid"]: i
         for i in (
             await db.execute(
-                select(Instance).where(
-                    Instance.cluster_id == cluster.id, Instance.deleted_at.is_(None)
-                )
+                select(Instance)
+                .where(Instance.cluster_id == cluster.id, Instance.deleted_at.is_(None))
+                .with_for_update()
             )
         ).scalars()
         if "vmid" in i.provider_ref  # still being created: no guest id yet
@@ -121,6 +123,10 @@ async def reconcile(
             )
             db.add(instance)
             stats.discovered += 1
+        elif instance.state in BUSY_STATES:
+            # its job owns the row until it finishes; mid-clone the provider may not even
+            # report the final name yet (PVE shows "qemu-<id>"), which must not stick
+            continue
         else:
             stats.updated += 1
         node = existing_nodes.get(obs.node)

@@ -23,6 +23,13 @@ from app.providers.base import (
 )
 
 
+async def _lock_fresh(db: AsyncSession, instance: Instance) -> None:
+    """Re-read the row, locked, right before writing the outcome. Between reading it and
+    now the job waited on the provider for seconds or minutes, and the reconciler may
+    have refreshed the row meanwhile (a stale copy fails the version check)."""
+    await db.refresh(instance, with_for_update=True)
+
+
 @handler("instance.power")
 async def instance_power(ctx: JobContext) -> dict[str, Any]:
     action = PowerAction(ctx.job.payload["action"])
@@ -48,6 +55,7 @@ async def instance_power(ctx: JobContext) -> dict[str, Any]:
             if not result.ok:
                 raise JobFailed("PROVIDER_TASK_FAILED", result.message or "task failed")
             live = await provider.get_instance(ref)
+        await _lock_fresh(db, instance)
         instance.power_state = live.power_state.value
         instance.last_seen_at = datetime.now(UTC)
         await db.commit()
@@ -162,6 +170,7 @@ async def instance_create(ctx: JobContext) -> dict[str, Any]:
                 raise JobFailed("PROVIDER_TASK_FAILED", f"start: {result.message}")
             live = await provider.get_instance(ref)
 
+        await _lock_fresh(db, instance)
         instance.state, instance.power_state = "active", live.power_state.value
         instance.last_seen_at = datetime.now(UTC)
         await audit.record(
@@ -193,6 +202,7 @@ async def instance_create_failed(ctx: JobContext, code: str, message: str) -> No
                 await ctx.event("compensated", "partially created guest destroyed")
             except (ProviderError, JobFailed) as exc:
                 await ctx.event("compensation_failed", str(exc))
+        await _lock_fresh(db, instance)
         instance.state, instance.deleted_at = "error", datetime.now(UTC)
         await audit.record(
             db, "INSTANCE_CREATE_FAILED", outcome="failure",
@@ -245,6 +255,7 @@ async def instance_delete(ctx: JobContext) -> dict[str, Any]:
             cluster = await db.get_one(ProviderCluster, instance.cluster_id)
             async with ctx.providers.open(db, cluster) as provider:
                 await _destroy(provider, ProviderRef(instance.provider_ref), instance.provider_name)
+        await _lock_fresh(db, instance)
         instance.state, instance.deleted_at = "deleted", datetime.now(UTC)
         instance.power_state = PowerState.UNKNOWN.value
         await audit.record(
@@ -262,7 +273,7 @@ async def instance_delete_failed(ctx: JobContext, code: str, message: str) -> No
     # back to a state from which the user can retry the deletion
     db = await ctx.session()
     try:
-        instance = await db.get(Instance, ctx.job.resource_id)
+        instance = await db.get(Instance, ctx.job.resource_id, with_for_update=True)
         if instance is not None and instance.state == "deleting":
             instance.state = "error"
             await db.commit()

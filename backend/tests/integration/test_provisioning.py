@@ -20,6 +20,7 @@ from app.jobs.queue import run_one
 from app.providers.base import InstanceSpec, ProviderError, ProviderRef, StaticIPv4
 from app.providers.fake import FakeProvider
 from app.providers.registry import ProviderRegistry
+from app.worker.main import reconcile_all
 from tests.integration.factories import (
     PASSWORD,
     add_member,
@@ -557,3 +558,68 @@ async def test_placement_prefers_the_least_loaded_server_in_a_zone(client, env, 
         await env.drain()
     # equal capacity: allocations alternate between the two servers
     assert len(fake.instances) == 2 and len(two_servers.instances) == 2
+
+
+# --- the reconciler running while a job works on the same instance ---------------------
+
+
+async def _until(owner_db, job_id, kind, count=1):
+    """Wait (bounded) until the job has recorded `count` events of `kind`."""
+    for _ in range(200):
+        n = len((await owner_db.execute(
+            select(JobEvent.id).where(JobEvent.job_id == job_id, JobEvent.kind == kind)
+        )).all())
+        if n >= count:
+            return
+        await asyncio.sleep(0.02)
+    raise AssertionError(f"job {job_id} never reached {kind}")
+
+
+async def test_sync_during_creation_neither_breaks_it_nor_renames_it(env, fake, owner_db, app):
+    key_id, _ = await env.add_key("alice")
+    r = await env.create("alice", env.body(key_id))
+    job_id, iid = r.json()["job"]["id"], r.json()["instance"]["id"]
+    gate = asyncio.Event()
+    fake.wait_gate = gate  # the clone task "takes a while"
+    worker = asyncio.create_task(env.drain())
+    try:
+        await _until(owner_db, job_id, "provider_task")
+        # mid-clone, PVE lists the guest under a placeholder name
+        obs = fake.instances["10000"]
+        fake.instances["10000"] = obs.__class__(**{**obs.__dict__, "name": "qemu-10000"})
+        await reconcile_all(app.state.sessionmaker, app.state.providers)
+        fake.instances["10000"] = obs
+        gate.set()
+        await asyncio.wait_for(worker, 10)
+    finally:
+        gate.set()
+    job = await owner_db.get(Job, job_id, populate_existing=True)
+    assert job.status == "succeeded", job.error_message
+    row = await owner_db.get(Instance, iid, populate_existing=True)
+    assert row.state == "active" and row.provider_name == "web-01"
+    live = (await owner_db.execute(
+        select(Instance).where(Instance.deleted_at.is_(None))
+    )).scalars().all()
+    assert len(live) == 1  # not re-discovered as a second, unmanaged instance
+
+
+async def test_sync_during_a_power_operation_does_not_break_it(client, env, fake, owner_db, app):
+    key_id, _ = await env.add_key("alice")
+    iid = (await env.create("alice", env.body(key_id))).json()["instance"]["id"]
+    await env.drain()
+    h = await env.h("alice", env.acme)
+    job_id = (await client.post(f"/api/v1/instances/{iid}/stop", headers=h)).json()["job"]["id"]
+    gate = asyncio.Event()
+    fake.wait_gate = gate  # a slow shutdown
+    worker = asyncio.create_task(env.drain())
+    try:
+        await _until(owner_db, job_id, "provider_task")
+        await reconcile_all(app.state.sessionmaker, app.state.providers)  # bumps the row
+        gate.set()
+        await asyncio.wait_for(worker, 10)
+    finally:
+        gate.set()
+    job = await owner_db.get(Job, job_id, populate_existing=True)
+    assert job.status == "succeeded", job.error_message
+    row = await owner_db.get(Instance, iid, populate_existing=True)
+    assert row.power_state == "stopped"
