@@ -150,6 +150,11 @@ async def test_cluster_validation(client, ctx):
         json={"token_id": "no-realm", "secret": "x"}, headers=root,
     )
     assert r.status_code == 422
+    r = await client.put(  # a password pasted where the token secret goes
+        "/api/v1/admin/clusters/00000000-0000-0000-0000-000000000000/credentials",
+        json={"token_id": "cloudmgr@pve!cm", "secret": "my-admin-password"}, headers=root,
+    )
+    assert r.status_code == 422 and "UUID" in r.text and "my-admin-password" not in r.text
 
 
 async def test_missing_kek_is_a_clear_503(client, ctx, app, settings):
@@ -286,3 +291,37 @@ async def test_worker_reconciles_all_clusters(client, ctx, app, registry, owner_
 async def test_admin_lists_all_tenants(client, ctx):
     r = await client.get("/api/v1/admin/tenants", headers=ctx["root"])
     assert [t["slug"] for t in r.json()] == ["acme", "globex"]
+
+
+async def test_worker_skips_clusters_with_rejected_credentials(
+    client, ctx, app, registry, fake, owner_db
+):
+    from app.providers.base import ProviderAuthError
+
+    cid = await _cluster_with_creds(client, ctx["root"])
+
+    async def rejected():
+        raise ProviderAuthError("GET /cluster/resources: HTTP 401 (check token/ACL)")
+
+    fake.inventory = rejected  # type: ignore[method-assign]
+    await reconcile_all(app.state.sessionmaker, registry)
+    cluster = await owner_db.get(ProviderCluster, cid)
+    await owner_db.refresh(cluster)
+    assert cluster.status == "auth_error"
+
+    calls = []
+
+    async def counting():
+        calls.append(1)
+        raise ProviderAuthError("401")
+
+    fake.inventory = counting  # type: ignore[method-assign]
+    await reconcile_all(app.state.sessionmaker, registry)
+    assert calls == []  # not retried every tick
+
+    # new credentials re-enable the scheduled sync
+    await client.put(f"/api/v1/admin/clusters/{cid}/credentials", json=CREDS, headers=ctx["root"])
+    await owner_db.refresh(cluster)
+    assert cluster.status == "unknown"
+    await reconcile_all(app.state.sessionmaker, registry)
+    assert calls == [1]

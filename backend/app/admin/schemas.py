@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime
 from typing import Annotated, Any
@@ -61,9 +62,24 @@ class ClusterUpdate(Input):
     _ca = field_validator("ca_pem")(_check_ca)
 
 
+_PVE_SECRET = re.compile(r"^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$")
+
+
 class CredentialsPut(Input):
     token_id: TokenId
     secret: Annotated[SecretStr, Field(min_length=1, max_length=256)]
+
+    @field_validator("secret")
+    @classmethod
+    def _secret_format(cls, value: SecretStr) -> SecretStr:
+        # Proxmox token secrets are UUIDs; catching a pasted password here beats a 401
+        # from the hypervisor (and repeated failed logins against it)
+        cleaned = value.get_secret_value().strip()
+        if not _PVE_SECRET.match(cleaned):
+            raise ValueError(
+                "expected the Proxmox token secret (UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
+            )
+        return SecretStr(cleaned)
 
 
 class ClusterOut(BaseModel):

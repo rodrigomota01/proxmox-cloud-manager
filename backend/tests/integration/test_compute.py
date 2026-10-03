@@ -69,7 +69,8 @@ async def env(owner_db, client, app, registry):
     e.cluster = cid = r.json()["id"]
     await client.put(
         f"/api/v1/admin/clusters/{cid}/credentials",
-        json={"token_id": "cloudmgr@pve!cm", "secret": "s3cr3t"}, headers=root,
+        json={"token_id": "cloudmgr@pve!cm", "secret": "0e5c6a3e-1b2d-4f6a-9c8b-7d6e5f4a3b2c"},
+        headers=root,
     )
     await client.post(f"/api/v1/admin/clusters/{cid}/sync", headers=root)
     await e.drain()

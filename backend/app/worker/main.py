@@ -43,11 +43,14 @@ async def reconcile_all(
 ) -> None:
     async with sessionmaker() as db, db.begin():
         await set_platform_scope(db)
+        # a rejected token is not retried every tick: repeated auth failures against the
+        # hypervisor are noise at best and can trip fail2ban. New credentials (or a manual
+        # test/sync) reset the status.
         ids = (
             await db.execute(
-                select(ProviderCluster.id).join(
-                    ProviderCredential, ProviderCredential.cluster_id == ProviderCluster.id
-                )
+                select(ProviderCluster.id)
+                .join(ProviderCredential, ProviderCredential.cluster_id == ProviderCluster.id)
+                .where(ProviderCluster.status != "auth_error")
             )
         ).scalars().all()
     for cluster_id in ids:

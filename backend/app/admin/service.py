@@ -25,7 +25,7 @@ from app.infra.secrets import seal
 from app.inventory.models import ProviderCluster, ProviderCredential
 from app.jobs.models import Job
 from app.jobs.queue import enqueue
-from app.providers.base import ProviderError
+from app.providers.base import ProviderAuthError, ProviderError
 from app.providers.registry import ProviderRegistry
 from app.tenancy.models import Project
 
@@ -141,6 +141,8 @@ class AdminService:
         cred.token_id = body.token_id
         cred.secret_ciphertext, cred.dek_wrapped = sealed.ciphertext, sealed.dek_wrapped
         cred.kek_ref, cred.rotated_at = sealed.kek_ref, datetime.now(UTC)
+        if cluster.status == "auth_error":  # let the scheduled sync try the new token
+            cluster.status, cluster.last_error = "unknown", None
         await self.db.flush()
         await self._audit(
             "CLUSTER_CREDENTIALS_ROTATE" if rotated else "CLUSTER_CREDENTIALS_SET",
@@ -157,8 +159,12 @@ class AdminService:
                 inv = await provider.inventory()
         except ProviderError as exc:
             cluster.last_error = str(exc)
+            if isinstance(exc, ProviderAuthError):
+                cluster.status = "auth_error"
             return ConnectionTest(ok=False, error=str(exc))
         cluster.version, cluster.last_error = health.version, None
+        if cluster.status == "auth_error":
+            cluster.status = "unknown"
         return ConnectionTest(
             ok=True, version=health.version, nodes_online=health.nodes_online,
             nodes_total=health.nodes_total, guests_visible=len(inv.instances),
