@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 
 import { NodeMetrics } from "@/components/metrics-panel";
 import { Card, ErrorBox, formatBytes } from "@/components/ui";
-import { Meter, mib, uptime } from "@/components/viz";
+import { Allocation, Meter, mib, uptime } from "@/components/viz";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
 
 export default function NodeDetailPage() {
@@ -40,16 +40,22 @@ export default function NodeDetailPage() {
       ),
     ],
     [
-      "vCPUs alocadas",
-      <Meter key="v" value={n.cpu_count ? n.vcpus_allocated / n.cpu_count : 0} label={`${n.vcpus_allocated} / ${n.cpu_count}`} title="vCPUs alocadas" />,
+      "vCPUs configuradas",
+      <Allocation
+        key="v"
+        ratio={n.cpu_count ? n.vcpus_allocated / n.cpu_count : 0}
+        label={`${n.vcpus_allocated} / ${n.cpu_count} núcleos`}
+        title="vCPUs configuradas nas VMs sobre os núcleos físicos. Não é consumo: acima de 1× é normal em CPU."
+      />,
     ],
     [
-      "RAM alocada",
-      <Meter
+      "RAM configurada",
+      <Allocation
         key="r"
-        value={n.memory_bytes ? (n.memory_allocated_mb * 1024 ** 2) / n.memory_bytes : 0}
+        ratio={n.memory_bytes ? (n.memory_allocated_mb * 1024 ** 2) / n.memory_bytes : 0}
         label={`${mib(n.memory_allocated_mb)} / ${formatBytes(n.memory_bytes)}`}
-        title="RAM alocada"
+        title="RAM configurada nas VMs sobre a RAM física. Acima de 1× há risco se todas usarem o máximo."
+        warnAbove={1}
       />,
     ],
     ["VMs ligadas", `${n.instances_running} de ${n.instances_total}`],

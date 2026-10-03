@@ -34,6 +34,38 @@ export function uptime(seconds: number): string {
   return d ? `${d}d ${h}h` : h ? `${h}h ${m}min` : `${m}min`;
 }
 
+// --- allocation ------------------------------------------------------------------------
+
+/** What VMs were *given* versus the physical capacity — configuration, not consumption.
+ * Deliberately not a bar: a full red bar reads as "saturated" when the host may be idle.
+ * Overcommit above 1× is normal for CPU; `warnAbove` flags it only where it is risky (RAM). */
+export function Allocation({
+  ratio,
+  label,
+  title,
+  warnAbove,
+}: {
+  ratio: number;
+  label: string;
+  title?: string;
+  warnAbove?: number;
+}) {
+  const warn = warnAbove !== undefined && ratio > warnAbove;
+  return (
+    <span className="whitespace-nowrap text-xs tabular-nums text-slate-700 dark:text-slate-300" title={title}>
+      {warn && (
+        <span aria-label="sobrecomprometida" className="mr-0.5" style={{ color: "var(--viz-serious)" }}>
+          ⚠
+        </span>
+      )}
+      {label}
+      <span className="ml-1.5 text-slate-500">{ratioLabel(ratio)}</span>
+    </span>
+  );
+}
+
+export const ratioLabel = (r: number) => `${r.toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}×`;
+
 // --- meter -----------------------------------------------------------------------------
 
 const SERIOUS = 0.75;

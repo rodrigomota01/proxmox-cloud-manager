@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Badge, Card, Empty, ErrorBox, Select, formatBytes } from "@/components/ui";
-import { Meter, SortHeader, mib, uptime, useSorted } from "@/components/viz";
+import { Allocation, Meter, SortHeader, mib, ratioLabel, uptime, useSorted } from "@/components/viz";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 
 type Node = Schemas["NodeOut"];
@@ -33,7 +33,7 @@ function Totals({ nodes }: { nodes: Node[] }) {
     { label: "Hypervisors online", value: `${online.length} de ${nodes.length}` },
     { label: "CPU em uso", value: `${Math.round(cpuWeighted * 100)}%` },
     { label: "Memória em uso", value: `${formatBytes(memUsed)} de ${formatBytes(mem)}` },
-    { label: "vCPUs alocadas / núcleos", value: `${vcpus} / ${cores}` },
+    { label: "vCPUs configuradas / núcleos", value: `${vcpus} / ${cores}${cores ? ` · ${ratioLabel(vcpus / cores)}` : ""}` },
   ];
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -101,8 +101,8 @@ export default function NodesPage() {
                   <th className="py-2 pr-4 font-medium uppercase tracking-wide">Status</th>
                   <SortHeader label="CPU em uso" k="cpu" sort={sort} toggle={toggle} />
                   <SortHeader label="Memória em uso" k="memory" sort={sort} toggle={toggle} />
-                  <SortHeader label="vCPUs alocadas" k="vcpu" sort={sort} toggle={toggle} />
-                  <SortHeader label="RAM alocada" k="ram" sort={sort} toggle={toggle} />
+                  <SortHeader label="vCPUs configuradas" k="vcpu" sort={sort} toggle={toggle} />
+                  <SortHeader label="RAM configurada" k="ram" sort={sort} toggle={toggle} />
                   <SortHeader label="VMs" k="vms" sort={sort} toggle={toggle} align="right" />
                   <th className="py-2 text-right font-medium uppercase tracking-wide">Ligado há</th>
                 </tr>
@@ -137,17 +137,18 @@ export default function NodesPage() {
                         )}
                       </td>
                       <td className="py-2.5 pr-4">
-                        <Meter
-                          value={vcpuRatio(n)}
+                        <Allocation
+                          ratio={vcpuRatio(n)}
                           label={`${n.vcpus_allocated} / ${n.cpu_count}`}
-                          title="vCPUs alocadas às VMs sobre os núcleos físicos (acima de 100% = sobrecomprometido)"
+                          title="vCPUs configuradas nas VMs sobre os núcleos físicos. Não é consumo: acima de 1× é normal em CPU."
                         />
                       </td>
                       <td className="py-2.5 pr-4">
-                        <Meter
-                          value={ramRatio(n)}
-                          label={`${mib(n.memory_allocated_mb)}`}
-                          title="RAM configurada nas VMs sobre a RAM física"
+                        <Allocation
+                          ratio={ramRatio(n)}
+                          label={`${mib(n.memory_allocated_mb)} / ${formatBytes(n.memory_bytes)}`}
+                          title="RAM configurada nas VMs sobre a RAM física. Acima de 1× há risco de falta de memória se todas usarem o máximo."
+                          warnAbove={1}
                         />
                       </td>
                       <td className="py-2.5 pr-4 text-right tabular-nums">
@@ -165,8 +166,8 @@ export default function NodesPage() {
           </div>
         )}
         <p className="mt-3 text-xs text-slate-500">
-          “Em uso” é o consumo real medido pelo Proxmox; “alocadas” é o que as VMs receberam.
-          Alocado acima do físico (sobrecomprometimento) é comum em CPU, arriscado em memória.
+          “Em uso” é o consumo real medido pelo Proxmox. “Configuradas” é o que as VMs receberam
+          (não é consumo): acima de 1× é sobrecomprometimento, comum em CPU e arriscado em memória (⚠).
         </p>
       </Card>
 
