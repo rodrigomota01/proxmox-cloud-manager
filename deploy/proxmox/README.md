@@ -27,6 +27,26 @@ pool. Rodar de novo sem a opção remove essa visão.
 AUDIT_ALL=1 STORAGE=<storage> BRIDGE=<bridge> TEMPLATES="<vmid>" bash setup-node.sh
 ```
 
+### Na plataforma: adicionar o servidor
+
+*Hypervisors → Adicionar hypervisor*: nome (rótulo dos admins), URL da API, Token ID e
+secret (cole direto no formulário; nunca em chat/ticket), **zona** e **pool de
+destino**. Depois, em *Imagens*, registre os templates deste servidor.
+
+### Pool de destino: onde as VMs novas nascem
+
+- O campo **Pool de destino** (formulário ou *Hypervisors → servidor → Configuração*)
+  só **aponta** para um pool que já existe no Proxmox. A plataforma **não cria pools**:
+  isso exigiria privilégio administrativo amplo no token, e hoje ele só altera o que
+  está dentro do pool — se vazar, as VMs de clientes fora dele seguem intocáveis.
+- Quem cria o pool e dá as permissões ao token é o `setup-node.sh` (`POOL=<nome>`,
+  padrão `cm-lab`). Para usar outro nome, rode o script de novo com `POOL=<nome>`
+  **antes** de salvá-lo na plataforma; senão a criação de VM falha por permissão.
+- Sem pool **ou** sem zona, o servidor é sincronizado e monitorado, mas **não recebe
+  VMs novas**: a zona dele não aparece em *Nova instância* (a aba Configuração avisa).
+- Só VMs dentro do pool são operáveis (ligar/desligar/excluir); as de fora, mesmo
+  adotadas por um cliente, ficam **somente leitura**.
+
 As seções abaixo documentam o passo a passo manual equivalente (usado no primeiro lab).
 
 Referência de privilégios em
@@ -90,7 +110,7 @@ pveum acl modify /sdn/zones/localnetwork/vmbr0 --tokens 'cloudmgr@pve!cm' --role
 pveum user token permissions cloudmgr@pve cm   # conferência
 ```
 
-Na plataforma: defina o **pool de destino** do cluster (ex.: `cm-lab`) e registre o
+Na plataforma: defina o **pool de destino** do servidor (ex.: `cm-lab`) e registre o
 template em *Admin → Imagens*. O template precisa de drive de cloud-init; chaves, senha e
 IP dele **não** são herdados pelas VMs criadas.
 
