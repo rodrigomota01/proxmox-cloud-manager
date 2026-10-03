@@ -6,7 +6,8 @@ import { useState } from "react";
 
 import { AlertList } from "@/components/alerts";
 import { NoTenant } from "@/components/no-tenant";
-import { Card, ErrorBox, Select } from "@/components/ui";
+import { ScopeToggle } from "@/components/scope-toggle";
+import { Card, ErrorBox } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
 import { usePermissions, useSession } from "@/lib/session";
 
@@ -33,34 +34,21 @@ function Tabs({ state, setState }: { state: State; setState: (s: State) => void 
   );
 }
 
-/** Platform admins: every alert (hosts, storage, all clients' VMs) or one client's. */
+/** Platform admins, whole-platform view: hosts, storage and every client's VMs. */
 function PlatformAlerts() {
-  const { tenants } = useSession();
   const [state, setState] = useState<State>("active");
-  const [scope, setScope] = useState("");
   const alerts = useQuery({
-    queryKey: ["admin", "alerts", state, scope],
+    queryKey: ["admin", "alerts", state],
     queryFn: async () =>
-      unwrap(
-        await api.GET("/api/v1/admin/alerts", {
-          params: { query: { state, limit: 200, ...(scope ? { tenant_id: scope } : {}) } },
-        }),
-      ),
+      unwrap(await api.GET("/api/v1/admin/alerts", { params: { query: { state, limit: 200 } } })),
     refetchInterval: 15_000,
   });
   return (
     <div className="max-w-5xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold">Alertas</h1>
-        <div className="flex items-center gap-2">
-          <Select aria-label="Escopo" value={scope} onChange={(e) => setScope(e.target.value)}>
-            <option value="">Todos (hypervisors, storage e clientes)</option>
-            {tenants.map((t) => (
-              <option key={t.id} value={t.id}>
-                Cliente {t.name}
-              </option>
-            ))}
-          </Select>
+        <h1 className="text-lg font-semibold">Alertas de toda a plataforma</h1>
+        <div className="flex items-center gap-3">
+          <ScopeToggle />
           <Link href="/admin/alerts" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
             Regras e canais
           </Link>
@@ -102,11 +90,14 @@ function TenantAlerts({ tenantId }: { tenantId: string }) {
             VMs com consumo acima dos limites definidos pela plataforma e pelo seu time.
           </p>
         </div>
-        {perms.has("alert:manage") && (
-          <Link href="/alerts/settings" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
-            Regras e canais
-          </Link>
-        )}
+        <div className="flex items-center gap-3">
+          <ScopeToggle />
+          {perms.has("alert:manage") && (
+            <Link href="/alerts/settings" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+              Regras e canais
+            </Link>
+          )}
+        </div>
       </div>
       <Tabs state={state} setState={setState} />
       <ErrorBox message={alerts.isError ? errorMessage(alerts.error) : null} />
@@ -124,8 +115,8 @@ function TenantAlerts({ tenantId }: { tenantId: string }) {
 }
 
 export default function AlertsPage() {
-  const { tenantId, isPlatformAdmin } = useSession();
-  if (isPlatformAdmin) return <PlatformAlerts />;
+  const { tenantId, platformView } = useSession();
+  if (platformView) return <PlatformAlerts />;
   if (!tenantId) return <NoTenant />;
   return <TenantAlerts tenantId={tenantId} />;
 }

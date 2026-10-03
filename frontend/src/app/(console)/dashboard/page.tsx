@@ -2,12 +2,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
 
 import { NoTenant } from "@/components/no-tenant";
 import { ActivityRow } from "@/components/activity";
-import { Card, Empty, ErrorBox, Select, formatBytes } from "@/components/ui";
+import { Card, Empty, ErrorBox, formatBytes } from "@/components/ui";
 import { AlertList } from "@/components/alerts";
+import { ScopeToggle } from "@/components/scope-toggle";
 import { Stat, UsagePanel } from "@/components/usage-panel";
 import { pct } from "@/components/viz";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
@@ -15,30 +15,20 @@ import { useSession } from "@/lib/session";
 
 /** Platform admins: every guest on every hypervisor, or one tenant's. */
 function PlatformOverview() {
-  const { tenants } = useSession();
-  const [scope, setScope] = useState("");
   const overview = useQuery({
-    queryKey: ["admin", "overview", scope],
-    queryFn: async () =>
-      unwrap(await api.GET("/api/v1/admin/overview", { params: { query: scope ? { tenant_id: scope } : {} } })),
+    queryKey: ["admin", "overview"],
+    queryFn: async () => unwrap(await api.GET("/api/v1/admin/overview")),
     refetchInterval: 15_000,
   });
   const infra = overview.data?.infra;
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold">Visão geral</h1>
-        <Select aria-label="Escopo" value={scope} onChange={(e) => setScope(e.target.value)}>
-          <option value="">Todos os clientes e hypervisors</option>
-          {tenants.map((t) => (
-            <option key={t.id} value={t.id}>
-              Cliente {t.name}
-            </option>
-          ))}
-        </Select>
+        <h1 className="text-lg font-semibold">Toda a plataforma</h1>
+        <ScopeToggle />
       </div>
       <ErrorBox message={overview.isError ? errorMessage(overview.error) : null} />
-      <ActiveAlerts scope={{ admin: true, tenantId: scope }} />
+      <ActiveAlerts scope={{ admin: true, tenantId: "" }} />
       {infra && (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Stat label="Hypervisors online" value={`${infra.nodes_online} de ${infra.nodes_total}`} />
@@ -58,7 +48,7 @@ function PlatformOverview() {
       {overview.data && (
         <>
           <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-            {scope ? "VMs do cliente" : "VMs (todas, inclusive não adotadas)"}
+            VMs de todos os clientes, inclusive as não adotadas
           </h2>
           <UsagePanel
             usage={overview.data.usage}
@@ -123,8 +113,8 @@ function TenantUsage({ tenantId }: { tenantId: string }) {
 }
 
 export default function DashboardPage() {
-  const { tenantId, isPlatformAdmin } = useSession();
-  if (isPlatformAdmin) return <PlatformOverview />;
+  const { tenantId, platformView } = useSession();
+  if (platformView) return <PlatformOverview />;
   if (!tenantId) return <NoTenant />;
   return <TenantDashboard tenantId={tenantId} />;
 }
@@ -145,7 +135,10 @@ function TenantDashboard({ tenantId }: { tenantId: string }) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-semibold">{tenant?.name}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-lg font-semibold">{tenant?.name}</h1>
+        <ScopeToggle />
+      </div>
       <ErrorBox message={summary.isError ? errorMessage(summary.error) : null} />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Projetos" value={data?.projects ?? "—"} />

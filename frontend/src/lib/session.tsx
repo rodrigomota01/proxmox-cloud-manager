@@ -22,10 +22,22 @@ type SessionValue = {
   tenant: Me["tenants"][number] | null;
   selectTenant: (id: string) => void;
   isPlatformAdmin: boolean;
+  /** platform admins: Dashboard/Alertas show the whole platform instead of the tenant */
+  platformView: boolean;
+  setPlatformView: (on: boolean) => void;
 };
 
 const SessionContext = createContext<SessionValue | null>(null);
 const TENANT_KEY = "cm.tenant";
+const PLATFORM_VIEW_KEY = "cm.platformView";
+
+function remember(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    /* storage unavailable: the choice lasts for this page only */
+  }
+}
 
 function storedTenant(): string | null {
   try {
@@ -67,6 +79,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const authenticated = useAuthenticated();
   const queryClient = useQueryClient();
   const [tenantId, setTenantId] = useState<string | null>(null);
+  const [platformView, setPlatformViewState] = useState(() => {
+    try {
+      return window.localStorage.getItem(PLATFORM_VIEW_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setPlatformView = useCallback((on: boolean) => {
+    remember(PLATFORM_VIEW_KEY, on ? "1" : "0");
+    setPlatformViewState(on);
+  }, []);
 
   const me = useQuery({
     queryKey: ["me"],
@@ -105,24 +128,24 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const selectTenant = useCallback(
     (id: string) => {
-      try {
-        window.localStorage.setItem(TENANT_KEY, id);
-      } catch {
-        /* storage unavailable: selection lasts for this page only */
-      }
+      remember(TENANT_KEY, id);
+      setPlatformView(false); // picking a tenant means "show me this tenant"
       setActiveTenant(id);
       setTenantId(id);
       // everything tenant-scoped is now stale
       queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== "me" });
     },
-    [queryClient],
+    [queryClient, setPlatformView],
   );
 
   const value = useMemo<SessionValue | null>(() => {
     if (!me.data) return null;
     const tenant = tenants.find((t) => t.id === tenantId) ?? null;
-    return { me: me.data, tenants, tenantId, tenant, selectTenant, isPlatformAdmin };
-  }, [me.data, tenants, tenantId, selectTenant, isPlatformAdmin]);
+    return {
+      me: me.data, tenants, tenantId, tenant, selectTenant, isPlatformAdmin,
+      platformView: isPlatformAdmin && (platformView || tenantId === null), setPlatformView,
+    };
+  }, [me.data, tenants, tenantId, selectTenant, isPlatformAdmin, platformView, setPlatformView]);
 
   if (!value) {
     return (

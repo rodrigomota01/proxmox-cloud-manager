@@ -27,16 +27,16 @@ const ADMIN_NAV = [
 ];
 
 /** Firing alerts in view: the tenant's (as its members see them) or, for platform
- * admins, everything. */
+ * admins in the whole-platform view, everything. */
 function AlertCount() {
-  const { tenantId, isPlatformAdmin } = useSession();
+  const { tenantId, platformView } = useSession();
   const summary = useQuery({
-    queryKey: ["alerts-summary", isPlatformAdmin, tenantId],
+    queryKey: ["alerts-summary", platformView, tenantId],
     queryFn: async () =>
-      isPlatformAdmin
+      platformView
         ? unwrap(await api.GET("/api/v1/admin/alerts/summary"))
         : unwrap(await api.GET("/api/v1/alerts/summary")),
-    enabled: isPlatformAdmin || tenantId !== null,
+    enabled: platformView || tenantId !== null,
     refetchInterval: 30_000,
   });
   const s = summary.data;
