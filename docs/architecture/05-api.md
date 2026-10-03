@@ -128,7 +128,7 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | GET/POST/DELETE | `/instances/{id}/nics` | `vm:configure` | 2 |
 | POST | `/instances/{id}/console-tickets` | `vm:console` | 3 |
 | POST | `/instances/{id}/ssh-tickets` | `vm:console` | 3 |
-| GET | `/instances/{id}/metrics?range=1h` | `vm:view` | 5 |
+| GET | `/instances/{id}/metrics?range=hour\|day\|week` | `vm:view` (RRD do PVE; cache Redis 30s/5min; 503 se o provider cair) | 2a ✅ |
 | GET | `/instances/{id}/events` | `vm:view` | 3 |
 
 ### Catálogo, storage e rede (Fase 2)
@@ -177,7 +177,8 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | GET/PATCH | `/admin/users/{id}` | `user:manage` (nome, e-mail, ativo; regras anti-escalonamento) |
 | POST | `/admin/users/{id}/unlock` · `/password-reset` · `/sessions/revoke` | `user:manage` |
 | PUT | `/admin/users/{id}/platform-roles` | `platform:admin` |
-| GET | `/admin/nodes` · `/admin/nodes/{id}` | `node:view` |
+| GET | `/admin/nodes` · `/admin/nodes/{id}` | `node:view` (uso real + vCPU/RAM alocadas às VMs do node) |
+| GET | `/admin/nodes/{id}/metrics?range=hour\|day\|week` | `node:view` (RRD do node; cache) |
 | GET | `/admin/instances?managed=false` | `node:view` (descobertos) |
 | POST | `/admin/instances/{id}/adopt` | `cluster:manage` → atribui tenant/projeto |
 | GET | `/admin/storage` · `/admin/networks` | `cluster:manage` |

@@ -131,7 +131,7 @@ class SyncRunOut(BaseModel):
     error: str | None
 
 
-class NodeOut(BaseModel):
+class NodeBase(BaseModel):
     id: uuid.UUID
     cluster_id: uuid.UUID
     name: str
@@ -142,6 +142,31 @@ class NodeOut(BaseModel):
     memory_used_bytes: int
     uptime_seconds: int
     last_seen_at: datetime | None
+
+
+class NodeOut(NodeBase):
+    # capacity planning: what guests on this node were given vs what it physically has
+    cluster_name: str
+    instances_total: int
+    instances_running: int
+    vcpus_allocated: int
+    memory_allocated_mb: int
+
+
+class NodeMetricPointOut(BaseModel):
+    t: int
+    cpu: float
+    memory_used_mb: int
+    memory_total_mb: int
+    net_in_bps: float
+    net_out_bps: float
+    load: float
+    iowait: float
+
+
+class NodeMetricsOut(BaseModel):
+    range: str
+    points: list[NodeMetricPointOut]
 
 
 class StorageOut(BaseModel):

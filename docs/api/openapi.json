@@ -1443,6 +1443,10 @@
       "InstanceOut": {
         "description": "Tenant view. No provider identifiers (vmid/node/cluster) — ADR-0010.",
         "properties": {
+          "cpu_usage": {
+            "title": "Cpu Usage",
+            "type": "number"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -1507,6 +1511,10 @@
             "title": "Memory Mb",
             "type": "integer"
           },
+          "memory_used_mb": {
+            "title": "Memory Used Mb",
+            "type": "integer"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -1535,6 +1543,10 @@
             "title": "Tags",
             "type": "array"
           },
+          "uptime_seconds": {
+            "title": "Uptime Seconds",
+            "type": "integer"
+          },
           "vcpus": {
             "title": "Vcpus",
             "type": "integer"
@@ -1552,6 +1564,9 @@
           "root_disk_gb",
           "tags",
           "image_id",
+          "cpu_usage",
+          "memory_used_mb",
+          "uptime_seconds",
           "ipv4",
           "gateway",
           "created_at",
@@ -2194,11 +2209,153 @@
         "title": "Membership",
         "type": "object"
       },
+      "MetricPointOut": {
+        "properties": {
+          "cpu": {
+            "title": "Cpu",
+            "type": "number"
+          },
+          "disk_read_bps": {
+            "title": "Disk Read Bps",
+            "type": "number"
+          },
+          "disk_write_bps": {
+            "title": "Disk Write Bps",
+            "type": "number"
+          },
+          "memory_total_mb": {
+            "title": "Memory Total Mb",
+            "type": "integer"
+          },
+          "memory_used_mb": {
+            "title": "Memory Used Mb",
+            "type": "integer"
+          },
+          "net_in_bps": {
+            "title": "Net In Bps",
+            "type": "number"
+          },
+          "net_out_bps": {
+            "title": "Net Out Bps",
+            "type": "number"
+          },
+          "t": {
+            "title": "T",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "t",
+          "cpu",
+          "memory_used_mb",
+          "memory_total_mb",
+          "net_in_bps",
+          "net_out_bps",
+          "disk_read_bps",
+          "disk_write_bps"
+        ],
+        "title": "MetricPointOut",
+        "type": "object"
+      },
+      "MetricsOut": {
+        "properties": {
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/MetricPointOut"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "range": {
+            "title": "Range",
+            "type": "string"
+          }
+        },
+        "required": [
+          "range",
+          "points"
+        ],
+        "title": "MetricsOut",
+        "type": "object"
+      },
+      "NodeMetricPointOut": {
+        "properties": {
+          "cpu": {
+            "title": "Cpu",
+            "type": "number"
+          },
+          "iowait": {
+            "title": "Iowait",
+            "type": "number"
+          },
+          "load": {
+            "title": "Load",
+            "type": "number"
+          },
+          "memory_total_mb": {
+            "title": "Memory Total Mb",
+            "type": "integer"
+          },
+          "memory_used_mb": {
+            "title": "Memory Used Mb",
+            "type": "integer"
+          },
+          "net_in_bps": {
+            "title": "Net In Bps",
+            "type": "number"
+          },
+          "net_out_bps": {
+            "title": "Net Out Bps",
+            "type": "number"
+          },
+          "t": {
+            "title": "T",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "t",
+          "cpu",
+          "memory_used_mb",
+          "memory_total_mb",
+          "net_in_bps",
+          "net_out_bps",
+          "load",
+          "iowait"
+        ],
+        "title": "NodeMetricPointOut",
+        "type": "object"
+      },
+      "NodeMetricsOut": {
+        "properties": {
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/NodeMetricPointOut"
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "range": {
+            "title": "Range",
+            "type": "string"
+          }
+        },
+        "required": [
+          "range",
+          "points"
+        ],
+        "title": "NodeMetricsOut",
+        "type": "object"
+      },
       "NodeOut": {
         "properties": {
           "cluster_id": {
             "format": "uuid",
             "title": "Cluster Id",
+            "type": "string"
+          },
+          "cluster_name": {
+            "title": "Cluster Name",
             "type": "string"
           },
           "cpu_count": {
@@ -2214,6 +2371,14 @@
             "title": "Id",
             "type": "string"
           },
+          "instances_running": {
+            "title": "Instances Running",
+            "type": "integer"
+          },
+          "instances_total": {
+            "title": "Instances Total",
+            "type": "integer"
+          },
           "last_seen_at": {
             "anyOf": [
               {
@@ -2225,6 +2390,10 @@
               }
             ],
             "title": "Last Seen At"
+          },
+          "memory_allocated_mb": {
+            "title": "Memory Allocated Mb",
+            "type": "integer"
           },
           "memory_bytes": {
             "title": "Memory Bytes",
@@ -2245,6 +2414,10 @@
           "uptime_seconds": {
             "title": "Uptime Seconds",
             "type": "integer"
+          },
+          "vcpus_allocated": {
+            "title": "Vcpus Allocated",
+            "type": "integer"
           }
         },
         "required": [
@@ -2257,7 +2430,12 @@
           "cpu_usage",
           "memory_used_bytes",
           "uptime_seconds",
-          "last_seen_at"
+          "last_seen_at",
+          "cluster_name",
+          "instances_total",
+          "instances_running",
+          "vcpus_allocated",
+          "memory_allocated_mb"
         ],
         "title": "NodeOut",
         "type": "object"
@@ -4122,6 +4300,107 @@
         ]
       }
     },
+    "/api/v1/admin/nodes/{node_id}": {
+      "get": {
+        "operationId": "get_node_api_v1_admin_nodes__node_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Node Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Node",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/nodes/{node_id}/metrics": {
+      "get": {
+        "operationId": "node_metrics_api_v1_admin_nodes__node_id__metrics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "node_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Node Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "default": "hour",
+              "enum": [
+                "hour",
+                "day",
+                "week"
+              ],
+              "title": "Range",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeMetricsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Node Metrics",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/storage": {
       "get": {
         "operationId": "list_storage_api_v1_admin_storage_get",
@@ -5278,6 +5557,64 @@
           }
         },
         "summary": "Get Instance",
+        "tags": [
+          "instances"
+        ]
+      }
+    },
+    "/api/v1/instances/{instance_id}/metrics": {
+      "get": {
+        "operationId": "instance_metrics_api_v1_instances__instance_id__metrics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Instance Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "range",
+            "required": false,
+            "schema": {
+              "default": "hour",
+              "enum": [
+                "hour",
+                "day",
+                "week"
+              ],
+              "title": "Range",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Instance Metrics",
         "tags": [
           "instances"
         ]

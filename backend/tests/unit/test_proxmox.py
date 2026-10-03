@@ -198,3 +198,33 @@ async def test_get_instance_reads_live_status(status, qmp, expected):
     assert route.called
     assert obs.power_state is expected and obs.vcpus == 2 and obs.memory_mb == 4096
     assert obs.node == "tagima" and obs.name == "cm-test-1"
+
+
+def test_mapper_usage_and_rrd_points():
+    [vm] = mapper.inventory([{
+        "type": "qemu", "vmid": 10001, "node": "tagima", "name": "web", "status": "running",
+        "maxcpu": 2, "maxmem": 4294967296, "mem": 1073741824, "cpu": 0.37, "uptime": 120,
+    }]).instances
+    assert vm.cpu_usage == 0.37 and vm.memory_used_mb == 1024 and vm.uptime_seconds == 120
+
+    rows = [
+        {"time": 1700000060, "cpu": 0.5, "mem": 2147483648, "maxmem": 4294967296,
+         "netin": 1000.5, "netout": 10, "diskread": 0, "diskwrite": 4096},
+        {"time": 1700000000},  # stopped guest: PVE returns timestamps without values
+    ]
+    points = [p for p in map(mapper.metric_point, rows) if p]
+    assert len(points) == 1
+    assert points[0].memory_used_mb == 2048 and points[0].net_in_bps == 1000.5
+
+
+@respx.mock
+async def test_metrics_asks_rrd_and_sorts():
+    route = respx.get(f"{API}/nodes/tagima/qemu/10001/rrddata").respond(json={"data": [
+        {"time": 20, "cpu": 0.2, "mem": 0, "maxmem": 0},
+        {"time": 10, "cpu": 0.1, "mem": 0, "maxmem": 0},
+    ]})
+    points = await ProxmoxProvider(_client()).metrics(
+        mapper.instance_ref(10001, "tagima", "qemu"), "day"
+    )
+    assert [p.time for p in points] == [10, 20]
+    assert route.calls[0].request.url.params["timeframe"] == "day"

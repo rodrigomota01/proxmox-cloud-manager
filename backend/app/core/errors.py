@@ -54,6 +54,10 @@ class Conflict(AppError):
     status, code, title = 409, "CONFLICT", "Conflict"
 
 
+class ProviderUnavailableError(AppError):
+    status, code, title = 503, "PROVIDER_UNAVAILABLE", "Provider unavailable"
+
+
 class RateLimited(AppError):
     status, code, title = 429, "RATE_LIMITED", "Too many requests"
 

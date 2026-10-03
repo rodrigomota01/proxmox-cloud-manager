@@ -4,8 +4,10 @@ from typing import Any
 
 from sqlalchemy import (
     ARRAY,
+    BigInteger,
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -68,6 +70,10 @@ class Instance(UUIDPk, Timestamps, Base):
     provider_name: Mapped[str] = mapped_column(Text)  # name as seen in the provider
     tags: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
     managed: Mapped[bool] = mapped_column(server_default="false")
+    # live usage, refreshed by the reconciler (one /cluster/resources call per cycle)
+    cpu_usage: Mapped[float] = mapped_column(Float, server_default="0")  # 0..1 of vcpus
+    memory_used_mb: Mapped[int] = mapped_column(Integer, server_default="0")
+    uptime_seconds: Mapped[int] = mapped_column(BigInteger, server_default="0")
     missing_count: Mapped[int] = mapped_column(Integer, server_default="0")
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

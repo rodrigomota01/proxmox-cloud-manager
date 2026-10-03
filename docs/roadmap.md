@@ -83,7 +83,8 @@ integração com billing externo.
 
 ## Fase 5 — Operação
 
-Métricas por instância (RRD do PVE → API), UI de auditoria com filtros/export,
+~~Métricas por instância (RRD do PVE → API)~~ (adiantado: uso ao vivo nas listas,
+gráficos de VM e de hypervisor), UI de auditoria com filtros/export,
 painel de jobs/erros para admin, multi-cluster na UI, MFA (TOTP), particionamento de
 `audit_logs`, ServiceMonitor/dashboards Grafana da própria plataforma.
 

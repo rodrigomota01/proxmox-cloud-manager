@@ -257,6 +257,44 @@ async def test_job_resumes_recorded_provider_task(client, env, fake, owner_db):
 # --- jobs API --------------------------------------------------------------------------
 
 
+async def test_usage_is_reported_and_metrics_are_served(client, env, fake):
+    from dataclasses import replace as dc_replace
+
+    fake.instances["10002"] = dc_replace(fake.instances["10002"], cpu_usage=0.42,
+                                         memory_used_mb=900, uptime_seconds=3600)
+    await client.post(f"/api/v1/admin/clusters/{env.cluster}/sync", headers=await env.h("root"))
+    await env.drain()
+    h = await env.h("alice", env.acme)
+    ct = (await client.get(f"/api/v1/instances/{env.ct}", headers=h)).json()
+    assert (ct["cpu_usage"], ct["memory_used_mb"], ct["uptime_seconds"]) == (0.42, 900, 3600)
+
+    calls = []
+    original = fake.metrics
+
+    async def counted(ref, timeframe):
+        calls.append(timeframe)
+        return await original(ref, timeframe)
+
+    fake.metrics = counted  # type: ignore[method-assign]
+    url = f"/api/v1/instances/{env.vm}/metrics"
+    first = await client.get(url, params={"range": "day"}, headers=h)
+    again = await client.get(url, params={"range": "day"}, headers=h)
+    assert first.status_code == 200 and first.json() == again.json()
+    assert calls == ["day"]  # second answer came from the cache
+    point = first.json()["points"][0]
+    assert set(point) == {"t", "cpu", "memory_used_mb", "memory_total_mb", "net_in_bps",
+                          "net_out_bps", "disk_read_bps", "disk_write_bps"}
+    assert (await client.get(url, params={"range": "year"}, headers=h)).status_code == 422
+    # same authorization as the instance itself
+    assert (await client.get(f"/api/v1/instances/{env.ct}/metrics",
+                             headers=await env.h("carol", env.acme))).status_code == 403
+    assert (await client.get(url, headers=await env.h("eve", env.globex))).status_code == 404
+
+    fake.available = False
+    down = await client.get(url, params={"range": "week"}, headers=h)
+    assert down.status_code == 503 and down.json()["code"] == "PROVIDER_UNAVAILABLE"
+
+
 async def test_jobs_filter_by_type(client, env):
     h = await env.h("alice", env.acme)
     await client.post(f"/api/v1/instances/{env.vm}/start", headers=h)

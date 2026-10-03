@@ -178,9 +178,11 @@ def _observe(
     if not instance.managed:
         instance.name = obs.name  # adopted instances keep their platform name
     instance.node_id = node_id
-    instance.power_state = (
-        PowerState.UNKNOWN.value if obs.node in offline_nodes else obs.power_state.value
-    )
+    stale = obs.node in offline_nodes
+    instance.power_state = PowerState.UNKNOWN.value if stale else obs.power_state.value
+    instance.cpu_usage = 0.0 if stale else obs.cpu_usage
+    instance.memory_used_mb = 0 if stale else obs.memory_used_mb
+    instance.uptime_seconds = 0 if stale else obs.uptime_seconds
     instance.vcpus, instance.memory_mb, instance.root_disk_gb = (
         obs.vcpus, obs.memory_mb, obs.disk_gb,
     )

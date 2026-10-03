@@ -7,12 +7,17 @@ import { useState } from "react";
 import { NoTenant } from "@/components/no-tenant";
 import { PowerActions } from "@/components/power-actions";
 import { Button, Card, Empty, ErrorBox, PowerBadge, Select, StateBadge } from "@/components/ui";
-import { api, errorMessage, unwrap } from "@/lib/api/client";
+import { Meter, SortHeader, mib, uptime, useSorted } from "@/components/viz";
+import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { useProjectNames, useProjects } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 
 type Kind = "vm" | "container";
 type Power = "running" | "stopped" | "paused" | "unknown";
+type Instance = Schemas["InstanceOut"];
+type SortKey = "name" | "cpu" | "memory" | "uptime";
+
+const memRatio = (i: Instance) => (i.memory_mb ? i.memory_used_mb / i.memory_mb : 0);
 
 export default function InstancesPage() {
   const { tenantId } = useSession();
@@ -29,7 +34,7 @@ export default function InstancesPage() {
         await api.GET("/api/v1/instances", {
           params: {
             query: {
-              limit: 50,
+              limit: 200,
               cursor: pageParam ?? undefined,
               project_id: projectId || undefined,
               kind: kind || undefined,
@@ -41,11 +46,22 @@ export default function InstancesPage() {
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.next_cursor ?? null,
     enabled: tenantId !== null,
-    refetchInterval: 15_000, // power state changes outside the platform show up here
+    refetchInterval: 15_000, // the reconciler refreshes usage every ~15s
   });
 
-  if (!tenantId) return <NoTenant />;
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
+  const { sorted, sort, toggle } = useSorted<Instance, SortKey>(
+    items,
+    {
+      name: (i) => i.name,
+      cpu: (i) => (i.power_state === "running" ? i.cpu_usage : -1),
+      memory: (i) => (i.power_state === "running" ? memRatio(i) : -1),
+      uptime: (i) => i.uptime_seconds,
+    },
+    { key: "name", desc: false },
+  );
+
+  if (!tenantId) return <NoTenant />;
 
   return (
     <div className="space-y-4">
@@ -84,42 +100,67 @@ export default function InstancesPage() {
         {items.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-slate-500">
+              <thead className="text-xs text-slate-500">
                 <tr>
-                  <th className="py-2 pr-4 font-medium">Nome</th>
-                  <th className="py-2 pr-4 font-medium">Projeto</th>
-                  <th className="py-2 pr-4 font-medium">Tipo</th>
-                  <th className="py-2 pr-4 font-medium">Estado</th>
-                  <th className="py-2 pr-4 font-medium">IP</th>
-                  <th className="py-2 pr-4 font-medium">vCPU / RAM / Disco</th>
-                  <th className="py-2 font-medium">Ações</th>
+                  <SortHeader label="Nome" k="name" sort={sort} toggle={toggle} />
+                  <th className="py-2 pr-4 font-medium uppercase tracking-wide">Estado</th>
+                  <SortHeader label="CPU" k="cpu" sort={sort} toggle={toggle} />
+                  <SortHeader label="Memória" k="memory" sort={sort} toggle={toggle} />
+                  <th className="py-2 pr-4 text-right font-medium uppercase tracking-wide">Disco</th>
+                  <th className="py-2 pr-4 font-medium uppercase tracking-wide">IP</th>
+                  <SortHeader label="Ligada há" k="uptime" sort={sort} toggle={toggle} align="right" />
+                  <th className="py-2 font-medium uppercase tracking-wide">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {items.map((i) => (
-                  <tr key={i.id}>
-                    <td className="py-2 pr-4">
-                      <Link
-                        href={`/instances/${i.id}`}
-                        className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-                      >
-                        {i.name}
-                      </Link>
-                    </td>
-                    <td className="py-2 pr-4">{projectNames.get(i.project_id) ?? "—"}</td>
-                    <td className="py-2 pr-4">{i.kind === "vm" ? "VM" : "Container"}</td>
-                    <td className="py-2 pr-4">
-                      {i.state === "active" ? <PowerBadge state={i.power_state} /> : <StateBadge state={i.state} />}
-                    </td>
-                    <td className="py-2 pr-4 font-mono text-xs">{i.ipv4?.split("/")[0] ?? "—"}</td>
-                    <td className="py-2 pr-4 tabular-nums text-slate-600 dark:text-slate-400">
-                      {i.vcpus} · {(i.memory_mb / 1024).toFixed(1)} GiB · {i.root_disk_gb} GiB
-                    </td>
-                    <td className="py-2">
-                      <PowerActions instance={i} compact />
-                    </td>
-                  </tr>
-                ))}
+                {sorted.map((i) => {
+                  const running = i.state === "active" && i.power_state === "running";
+                  return (
+                    <tr key={i.id} className="align-middle">
+                      <td className="py-2.5 pr-4">
+                        <Link
+                          href={`/instances/${i.id}`}
+                          className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                        >
+                          {i.name}
+                        </Link>
+                        <div className="text-xs text-slate-500">
+                          {i.kind === "vm" ? "VM" : "Container"} · {projectNames.get(i.project_id) ?? "—"} ·{" "}
+                          {i.vcpus} vCPU
+                        </div>
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        {i.state === "active" ? <PowerBadge state={i.power_state} /> : <StateBadge state={i.state} />}
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        {running ? (
+                          <Meter value={i.cpu_usage} title={`CPU de ${i.name}`} />
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        {running ? (
+                          <Meter
+                            value={memRatio(i)}
+                            label={`${mib(i.memory_used_mb)} / ${mib(i.memory_mb)}`}
+                            title={`Memória de ${i.name}`}
+                          />
+                        ) : (
+                          <span className="text-slate-400">{mib(i.memory_mb)}</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums">{i.root_disk_gb} GiB</td>
+                      <td className="py-2.5 pr-4 font-mono text-xs">{i.ipv4?.split("/")[0] ?? "—"}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-slate-600 dark:text-slate-400">
+                        {running ? uptime(i.uptime_seconds) : "—"}
+                      </td>
+                      <td className="py-2.5">
+                        <PowerActions instance={i} compact />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

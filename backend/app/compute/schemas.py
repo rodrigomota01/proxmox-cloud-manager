@@ -73,6 +73,9 @@ class InstanceOut(BaseModel):
     root_disk_gb: int
     tags: list[str]
     image_id: uuid.UUID | None
+    cpu_usage: float  # 0..1 of the allocated vCPUs, as of last_seen_at
+    memory_used_mb: int
+    uptime_seconds: int
     ipv4: str | None  # with prefix, as configured (e.g. 203.0.113.10/28)
     gateway: str | None
     created_at: datetime
@@ -128,3 +131,19 @@ class DashboardSummary(BaseModel):
     instances: dict[str, dict[str, int]]  # kind -> power_state -> count
     active_jobs: int
     recent_jobs: list[JobOut]
+
+
+class MetricPointOut(BaseModel):
+    t: int  # unix seconds
+    cpu: float  # 0..1 of allocated vCPUs
+    memory_used_mb: int
+    memory_total_mb: int
+    net_in_bps: float
+    net_out_bps: float
+    disk_read_bps: float
+    disk_write_bps: float
+
+
+class MetricsOut(BaseModel):
+    range: str
+    points: list[MetricPointOut]

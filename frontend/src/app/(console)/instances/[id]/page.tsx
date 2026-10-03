@@ -7,6 +7,8 @@ import { useParams } from "next/navigation";
 import { NoTenant } from "@/components/no-tenant";
 import { PowerActions } from "@/components/power-actions";
 import { DeleteInstance } from "@/components/delete-instance";
+import { InstanceMetrics } from "@/components/metrics-panel";
+import { Meter, mib, uptime } from "@/components/viz";
 import { ActivityRow } from "@/components/activity";
 import { Badge, Card, Empty, ErrorBox, PowerBadge, StateBadge, formatDate } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
@@ -83,6 +85,21 @@ export default function InstanceDetailPage() {
             <Row label="Tipo">{i.kind === "vm" ? "Máquina virtual" : "Container"}</Row>
             <Row label="Projeto">{projectNames.get(i.project_id) ?? "—"}</Row>
             <Row label="vCPUs">{i.vcpus}</Row>
+            {i.power_state === "running" && i.state === "active" && (
+              <>
+                <Row label="CPU agora">
+                  <Meter value={i.cpu_usage} title="CPU" />
+                </Row>
+                <Row label="Memória agora">
+                  <Meter
+                    value={i.memory_mb ? i.memory_used_mb / i.memory_mb : 0}
+                    label={`${mib(i.memory_used_mb)} / ${mib(i.memory_mb)}`}
+                    title="Memória"
+                  />
+                </Row>
+                <Row label="Ligada há">{uptime(i.uptime_seconds)}</Row>
+              </>
+            )}
             <Row label="Memória">{(i.memory_mb / 1024).toFixed(1)} GiB</Row>
             <Row label="Disco raiz">{i.root_disk_gb} GiB</Row>
             <Row label="IP">
@@ -125,6 +142,8 @@ export default function InstanceDetailPage() {
           </ul>
         </Card>
       </div>
+
+      {i.state === "active" && tenantId && <InstanceMetrics instanceId={i.id} tenantId={tenantId} />}
     </div>
   );
 }

@@ -1,1 +1,24 @@
 @import "tailwindcss";
+
+/* Data-viz tokens (validated: scripts/validate_palette.js against the card surfaces,
+   white in light mode and slate-900 in dark mode). Text never takes series colors. */
+:root {
+  --viz-surface: #ffffff;
+  --viz-series-1: #2a78d6; /* blue */
+  --viz-series-2: #eb6834; /* orange */
+  --viz-grid: #e5e7eb;
+  --viz-axis: #94a3b8;
+  --viz-meter-track: #dbeafe;
+  --viz-serious: #ec835a; /* status: never used as a series color */
+  --viz-critical: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --viz-surface: #0f172a;
+    --viz-series-1: #3987e5;
+    --viz-series-2: #d95926;
+    --viz-grid: #1e293b;
+    --viz-axis: #64748b;
+    --viz-meter-track: #1e3a5f;
+  }
+}

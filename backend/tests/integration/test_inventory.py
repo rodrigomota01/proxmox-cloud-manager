@@ -325,3 +325,22 @@ async def test_worker_skips_clusters_with_rejected_credentials(
     assert cluster.status == "unknown"
     await reconcile_all(app.state.sessionmaker, registry)
     assert calls == [1]
+
+
+async def test_nodes_show_allocation_and_metrics(client, ctx, fake):
+    root = ctx["root"]
+    cid = await _cluster_with_creds(client, root)
+    await _sync(client, root, cid)
+    [node] = (await client.get("/api/v1/admin/nodes", headers=root)).json()
+    # fake guests on tagima: 2 vCPU/2048 MB each, one running
+    assert node["name"] == "tagima" and node["cluster_name"] == "lab"
+    assert (node["instances_total"], node["instances_running"]) == (2, 1)
+    assert (node["vcpus_allocated"], node["memory_allocated_mb"]) == (4, 4096)
+    assert (await client.get(f"/api/v1/admin/nodes/{node['id']}", headers=root)).json() == node
+
+    url = f"/api/v1/admin/nodes/{node['id']}/metrics"
+    r = await client.get(url, params={"range": "day"}, headers=root)
+    assert r.status_code == 200 and len(r.json()["points"]) == 70
+    assert set(r.json()["points"][0]) == {"t", "cpu", "memory_used_mb", "memory_total_mb",
+                                          "net_in_bps", "net_out_bps", "load", "iowait"}
+    assert (await client.get(url, headers=ctx["alice"])).status_code == 403

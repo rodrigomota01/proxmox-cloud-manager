@@ -8,6 +8,8 @@ from app.providers.base import (
     InstanceObservation,
     InstanceSpec,
     Inventory,
+    MetricPoint,
+    NodeMetricPoint,
     OperationHandle,
     OperationResult,
     PowerAction,
@@ -63,6 +65,20 @@ class ProxmoxProvider:
     def _path(ref: ProviderRef) -> str:
         node = quote(ref.data["node"], safe="")
         return f"/nodes/{node}/{ref.data['type']}/{int(ref.data['vmid'])}"
+
+    async def metrics(self, ref: ProviderRef, timeframe: str) -> list[MetricPoint]:
+        rows = await self.client.get(
+            f"{self._path(ref)}/rrddata", {"timeframe": timeframe, "cf": "AVERAGE"}
+        ) or []
+        points = (mapper.metric_point(r) for r in rows)
+        return sorted((p for p in points if p is not None), key=lambda p: p.time)
+
+    async def node_metrics(self, node: str, timeframe: str) -> list[NodeMetricPoint]:
+        rows = await self.client.get(
+            f"/nodes/{quote(node, safe='')}/rrddata", {"timeframe": timeframe, "cf": "AVERAGE"}
+        ) or []
+        points = (mapper.node_metric_point(r) for r in rows)
+        return sorted((p for p in points if p is not None), key=lambda p: p.time)
 
     async def describe_template(self, ref: ProviderRef) -> TemplateDetails:
         config = await self.client.get(f"{self._path(ref)}/config") or {}

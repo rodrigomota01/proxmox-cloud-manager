@@ -1,11 +1,12 @@
 """/api/v1/instances, /jobs and /dashboard/summary (tenant scope via X-Tenant-Id)."""
 
 import uuid
+from dataclasses import asdict
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Header, Query, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 
-from app.api.deps import AppSettings, CurrentTenant, DbSession
+from app.api.deps import AppSettings, CurrentTenant, DbSession, RedisClient
 from app.compute.models import Instance
 from app.compute.schemas import (
     Accepted,
@@ -17,11 +18,16 @@ from app.compute.schemas import (
     JobDetail,
     JobEventOut,
     JobOut,
+    MetricPointOut,
+    MetricsOut,
     QuotaLineOut,
 )
 from app.compute.service import ComputeService
+from app.core.errors import ProviderUnavailableError
 from app.core.pagination import PageParams, page_params
+from app.inventory.models import ProviderCluster
 from app.jobs.presenter import job_out, jobs_out
+from app.providers.base import ProviderError, ProviderRef
 from app.tenancy import quota
 from app.tenancy.schemas import Page
 
@@ -29,6 +35,8 @@ router = APIRouter()
 
 Pagination = Annotated[PageParams, Depends(page_params)]
 IdempotencyKey = Annotated[str | None, Header(alias="Idempotency-Key", max_length=128)]
+# history moves slowly past the last hour: cache longer there
+METRICS_TTL = {"hour": 30, "day": 300, "week": 300}
 
 
 def instance_out(i: Instance) -> InstanceOut:
@@ -38,6 +46,8 @@ def instance_out(i: Instance) -> InstanceOut:
         id=i.id, project_id=i.project_id, kind=i.kind, name=i.name, state=i.state,
         power_state=i.power_state, vcpus=i.vcpus, memory_mb=i.memory_mb,
         root_disk_gb=i.root_disk_gb, tags=i.tags, image_id=i.image_id,
+        cpu_usage=i.cpu_usage, memory_used_mb=i.memory_used_mb,
+        uptime_seconds=i.uptime_seconds,
         ipv4=i.network.get("address"), gateway=i.network.get("gateway"),
         created_at=i.created_at, last_seen_at=i.last_seen_at,
     )
@@ -59,6 +69,33 @@ async def list_instances(
 @router.get("/instances/{instance_id}", tags=["instances"])
 async def get_instance(instance_id: uuid.UUID, ctx: CurrentTenant, db: DbSession) -> InstanceOut:
     return instance_out(await ComputeService(db, ctx).get(instance_id))
+
+
+@router.get("/instances/{instance_id}/metrics", tags=["instances"])
+async def instance_metrics(
+    instance_id: uuid.UUID, request: Request, ctx: CurrentTenant, db: DbSession,
+    redis: RedisClient, range_: Annotated[
+        Literal["hour", "day", "week"], Query(alias="range")
+    ] = "hour",
+) -> MetricsOut:
+    instance = await ComputeService(db, ctx).get(instance_id)  # authorizes {kind}:view
+    key = f"metrics:{instance.id}:{range_}"
+    if cached := await redis.get(key):
+        return MetricsOut.model_validate_json(cached)
+    out = MetricsOut(range=range_, points=[])
+    if "vmid" in instance.provider_ref:
+        cluster = await db.get_one(ProviderCluster, instance.cluster_id)
+        try:
+            async with request.app.state.providers.open(db, cluster) as provider:
+                points = await provider.metrics(ProviderRef(instance.provider_ref), range_)
+        except ProviderError as exc:
+            raise ProviderUnavailableError("Metrics are temporarily unavailable") from exc
+        out.points = [
+            MetricPointOut(t=p.time, **{k: v for k, v in asdict(p).items() if k != "time"})
+            for p in points
+        ]
+    await redis.set(key, out.model_dump_json(), ex=METRICS_TTL[range_])
+    return out
 
 
 @router.post("/instances", status_code=status.HTTP_202_ACCEPTED, tags=["instances"])

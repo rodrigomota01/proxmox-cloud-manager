@@ -283,6 +283,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/nodes/{node_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Node */
+        get: operations["get_node_api_v1_admin_nodes__node_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/nodes/{node_id}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Node Metrics */
+        get: operations["node_metrics_api_v1_admin_nodes__node_id__metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/storage": {
         parameters: {
             query?: never;
@@ -626,6 +660,23 @@ export interface paths {
         post?: never;
         /** Delete Instance */
         delete: operations["delete_instance_api_v1_instances__instance_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/instances/{instance_id}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Instance Metrics */
+        get: operations["instance_metrics_api_v1_instances__instance_id__metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1523,6 +1574,8 @@ export interface components {
          * @description Tenant view. No provider identifiers (vmid/node/cluster) — ADR-0010.
          */
         InstanceOut: {
+            /** Cpu Usage */
+            cpu_usage: number;
             /**
              * Created At
              * Format: date-time
@@ -1545,6 +1598,8 @@ export interface components {
             last_seen_at: string | null;
             /** Memory Mb */
             memory_mb: number;
+            /** Memory Used Mb */
+            memory_used_mb: number;
             /** Name */
             name: string;
             /** Power State */
@@ -1560,6 +1615,8 @@ export interface components {
             state: string;
             /** Tags */
             tags: string[];
+            /** Uptime Seconds */
+            uptime_seconds: number;
             /** Vcpus */
             vcpus: number;
         };
@@ -1779,6 +1836,58 @@ export interface components {
             /** Tenant Slug */
             tenant_slug: string;
         };
+        /** MetricPointOut */
+        MetricPointOut: {
+            /** Cpu */
+            cpu: number;
+            /** Disk Read Bps */
+            disk_read_bps: number;
+            /** Disk Write Bps */
+            disk_write_bps: number;
+            /** Memory Total Mb */
+            memory_total_mb: number;
+            /** Memory Used Mb */
+            memory_used_mb: number;
+            /** Net In Bps */
+            net_in_bps: number;
+            /** Net Out Bps */
+            net_out_bps: number;
+            /** T */
+            t: number;
+        };
+        /** MetricsOut */
+        MetricsOut: {
+            /** Points */
+            points: components["schemas"]["MetricPointOut"][];
+            /** Range */
+            range: string;
+        };
+        /** NodeMetricPointOut */
+        NodeMetricPointOut: {
+            /** Cpu */
+            cpu: number;
+            /** Iowait */
+            iowait: number;
+            /** Load */
+            load: number;
+            /** Memory Total Mb */
+            memory_total_mb: number;
+            /** Memory Used Mb */
+            memory_used_mb: number;
+            /** Net In Bps */
+            net_in_bps: number;
+            /** Net Out Bps */
+            net_out_bps: number;
+            /** T */
+            t: number;
+        };
+        /** NodeMetricsOut */
+        NodeMetricsOut: {
+            /** Points */
+            points: components["schemas"]["NodeMetricPointOut"][];
+            /** Range */
+            range: string;
+        };
         /** NodeOut */
         NodeOut: {
             /**
@@ -1786,6 +1895,8 @@ export interface components {
              * Format: uuid
              */
             cluster_id: string;
+            /** Cluster Name */
+            cluster_name: string;
             /** Cpu Count */
             cpu_count: number;
             /** Cpu Usage */
@@ -1795,8 +1906,14 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Instances Running */
+            instances_running: number;
+            /** Instances Total */
+            instances_total: number;
             /** Last Seen At */
             last_seen_at: string | null;
+            /** Memory Allocated Mb */
+            memory_allocated_mb: number;
             /** Memory Bytes */
             memory_bytes: number;
             /** Memory Used Bytes */
@@ -1807,6 +1924,8 @@ export interface components {
             status: string;
             /** Uptime Seconds */
             uptime_seconds: number;
+            /** Vcpus Allocated */
+            vcpus_allocated: number;
         };
         /** Page[AdminUserOut] */
         Page_AdminUserOut_: {
@@ -2772,6 +2891,70 @@ export interface operations {
             };
         };
     };
+    get_node_api_v1_admin_nodes__node_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    node_metrics_api_v1_admin_nodes__node_id__metrics_get: {
+        parameters: {
+            query?: {
+                range?: "hour" | "day" | "week";
+            };
+            header?: never;
+            path: {
+                node_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeMetricsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_storage_api_v1_admin_storage_get: {
         parameters: {
             query?: never;
@@ -3524,6 +3707,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Accepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    instance_metrics_api_v1_instances__instance_id__metrics_get: {
+        parameters: {
+            query?: {
+                range?: "hour" | "day" | "week";
+            };
+            header?: never;
+            path: {
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricsOut"];
                 };
             };
             /** @description Validation Error */

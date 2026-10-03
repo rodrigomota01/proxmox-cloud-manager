@@ -1,12 +1,13 @@
 """/api/v1/admin/* — platform administration (docs/architecture/05-api.md)."""
 
 import uuid
+from dataclasses import asdict
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.admin.schemas import (
     AdminInstanceOut,
@@ -18,6 +19,9 @@ from app.admin.schemas import (
     ConnectionTest,
     CredentialsOut,
     CredentialsPut,
+    NodeBase,
+    NodeMetricPointOut,
+    NodeMetricsOut,
     NodeOut,
     StorageOut,
     SyncRunOut,
@@ -28,12 +32,13 @@ from app.api.deps import (
     CurrentPrincipal,
     DbSession,
     Principal,
+    RedisClient,
     require_platform,
 )
 from app.audit import service as audit
 from app.compute.models import Instance
 from app.compute.schemas import Accepted, JobOut, QuotaLineOut
-from app.core.errors import NotFound
+from app.core.errors import NotFound, ProviderUnavailableError
 from app.inventory.models import (
     Node,
     ProviderCluster,
@@ -43,6 +48,7 @@ from app.inventory.models import (
 )
 from app.jobs.models import Job, JobEvent
 from app.jobs.presenter import job_out, jobs_out
+from app.providers.base import ProviderError
 from app.providers.registry import ProviderRegistry
 from app.tenancy import quota
 from app.tenancy.models import Tenant, TenantQuota
@@ -191,10 +197,73 @@ async def list_sync_runs(
 # --- inventory -------------------------------------------------------------------------
 
 
+async def nodes_out(db: DbSession, nodes: list[Node]) -> list[NodeOut]:
+    """Nodes plus what their live guests (managed or discovered) were allocated."""
+    if not nodes:
+        return []
+    rows = await db.execute(
+        select(
+            Instance.node_id,
+            func.count(),
+            func.count().filter(Instance.power_state == "running"),
+            func.coalesce(func.sum(Instance.vcpus), 0),
+            func.coalesce(func.sum(Instance.memory_mb), 0),
+        )
+        .where(Instance.node_id.in_([n.id for n in nodes]), Instance.deleted_at.is_(None))
+        .group_by(Instance.node_id)
+    )
+    alloc = {node_id: rest for node_id, *rest in rows}
+    clusters = dict((await db.execute(select(ProviderCluster.id, ProviderCluster.name))).all())
+    out = []
+    for n in nodes:
+        total, running, vcpus, memory = alloc.get(n.id, (0, 0, 0, 0))
+        out.append(NodeOut(
+            **NodeBase.model_validate(n, from_attributes=True).model_dump(),
+            cluster_name=clusters.get(n.cluster_id, ""),
+            instances_total=total, instances_running=running,
+            vcpus_allocated=vcpus, memory_allocated_mb=memory,
+        ))
+    return out
+
+
 @router.get("/nodes")
 async def list_nodes(_: NodeViewer, db: DbSession) -> list[NodeOut]:
-    nodes = (await db.execute(select(Node).order_by(Node.name))).scalars()
-    return [NodeOut.model_validate(n, from_attributes=True) for n in nodes]
+    nodes = list((await db.execute(select(Node).order_by(Node.name))).scalars())
+    return await nodes_out(db, nodes)
+
+
+@router.get("/nodes/{node_id}")
+async def get_node(node_id: uuid.UUID, _: NodeViewer, db: DbSession) -> NodeOut:
+    node = await db.get(Node, node_id)
+    if node is None:
+        raise NotFound()
+    return (await nodes_out(db, [node]))[0]
+
+
+@router.get("/nodes/{node_id}/metrics")
+async def node_metrics(
+    node_id: uuid.UUID, _: NodeViewer, db: DbSession, redis: RedisClient,
+    registry: Registry,
+    range_: Annotated[Literal["hour", "day", "week"], Query(alias="range")] = "hour",
+) -> NodeMetricsOut:
+    node = await db.get(Node, node_id)
+    if node is None:
+        raise NotFound()
+    key = f"node-metrics:{node.id}:{range_}"
+    if cached := await redis.get(key):
+        return NodeMetricsOut.model_validate_json(cached)
+    cluster = await db.get_one(ProviderCluster, node.cluster_id)
+    try:
+        async with registry.open(db, cluster) as provider:
+            points = await provider.node_metrics(node.name, range_)
+    except ProviderError as exc:
+        raise ProviderUnavailableError("Metrics are temporarily unavailable") from exc
+    out = NodeMetricsOut(range=range_, points=[
+        NodeMetricPointOut(t=p.time, **{k: v for k, v in asdict(p).items() if k != "time"})
+        for p in points
+    ])
+    await redis.set(key, out.model_dump_json(), ex=30 if range_ == "hour" else 300)
+    return out
 
 
 @router.get("/storage")

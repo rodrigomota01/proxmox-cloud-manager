@@ -6,7 +6,9 @@ from app.providers.base import (
     InstanceKind,
     InstanceObservation,
     Inventory,
+    MetricPoint,
     NodeInfo,
+    NodeMetricPoint,
     PowerState,
     ProviderRef,
     StaticIPv4,
@@ -63,6 +65,40 @@ def instance(item: dict[str, Any]) -> InstanceObservation:
         tags=tags,
         pool=item.get("pool"),
         uptime_seconds=_int(item.get("uptime")),
+        cpu_usage=float(item.get("cpu") or 0.0),
+        memory_used_mb=_int(item.get("mem")) // _MIB,
+    )
+
+
+def metric_point(item: dict[str, Any]) -> MetricPoint | None:
+    """From GET .../rrddata; samples with no data yet (stopped guest) are skipped."""
+    if item.get("cpu") is None and item.get("mem") is None:
+        return None
+    return MetricPoint(
+        time=_int(item.get("time")),
+        cpu=float(item.get("cpu") or 0.0),
+        memory_used_mb=int(float(item.get("mem") or 0)) // _MIB,
+        memory_total_mb=int(float(item.get("maxmem") or 0)) // _MIB,
+        net_in_bps=float(item.get("netin") or 0.0),
+        net_out_bps=float(item.get("netout") or 0.0),
+        disk_read_bps=float(item.get("diskread") or 0.0),
+        disk_write_bps=float(item.get("diskwrite") or 0.0),
+    )
+
+
+def node_metric_point(item: dict[str, Any]) -> NodeMetricPoint | None:
+    """From GET /nodes/{node}/rrddata."""
+    if item.get("cpu") is None and item.get("memused") is None:
+        return None
+    return NodeMetricPoint(
+        time=_int(item.get("time")),
+        cpu=float(item.get("cpu") or 0.0),
+        memory_used_mb=int(float(item.get("memused") or 0)) // _MIB,
+        memory_total_mb=int(float(item.get("memtotal") or 0)) // _MIB,
+        net_in_bps=float(item.get("netin") or 0.0),
+        net_out_bps=float(item.get("netout") or 0.0),
+        load=float(item.get("loadavg") or 0.0),
+        iowait=float(item.get("iowait") or 0.0),
     )
 
 

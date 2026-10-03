@@ -1,6 +1,7 @@
 """In-memory, deterministic CloudProvider for tests."""
 
 import asyncio
+import math
 from dataclasses import dataclass, field, replace
 from typing import ClassVar
 
@@ -9,7 +10,9 @@ from app.providers.base import (
     InstanceObservation,
     InstanceSpec,
     Inventory,
+    MetricPoint,
     NodeInfo,
+    NodeMetricPoint,
     OperationHandle,
     OperationResult,
     PowerAction,
@@ -102,6 +105,36 @@ class FakeProvider:
         return Inventory(
             list(self.nodes), list(self.instances.values()), list(self.storage), templates
         )
+
+    async def metrics(self, ref: ProviderRef, timeframe: str) -> list[MetricPoint]:
+        self._check()
+        obs = self.instances[ref.key]
+        step = {"hour": 60, "day": 1800, "week": 10800}[timeframe]
+        return [
+            MetricPoint(
+                time=1_700_000_000 + i * step,
+                cpu=0.2 + 0.15 * math.sin(i / 6),
+                memory_used_mb=int(obs.memory_mb * (0.5 + 0.1 * math.sin(i / 9))),
+                memory_total_mb=obs.memory_mb,
+                net_in_bps=50_000 + 20_000 * math.sin(i / 4),
+                net_out_bps=20_000 + 5_000 * math.cos(i / 5),
+                disk_read_bps=10_000.0,
+                disk_write_bps=30_000 + 10_000 * math.sin(i / 7),
+            )
+            for i in range(70)
+        ]
+
+    async def node_metrics(self, node: str, timeframe: str) -> list[NodeMetricPoint]:
+        self._check()
+        step = {"hour": 60, "day": 1800, "week": 10800}[timeframe]
+        return [
+            NodeMetricPoint(
+                time=1_700_000_000 + i * step, cpu=0.3 + 0.1 * math.sin(i / 5),
+                memory_used_mb=20_000, memory_total_mb=32_768,
+                net_in_bps=1e6, net_out_bps=5e5, load=1.5 + math.sin(i / 8), iowait=0.01,
+            )
+            for i in range(70)
+        ]
 
     async def describe_template(self, ref: ProviderRef) -> TemplateDetails:
         self._check()

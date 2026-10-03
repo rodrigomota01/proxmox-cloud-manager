@@ -94,6 +94,34 @@ class InstanceObservation:
     tags: tuple[str, ...] = ()
     pool: str | None = None
     uptime_seconds: int = 0
+    cpu_usage: float = 0.0  # 0..1 of the allocated vCPUs
+    memory_used_mb: int = 0
+
+
+@dataclass(frozen=True)
+class MetricPoint:
+    """One sample of a guest's history (rates are per second, averaged over the step)."""
+
+    time: int  # unix seconds
+    cpu: float  # 0..1 of allocated vCPUs
+    memory_used_mb: int
+    memory_total_mb: int
+    net_in_bps: float
+    net_out_bps: float
+    disk_read_bps: float
+    disk_write_bps: float
+
+
+@dataclass(frozen=True)
+class NodeMetricPoint:
+    time: int
+    cpu: float  # 0..1 of the host's cores
+    memory_used_mb: int
+    memory_total_mb: int
+    net_in_bps: float
+    net_out_bps: float
+    load: float  # 1-minute load average
+    iowait: float  # 0..1
 
 
 @dataclass(frozen=True)
@@ -186,6 +214,10 @@ class CloudProvider(Protocol):
     async def get_instance(self, ref: ProviderRef) -> InstanceObservation:
         """Live state of one guest (not the cached bulk listing)."""
         ...
+    async def metrics(self, ref: ProviderRef, timeframe: str) -> list[MetricPoint]:
+        """History for timeframe in hour|day|week (provider-side retention)."""
+        ...
+    async def node_metrics(self, node: str, timeframe: str) -> list[NodeMetricPoint]: ...
     async def describe_template(self, ref: ProviderRef) -> TemplateDetails: ...
     async def slot_available(self, ref: ProviderRef) -> bool:
         """Whether the target id is free in the whole provider (also where we cannot see)."""
