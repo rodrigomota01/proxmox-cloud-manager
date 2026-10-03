@@ -13,6 +13,7 @@ x-backend-env: &backend-env
   CM_COOKIE_SECURE: ${CM_COOKIE_SECURE:-false}
   CM_SMTP_HOST: mailpit
   CM_SMTP_PORT: "1025"
+  CM_IPAM_MYSQL_URL: ${CM_IPAM_MYSQL_URL:-}
 
 services:
   traefik:

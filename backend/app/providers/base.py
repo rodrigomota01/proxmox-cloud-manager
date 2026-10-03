@@ -143,6 +143,18 @@ class FilesystemUsage:
 
 
 @dataclass(frozen=True)
+class GuestNic:
+    """One network card as configured in the provider (not what the guest reports)."""
+
+    name: str  # net0, net1...
+    mac: str | None  # lowercase
+    bridge: str | None
+    vlan: int | None
+    ip: str | None = None  # address/prefix from cloud-init (VMs) or the NIC (containers)
+    gateway: str | None = None
+
+
+@dataclass(frozen=True)
 class StorageObservation:
     node: str
     name: str
@@ -236,6 +248,10 @@ class CloudProvider(Protocol):
         """History for timeframe in hour|day|week (provider-side retention)."""
         ...
     async def node_metrics(self, node: str, timeframe: str) -> list[NodeMetricPoint]: ...
+    async def guest_nics(self, ref: ProviderRef) -> list[GuestNic]:
+        """NICs from the guest's configuration (read-only, needs VM.Audit)."""
+        ...
+
     async def guest_filesystems(self, ref: ProviderRef) -> list[FilesystemUsage]:
         """Filesystems inside a running VM. GuestAgentUnavailable without an agent."""
         ...

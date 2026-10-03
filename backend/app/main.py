@@ -25,6 +25,7 @@ from app.iam import router as iam
 from app.images import router as images
 from app.infra.mailer import build_mailer
 from app.infra.secrets import SecretsError, build_secrets_backend
+from app.ipam import router as ipam
 from app.providers.registry import ProviderRegistry
 from app.regions import router as regions
 from app.sshkeys import router as sshkeys
@@ -93,6 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     v1.include_router(admin.router)
     v1.include_router(alerts.router)
     v1.include_router(alerts.admin_router)
+    v1.include_router(ipam.router)
     app.include_router(v1)
 
     return app

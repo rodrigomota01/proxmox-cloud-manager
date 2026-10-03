@@ -13,6 +13,99 @@
         "title": "Accepted",
         "type": "object"
       },
+      "AddressOut": {
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "assigned": {
+            "title": "Assigned",
+            "type": "boolean"
+          },
+          "external_id": {
+            "title": "External Id",
+            "type": "integer"
+          },
+          "guest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GuestRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hostname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hostname"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "mac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mac"
+          },
+          "mac_mismatch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mac Mismatch"
+          },
+          "prefix": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefix"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "external_id",
+          "address",
+          "prefix",
+          "status",
+          "assigned",
+          "hostname",
+          "mac",
+          "guest",
+          "mac_mismatch"
+        ],
+        "title": "AddressOut",
+        "type": "object"
+      },
       "AdminAlertOut": {
         "properties": {
           "fired_at": {
@@ -2398,6 +2491,30 @@
         "title": "ForgotPasswordRequest",
         "type": "object"
       },
+      "GuestRef": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "managed": {
+            "title": "Managed",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "managed"
+        ],
+        "title": "GuestRef",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2967,6 +3084,95 @@
           "last_seen_at"
         ],
         "title": "InstanceOut",
+        "type": "object"
+      },
+      "IpamReportOut": {
+        "properties": {
+          "addresses": {
+            "items": {
+              "$ref": "#/components/schemas/AddressOut"
+            },
+            "title": "Addresses",
+            "type": "array"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "networks": {
+            "items": {
+              "$ref": "#/components/schemas/NetworkOut"
+            },
+            "title": "Networks",
+            "type": "array"
+          },
+          "nics_known": {
+            "title": "Nics Known",
+            "type": "boolean"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/NetworkOut"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "unregistered": {
+            "items": {
+              "$ref": "#/components/schemas/UnregisteredOut"
+            },
+            "title": "Unregistered",
+            "type": "array"
+          }
+        },
+        "required": [
+          "nics_known",
+          "counts",
+          "addresses",
+          "unregistered",
+          "networks",
+          "suggestions"
+        ],
+        "title": "IpamReportOut",
+        "type": "object"
+      },
+      "IpamStatusOut": {
+        "properties": {
+          "addresses": {
+            "title": "Addresses",
+            "type": "integer"
+          },
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "integrated": {
+            "title": "Integrated",
+            "type": "integer"
+          },
+          "last_synced_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Synced At"
+          }
+        },
+        "required": [
+          "configured",
+          "addresses",
+          "integrated",
+          "last_synced_at"
+        ],
+        "title": "IpamStatusOut",
         "type": "object"
       },
       "JobDetail": {
@@ -3670,6 +3876,116 @@
           "points"
         ],
         "title": "MetricsOut",
+        "type": "object"
+      },
+      "NetworkIn": {
+        "additionalProperties": false,
+        "properties": {
+          "bridge": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9._-]{1,32}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bridge"
+          },
+          "cidr": {
+            "title": "Cidr",
+            "type": "string"
+          },
+          "gateway": {
+            "title": "Gateway",
+            "type": "string"
+          },
+          "vlan": {
+            "anyOf": [
+              {
+                "maximum": 4094.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vlan"
+          }
+        },
+        "required": [
+          "cidr",
+          "gateway"
+        ],
+        "title": "NetworkIn",
+        "type": "object"
+      },
+      "NetworkOut": {
+        "properties": {
+          "bridge": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bridge"
+          },
+          "cidr": {
+            "title": "Cidr",
+            "type": "string"
+          },
+          "gateway": {
+            "title": "Gateway",
+            "type": "string"
+          },
+          "guests": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guests"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "vlan": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vlan"
+          }
+        },
+        "required": [
+          "id",
+          "cidr",
+          "gateway",
+          "vlan",
+          "bridge"
+        ],
+        "title": "NetworkOut",
         "type": "object"
       },
       "NodeMetricPointOut": {
@@ -5056,6 +5372,35 @@
         "title": "TopInstancesOut",
         "type": "object"
       },
+      "UnregisteredOut": {
+        "properties": {
+          "guest": {
+            "$ref": "#/components/schemas/GuestRef"
+          },
+          "ip": {
+            "title": "Ip",
+            "type": "string"
+          },
+          "mac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mac"
+          }
+        },
+        "required": [
+          "ip",
+          "mac",
+          "guest"
+        ],
+        "title": "UnregisteredOut",
+        "type": "object"
+      },
       "UsageOut": {
         "description": "Live usage of the running instances in view (as of the last sync).",
         "properties": {
@@ -5965,6 +6310,102 @@
         ]
       }
     },
+    "/api/v1/admin/clusters/{cluster_id}/ipam": {
+      "get": {
+        "operationId": "cluster_ipam_api_v1_admin_clusters__cluster_id__ipam_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IpamReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cluster Ipam",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/clusters/{cluster_id}/ipam/networks": {
+      "post": {
+        "operationId": "add_network_api_v1_admin_clusters__cluster_id__ipam_networks_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NetworkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Network",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/clusters/{cluster_id}/sync": {
       "post": {
         "operationId": "sync_cluster_api_v1_admin_clusters__cluster_id__sync_post",
@@ -6560,6 +7001,84 @@
           }
         },
         "summary": "Adopt Instance",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/ipam": {
+      "get": {
+        "operationId": "ipam_status_api_v1_admin_ipam_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IpamStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ipam Status",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/ipam/networks/{network_id}": {
+      "delete": {
+        "operationId": "delete_network_api_v1_admin_ipam_networks__network_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "network_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Network Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Network",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/ipam/sync": {
+      "post": {
+        "operationId": "ipam_sync_api_v1_admin_ipam_sync_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ipam Sync",
         "tags": [
           "admin"
         ]

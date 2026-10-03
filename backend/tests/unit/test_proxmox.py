@@ -275,3 +275,23 @@ async def test_guest_filesystems_reads_agent_and_maps_missing_agent():
     route.respond(403)
     with pytest.raises(ProviderAuthError):
         await ProxmoxProvider(_client()).guest_filesystems(ref)
+
+
+def test_nics_from_vm_and_container_config():
+    vm = mapper.nics({
+        "net0": "virtio=BE:80:46:72:1E:A2,bridge=vmbr0,firewall=1,tag=151",
+        "ipconfig0": "ip=177.54.151.188/24,gw=177.54.151.1",
+        "net1": "virtio=BC:24:11:20:05:FF,bridge=vnet100",
+        "ipconfig1": "ip=dhcp",
+        "netmask": "ignored",
+    }, "qemu")
+    assert [(n.name, n.mac, n.bridge, n.vlan, n.ip, n.gateway) for n in vm] == [
+        ("net0", "be:80:46:72:1e:a2", "vmbr0", 151, "177.54.151.188/24", "177.54.151.1"),
+        ("net1", "bc:24:11:20:05:ff", "vnet100", None, None, None),
+    ]
+    [ct] = mapper.nics({
+        "net0": "name=eth0,bridge=vmbr0,hwaddr=AA:BB:CC:00:11:22,"
+                "ip=152.236.18.21/31,gw=152.236.18.20",
+    }, "lxc")
+    assert (ct.mac, ct.ip) == ("aa:bb:cc:00:11:22", "152.236.18.21/31")
+    assert ct.gateway == "152.236.18.20"

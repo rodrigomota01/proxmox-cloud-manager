@@ -8,6 +8,7 @@ from app.db.base import Base
 from app.iam.models import Permission, Role, RoleBinding, RolePermission, User
 from app.images.models import Image, ImageTemplate
 from app.inventory.models import Node, ProviderCluster, ProviderCredential, StoragePool, SyncRun
+from app.ipam.models import IpamAddress, IpamNetwork
 from app.jobs.models import Job, JobEvent
 from app.regions.models import Region, Zone
 from app.sshkeys.models import SshPublicKey
@@ -21,6 +22,8 @@ __all__ = [
     "Image",
     "ImageTemplate",
     "Instance",
+    "IpamAddress",
+    "IpamNetwork",
     "Job",
     "JobEvent",
     "Node",

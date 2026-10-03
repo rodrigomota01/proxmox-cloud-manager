@@ -4,6 +4,7 @@ from typing import Any
 
 from app.providers.base import (
     FilesystemUsage,
+    GuestNic,
     InstanceKind,
     InstanceObservation,
     Inventory,
@@ -226,3 +227,30 @@ def template_details(ref: ProviderRef, config: dict[str, Any]) -> TemplateDetail
 
 def ipconfig(ip: StaticIPv4) -> str:
     return f"ip={ip.address},gw={ip.gateway}"
+
+
+def _kv(spec: str) -> dict[str, str]:
+    return dict(part.split("=", 1) for part in spec.split(",") if "=" in part)
+
+
+_NIC_MODELS = ("virtio", "e1000", "e1000e", "rtl8139", "vmxnet3")
+
+
+def nics(config: dict[str, Any], pve_type: str) -> list[GuestNic]:
+    """From GET .../config. VMs: netN=virtio=MAC,bridge=..,tag=.. + ipconfigN=ip=..,gw=..;
+    containers: netN=name=eth0,hwaddr=MAC,bridge=..,ip=..,gw=..,tag=.."""
+    out: list[GuestNic] = []
+    for key in sorted(k for k in config if k.startswith("net") and k[3:].isdigit()):
+        fields = _kv(str(config[key]))
+        if pve_type == "lxc":
+            mac, ip, gw = fields.get("hwaddr"), fields.get("ip"), fields.get("gw")
+        else:
+            mac = next((fields[m] for m in _NIC_MODELS if m in fields), None)
+            cloud = _kv(str(config.get(f"ipconfig{key[3:]}", "")))
+            ip, gw = cloud.get("ip"), cloud.get("gw")
+        if ip in ("dhcp", "manual", "auto"):
+            ip = None
+        tag = fields.get("tag")
+        out.append(GuestNic(key, mac.lower() if mac else None, fields.get("bridge"),
+                            int(tag) if tag and tag.isdigit() else None, ip, gw))
+    return out

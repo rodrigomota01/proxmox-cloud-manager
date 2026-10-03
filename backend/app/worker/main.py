@@ -30,6 +30,8 @@ from app.infra.secrets import SecretsError, build_secrets_backend
 from app.inventory.guest_disk import poll_guest_disks
 from app.inventory.models import ProviderCluster, ProviderCredential
 from app.inventory.reconciler import reconcile
+from app.ipam.service import source_for
+from app.ipam.sync import poll_guest_nics, sync_ipam
 from app.jobs import handlers  # noqa: F401 - registers job handlers
 from app.jobs.queue import CHANNEL, run_one
 from app.providers.base import ProviderError
@@ -122,6 +124,24 @@ async def _set_status(
     logger.warning("inventory sync failed", extra={"cluster_id": str(cluster_id), "error": error})
 
 
+async def refresh_ipam(
+    settings: Settings,
+    sessionmaker: async_sessionmaker[AsyncSession],
+    registry: ProviderRegistry,
+) -> None:
+    """NICs of every guest (for IP matching), then the IPAM copy when configured. A
+    MySQL outage only delays the copy; it never stops the reconcile loop."""
+    await poll_guest_nics(sessionmaker, registry)
+    source = source_for(settings)
+    if source is None:
+        return
+    try:
+        stats = await sync_ipam(sessionmaker, source)
+        logger.info("ipam synced", extra={"stats": stats})
+    except Exception as exc:
+        logger.warning("ipam sync failed", extra={"error": str(exc)})
+
+
 JOB_POLL_SECONDS = 5.0
 
 
@@ -185,7 +205,7 @@ async def reconcile_loop(
     stop: asyncio.Event,
 ) -> None:
     loop = asyncio.get_running_loop()
-    next_disk_poll = 0.0
+    next_disk_poll = next_ipam = 0.0
     while not stop.is_set():
         try:
             await reconcile_all(
@@ -196,6 +216,9 @@ async def reconcile_loop(
             if loop.time() >= next_disk_poll:
                 next_disk_poll = loop.time() + settings.guest_disk_interval_seconds
                 await poll_guest_disks(sessionmaker, registry)
+            if loop.time() >= next_ipam:
+                next_ipam = loop.time() + settings.ipam_sync_interval_seconds
+                await refresh_ipam(settings, sessionmaker, registry)
             changes = await run_alerts(sessionmaker)
             if changes:
                 logger.info("alerts changed", extra={"changes": len(changes)})

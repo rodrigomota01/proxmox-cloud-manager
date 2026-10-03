@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     webhook_allow_http: bool = False
     webhook_allow_private: bool = False
     webhook_timeout_seconds: float = 5.0
+    # legacy IPAM (MySQL awf_ip_pool), e.g. mysql://user:pw@host:3306/awf_cloud; None = off
+    ipam_mysql_url: SecretStr | None = None
+    ipam_sync_interval_seconds: float = 120.0
     # concurrent job runners per worker process (a slow shutdown on one server must not
     # hold back operations on another)
     job_concurrency: int = 4
@@ -74,7 +77,8 @@ class Settings(BaseSettings):
     smtp_from: str = "Cloud Manager <no-reply@cloud-manager.local>"
 
     @field_validator(
-        "jwt_private_key", "kek", "smtp_host", "migration_database_url", mode="before"
+        "jwt_private_key", "kek", "smtp_host", "migration_database_url", "ipam_mysql_url",
+        mode="before",
     )
     @classmethod
     def _empty_is_unset(cls, value: object) -> object:

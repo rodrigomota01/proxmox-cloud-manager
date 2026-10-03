@@ -165,6 +165,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/clusters/{cluster_id}/ipam": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cluster Ipam */
+        get: operations["cluster_ipam_api_v1_admin_clusters__cluster_id__ipam_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/clusters/{cluster_id}/ipam/networks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Network */
+        post: operations["add_network_api_v1_admin_clusters__cluster_id__ipam_networks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/clusters/{cluster_id}/sync": {
         parameters: {
             query?: never;
@@ -347,6 +381,57 @@ export interface paths {
         put?: never;
         /** Adopt Instance */
         post: operations["adopt_instance_api_v1_admin_instances__instance_id__adopt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ipam": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ipam Status */
+        get: operations["ipam_status_api_v1_admin_ipam_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ipam/networks/{network_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Network */
+        delete: operations["delete_network_api_v1_admin_ipam_networks__network_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ipam/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ipam Sync */
+        post: operations["ipam_sync_api_v1_admin_ipam_sync_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1466,6 +1551,31 @@ export interface components {
         Accepted: {
             job: components["schemas"]["JobOut"];
         };
+        /** AddressOut */
+        AddressOut: {
+            /** Address */
+            address: string;
+            /** Assigned */
+            assigned: boolean;
+            /** External Id */
+            external_id: number;
+            guest: components["schemas"]["GuestRef"] | null;
+            /** Hostname */
+            hostname: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mac */
+            mac: string | null;
+            /** Mac Mismatch */
+            mac_mismatch: string | null;
+            /** Prefix */
+            prefix: number | null;
+            /** Status */
+            status: string;
+        };
         /** AdminAlertOut */
         AdminAlertOut: {
             /** Fired At */
@@ -2301,6 +2411,18 @@ export interface components {
             /** Email */
             email: string;
         };
+        /** GuestRef */
+        GuestRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Managed */
+            managed: boolean;
+            /** Name */
+            name: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -2522,6 +2644,34 @@ export interface components {
             zone_id: string | null;
             /** Zone Name */
             zone_name: string | null;
+        };
+        /** IpamReportOut */
+        IpamReportOut: {
+            /** Addresses */
+            addresses: components["schemas"]["AddressOut"][];
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Networks */
+            networks: components["schemas"]["NetworkOut"][];
+            /** Nics Known */
+            nics_known: boolean;
+            /** Suggestions */
+            suggestions: components["schemas"]["NetworkOut"][];
+            /** Unregistered */
+            unregistered: components["schemas"]["UnregisteredOut"][];
+        };
+        /** IpamStatusOut */
+        IpamStatusOut: {
+            /** Addresses */
+            addresses: number;
+            /** Configured */
+            configured: boolean;
+            /** Integrated */
+            integrated: number;
+            /** Last Synced At */
+            last_synced_at: string | null;
         };
         /** JobDetail */
         JobDetail: {
@@ -2764,6 +2914,32 @@ export interface components {
             points: components["schemas"]["MetricPointOut"][];
             /** Range */
             range: string;
+        };
+        /** NetworkIn */
+        NetworkIn: {
+            /** Bridge */
+            bridge?: string | null;
+            /** Cidr */
+            cidr: string;
+            /** Gateway */
+            gateway: string;
+            /** Vlan */
+            vlan?: number | null;
+        };
+        /** NetworkOut */
+        NetworkOut: {
+            /** Bridge */
+            bridge: string | null;
+            /** Cidr */
+            cidr: string;
+            /** Gateway */
+            gateway: string;
+            /** Guests */
+            guests?: number | null;
+            /** Id */
+            id: string | null;
+            /** Vlan */
+            vlan: number | null;
         };
         /** NodeMetricPointOut */
         NodeMetricPointOut: {
@@ -3267,6 +3443,14 @@ export interface components {
             memory: components["schemas"]["TopInstanceOut"][];
             /** Network */
             network: components["schemas"]["TopInstanceOut"][];
+        };
+        /** UnregisteredOut */
+        UnregisteredOut: {
+            guest: components["schemas"]["GuestRef"];
+            /** Ip */
+            ip: string;
+            /** Mac */
+            mac: string | null;
         };
         /**
          * UsageOut
@@ -3805,6 +3989,72 @@ export interface operations {
             };
         };
     };
+    cluster_ipam_api_v1_admin_clusters__cluster_id__ipam_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IpamReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_network_api_v1_admin_clusters__cluster_id__ipam_networks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     sync_cluster_api_v1_admin_clusters__cluster_id__sync_post: {
         parameters: {
             query?: never;
@@ -4183,6 +4433,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ipam_status_api_v1_admin_ipam_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IpamStatusOut"];
+                };
+            };
+        };
+    };
+    delete_network_api_v1_admin_ipam_networks__network_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                network_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ipam_sync_api_v1_admin_ipam_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Accepted"];
                 };
             };
         };

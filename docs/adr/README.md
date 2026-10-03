@@ -18,3 +18,4 @@ mudança de decisão gera um novo ADR que marca o anterior como *Substituído*.
 | [0011](0011-stack-e-borda.md) | FastAPI + SQLAlchemy async + Next.js, mesma origem via Traefik | Aceito |
 | [0012](0012-regioes-e-zonas.md) | Regiões e zonas; imagem lógica com templates por servidor; placement na zona | Aceito |
 | [0013](0013-alertas-e-uso.md) | Uso de disco (guest agent) e rede; alertas, avisos por e-mail e webhook assinado | Aceito |
+| [0014](0014-ipam-legado.md) | IPs: cadastro MySQL legado como fonte, conferência com as placas das VMs, reserva na criação | Aceito |

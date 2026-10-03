@@ -7,6 +7,7 @@ from urllib.parse import quote
 from app.providers.base import (
     FilesystemUsage,
     GuestAgentUnavailable,
+    GuestNic,
     InstanceObservation,
     InstanceSpec,
     Inventory,
@@ -75,6 +76,10 @@ class ProxmoxProvider:
         ) or []
         points = (mapper.metric_point(r) for r in rows)
         return sorted((p for p in points if p is not None), key=lambda p: p.time)
+
+    async def guest_nics(self, ref: ProviderRef) -> list[GuestNic]:
+        config = await self.client.get(f"{self._path(ref)}/config") or {}
+        return mapper.nics(config, ref.data["type"])
 
     async def guest_filesystems(self, ref: ProviderRef) -> list[FilesystemUsage]:
         try:

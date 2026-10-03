@@ -8,6 +8,7 @@ from typing import ClassVar
 from app.providers.base import (
     FilesystemUsage,
     GuestAgentUnavailable,
+    GuestNic,
     InstanceKind,
     InstanceObservation,
     InstanceSpec,
@@ -58,6 +59,7 @@ class FakeProvider:
     calls: list[tuple[str, str]] = field(default_factory=list)
     # vmid -> what its guest agent reports; absent = no agent
     filesystems: dict[str, list[FilesystemUsage]] = field(default_factory=dict)
+    nics: dict[str, list[GuestNic]] = field(default_factory=dict)  # vmid -> NICs
 
     def add_node(self, name: str, *, online: bool = True) -> None:
         self.nodes.append(NodeInfo(name, online, 8, 32 * 1024**3, 0.1, 4 * 1024**3, 3600))
@@ -195,6 +197,10 @@ class FakeProvider:
         del self.instances[ref.key]
         self.calls.append((ref.key, "delete"))
         return OperationHandle({"key": ref.key, "action": "delete"})
+
+    async def guest_nics(self, ref: ProviderRef) -> list[GuestNic]:
+        self._check()
+        return self.nics.get(ref.key, [])
 
     async def guest_filesystems(self, ref: ProviderRef) -> list[FilesystemUsage]:
         self._check()

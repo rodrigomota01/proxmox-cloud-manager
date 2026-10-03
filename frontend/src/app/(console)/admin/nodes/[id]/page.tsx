@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { ConnectionInstances, ConnectionSettings } from "@/components/admin/connection";
+import { IpamPanel } from "@/components/admin/ipam-panel";
 import { NodeMetrics } from "@/components/metrics-panel";
 import { Card, ErrorBox, formatBytes } from "@/components/ui";
 import { Allocation, Meter, mib, uptime } from "@/components/viz";
@@ -13,6 +14,7 @@ import { api, errorMessage, unwrap } from "@/lib/api/client";
 const TABS = [
   { key: "overview", label: "Visão geral" },
   { key: "vms", label: "VMs" },
+  { key: "ips", label: "IPs" },
   { key: "config", label: "Configuração" },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
@@ -116,6 +118,7 @@ export default function NodeDetailPage() {
         ))}
       </nav>
       {tab === "vms" && <ConnectionInstances clusterId={n.cluster_id} nodeName={n.name} />}
+      {tab === "ips" && <IpamPanel clusterId={n.cluster_id} />}
       {tab === "config" && cluster.data && <ConnectionSettings cluster={cluster.data} nodeCount={siblings} />}
       {tab === "overview" && (
         <>

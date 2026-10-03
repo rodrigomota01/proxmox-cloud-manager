@@ -14,6 +14,7 @@ dependencies = [
   "argon2-cffi>=25.1,<26.0",
   "pyjwt[crypto]>=2.15,<3.0",
   "httpx>=0.28,<1.0",
+  "aiomysql>=0.3,<1.0",  # IPAM: the legacy awf_ip_pool lives in MySQL
 ]
 
 [project.optional-dependencies]
