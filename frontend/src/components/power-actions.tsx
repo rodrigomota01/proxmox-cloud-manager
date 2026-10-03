@@ -3,7 +3,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { Button, Dialog, ErrorBox, JobBadge, Spinner } from "@/components/ui";
+import { Badge, Button, Dialog, ErrorBox, JobBadge, Spinner } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { useJob } from "@/lib/jobs";
 import { usePermissions } from "@/lib/session";
@@ -44,6 +44,13 @@ export function PowerActions({ instance, compact = false }: { instance: Instance
     (a) => a.when.includes(instance.power_state) && perms.has(`${instance.kind}:${a.verb}`),
   );
   if (instance.state !== "active") return null;
+  if (instance.read_only) {
+    return (
+      <span title="Fora do pool gerenciado pela plataforma: visível, mas sem ações.">
+        <Badge tone="gray">Somente leitura</Badge>
+      </span>
+    );
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-2">

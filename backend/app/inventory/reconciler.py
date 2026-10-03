@@ -175,6 +175,7 @@ def _observe(
 ) -> None:
     instance.provider_ref = obs.ref.data
     instance.provider_name = obs.name
+    instance.provider_pool = obs.pool
     if not instance.managed:
         instance.name = obs.name  # adopted instances keep their platform name
     instance.node_id = node_id
@@ -186,6 +187,7 @@ def _observe(
     instance.vcpus, instance.memory_mb, instance.root_disk_gb = (
         obs.vcpus, obs.memory_mb, obs.disk_gb,
     )
-    instance.tags = list(obs.tags)
+    # one spelling per tag, whatever the provider: filters and tag-based adoption match
+    instance.tags = sorted({t.strip().lower() for t in obs.tags if t.strip()})
     instance.missing_count = 0
     instance.last_seen_at = now

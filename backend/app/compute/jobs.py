@@ -129,6 +129,7 @@ async def instance_create(ctx: JobContext) -> dict[str, Any]:
             if "vmid" not in instance.provider_ref:
                 ref = await _allocate_guest_id(db, cluster, provider, template.data["node"])
                 instance.provider_ref = ref.data
+                instance.provider_pool = ref.data["pool"]  # created inside the managed pool
                 await ctx.checkpoint(db)
                 await ctx.event("allocated", f"guest id {ref.key}")
             ref = ProviderRef(instance.provider_ref)

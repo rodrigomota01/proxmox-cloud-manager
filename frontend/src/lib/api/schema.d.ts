@@ -249,6 +249,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/instances/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Adopt Instances */
+        post: operations["adopt_instances_api_v1_admin_instances_adopt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/instances/{instance_id}/adopt": {
         parameters: {
             query?: never;
@@ -1224,12 +1241,16 @@ export interface components {
             name: string;
             /** Node */
             node: string;
+            /** Pool */
+            pool: string | null;
             /** Power State */
             power_state: string;
             /** Project Id */
             project_id: string | null;
             /** Provider Name */
             provider_name: string;
+            /** Read Only */
+            read_only: boolean;
             /** Root Disk Gb */
             root_disk_gb: number;
             /** State */
@@ -1464,6 +1485,24 @@ export interface components {
              * Format: uuid
              */
             user_id: string;
+        };
+        /**
+         * BulkAdoptRequest
+         * @description Adopt many discovered guests at once (e.g. every VM tagged 'pluxee').
+         */
+        BulkAdoptRequest: {
+            /** Instance Ids */
+            instance_ids: string[];
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
         };
         /** ClusterCreate */
         ClusterCreate: {
@@ -1789,6 +1828,8 @@ export interface components {
              * Format: uuid
              */
             project_id: string;
+            /** Read Only */
+            read_only: boolean;
             /** Region Name */
             region_name: string | null;
             /** Root Disk Gb */
@@ -3112,12 +3153,46 @@ export interface operations {
             query?: {
                 managed?: boolean | null;
                 cluster_id?: string | null;
+                tag?: string | null;
             };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminInstanceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    adopt_instances_api_v1_admin_instances_adopt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkAdoptRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

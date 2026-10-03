@@ -7,11 +7,12 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select
+from sqlalchemy import any_, func, select
 
 from app.admin.schemas import (
     AdminInstanceOut,
     AdoptRequest,
+    BulkAdoptRequest,
     ClusterCreate,
     ClusterOut,
     ClusterUpdate,
@@ -36,7 +37,7 @@ from app.api.deps import (
     require_platform,
 )
 from app.audit import service as audit
-from app.compute.models import Instance
+from app.compute.models import Instance, operable
 from app.compute.schemas import Accepted, JobOut, QuotaLineOut
 from app.core.errors import NotFound, ProviderUnavailableError
 from app.inventory.models import (
@@ -105,13 +106,18 @@ def run_out(r: SyncRun) -> SyncRunOut:
     )
 
 
-def admin_instance_out(i: Instance) -> AdminInstanceOut:
+async def cluster_settings(db: DbSession) -> dict[uuid.UUID, dict]:
+    return dict((await db.execute(select(ProviderCluster.id, ProviderCluster.settings))).all())
+
+
+def admin_instance_out(i: Instance, settings: dict[uuid.UUID, dict]) -> AdminInstanceOut:
     return AdminInstanceOut(
         id=i.id, cluster_id=i.cluster_id, tenant_id=i.tenant_id, project_id=i.project_id,
         kind=i.kind, name=i.name, provider_name=i.provider_name, state=i.state,
         power_state=i.power_state, vcpus=i.vcpus, memory_mb=i.memory_mb,
         root_disk_gb=i.root_disk_gb, vmid=int(i.provider_ref["vmid"]),
         node=str(i.provider_ref["node"]), tags=i.tags, managed=i.managed,
+        pool=i.provider_pool, read_only=not operable(i, settings.get(i.cluster_id, {})),
         last_seen_at=i.last_seen_at,
     )
 
@@ -290,13 +296,26 @@ async def list_storage(_: ClusterManager, db: DbSession) -> list[StorageOut]:
 async def list_instances(
     _: NodeViewer, db: DbSession, managed: bool | None = None,
     cluster_id: uuid.UUID | None = None,
+    tag: Annotated[str | None, Query(max_length=64)] = None,
 ) -> list[AdminInstanceOut]:
     stmt = select(Instance).where(Instance.deleted_at.is_(None)).order_by(Instance.name)
     if managed is not None:
         stmt = stmt.where(Instance.managed == managed)
     if cluster_id is not None:
         stmt = stmt.where(Instance.cluster_id == cluster_id)
-    return [admin_instance_out(i) for i in (await db.execute(stmt)).scalars()]
+    if tag:
+        stmt = stmt.where(any_(Instance.tags) == tag.strip().lower())
+    settings = await cluster_settings(db)
+    return [admin_instance_out(i, settings) for i in (await db.execute(stmt)).scalars()]
+
+
+@router.post("/instances/adopt")
+async def adopt_instances(
+    body: BulkAdoptRequest, _: ClusterManager, svc: Admin, db: DbSession
+) -> list[AdminInstanceOut]:
+    instances = await svc.adopt_many(body.instance_ids, body.tenant_id, body.project_id)
+    settings = await cluster_settings(db)
+    return [admin_instance_out(i, settings) for i in instances]
 
 
 @router.post("/instances/{instance_id}/adopt")
@@ -304,7 +323,7 @@ async def adopt_instance(
     instance_id: uuid.UUID, body: AdoptRequest, _: ClusterManager, svc: Admin, db: DbSession,
 ) -> AdminInstanceOut:
     instance = await svc.adopt(instance_id, body)
-    return admin_instance_out(instance)
+    return admin_instance_out(instance, await cluster_settings(db))
 
 
 # --- tenants ---------------------------------------------------------------------------

@@ -39,7 +39,7 @@ export function DeleteInstance({ instance }: { instance: Schemas["InstanceOut"] 
     if (done && job?.status === "succeeded") router.replace("/instances");
   }, [done, job?.status, router]);
 
-  if (!perms.has(`${instance.kind}:delete`) || !["active", "error"].includes(instance.state)) {
+  if (instance.read_only || !perms.has(`${instance.kind}:delete`) || !["active", "error"].includes(instance.state)) {
     return jobId && !done ? <Spinner /> : null;
   }
 

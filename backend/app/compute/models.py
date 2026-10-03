@@ -68,6 +68,9 @@ class Instance(UUIDPk, Timestamps, Base):
     network: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     provider_ref: Mapped[dict[str, Any]] = mapped_column(JSONB)
     provider_name: Mapped[str] = mapped_column(Text)  # name as seen in the provider
+    # provider-side grouping (Proxmox pool) as last observed. Only guests in the cluster's
+    # target pool can be operated: the token's write ACLs exist there and nowhere else.
+    provider_pool: Mapped[str | None] = mapped_column(Text)
     tags: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
     managed: Mapped[bool] = mapped_column(server_default="false")
     # live usage, refreshed by the reconciler (one /cluster/resources call per cycle)
@@ -81,3 +84,10 @@ class Instance(UUIDPk, Timestamps, Base):
 
     __mapper_args__ = {"version_id_col": version}  # noqa: RUF012
 
+
+
+def operable(instance: Instance, cluster_settings: dict[str, Any]) -> bool:
+    """Write actions (power, delete) only inside the cluster's managed pool: the provider
+    token has write permissions there and nowhere else. Elsewhere: read-only."""
+    pool = cluster_settings.get("pool")
+    return bool(pool) and instance.provider_pool == pool

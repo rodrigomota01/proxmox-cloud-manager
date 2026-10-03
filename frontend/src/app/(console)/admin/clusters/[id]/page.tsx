@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { ClusterStatus } from "@/components/cluster-status";
 import {
+  Badge,
   Button,
   Card,
   Dialog,
@@ -73,6 +74,84 @@ function CredentialsCard({ cluster }: { cluster: Schemas["ClusterOut"] }) {
         </div>
       </form>
     </Card>
+  );
+}
+
+function BulkAdoptDialog({ ids, onClose, onDone }: { ids: string[]; onClose: () => void; onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const [tenantId, setTenantId] = useState("");
+  const open = ids.length > 0;
+  const tenants = useQuery({
+    queryKey: ["admin", "tenants"],
+    queryFn: async () => unwrap(await api.GET("/api/v1/admin/tenants")),
+    enabled: open,
+  });
+  const projects = useQuery({
+    queryKey: ["admin", "projects", tenantId],
+    queryFn: async () =>
+      unwrap(await api.GET("/api/v1/projects", { params: { query: { limit: 200 } }, headers: { "X-Tenant-Id": tenantId } }))
+        .items,
+    enabled: tenantId !== "",
+  });
+  const adopt = useMutation({
+    mutationFn: async (projectId: string) =>
+      unwrap(
+        await api.POST("/api/v1/admin/instances/adopt", {
+          body: { instance_ids: ids, tenant_id: tenantId, project_id: projectId },
+        }),
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "instances"] });
+      onDone();
+    },
+  });
+  return (
+    <Dialog open={open} onClose={onClose} title={`Adotar ${ids.length} instância(s)`}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          adopt.mutate(String(new FormData(e.currentTarget).get("project_id")));
+        }}
+        className="space-y-4"
+      >
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Todas passam a pertencer ao projeto escolhido e ficam visíveis para os membros dele.
+        </p>
+        <Field label="Cliente (tenant)">
+          <Select className="w-full" required value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
+            <option value="" disabled>
+              Selecione…
+            </option>
+            {tenants.data?.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Projeto">
+          <Select className="w-full" name="project_id" required disabled={!projects.data} defaultValue="" key={tenantId}>
+            <option value="" disabled>
+              {tenantId ? (projects.data?.length ? "Selecione…" : "O cliente não tem projetos") : "Escolha o cliente primeiro"}
+            </option>
+            {projects.data?.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <ErrorBox message={adopt.isError ? errorMessage(adopt.error) : null} />
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={adopt.isPending || !tenantId}>
+            Adotar
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 
@@ -172,6 +251,9 @@ export default function ClusterDetailPage() {
   const queryClient = useQueryClient();
   const [syncJob, setSyncJob] = useState<string | null>(null);
   const [adopting, setAdopting] = useState<AdminInstance | null>(null);
+  const [tagFilter, setTagFilter] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkAdopting, setBulkAdopting] = useState(false);
 
   const cluster = useQuery({
     queryKey: ["admin", "cluster", id],
@@ -214,6 +296,10 @@ export default function ClusterDetailPage() {
   const c = cluster.data;
   if (!c) return null;
   const discovered = instances.data?.filter((i) => !i.managed) ?? [];
+  const tagCounts = Object.entries(
+    discovered.flatMap((i) => i.tags).reduce<Record<string, number>>((acc, t) => ({ ...acc, [t]: (acc[t] ?? 0) + 1 }), {}),
+  ).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const shown = tagFilter ? discovered.filter((i) => i.tags.includes(tagFilter)) : discovered;
   const managed = instances.data?.filter((i) => i.managed) ?? [];
   const syncing = sync.isPending || (syncJob !== null && !done);
 
@@ -295,14 +381,61 @@ export default function ClusterDetailPage() {
         <CredentialsCard cluster={c} />
       </div>
 
-      <Card title={`Descobertas (${discovered.length})`}>
+      <Card
+        title={`Descobertas (${discovered.length})`}
+        actions={
+          selected.size > 0 && (
+            <Button onClick={() => setBulkAdopting(true)}>Adotar selecionadas ({selected.size})</Button>
+          )
+        }
+      >
         <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
-          Guests que existem no Proxmox mas ainda não pertencem a nenhum projeto. Só administradores as veem.
+          Guests que existem no Proxmox mas ainda não pertencem a nenhum cliente. Só administradores as veem.
+          As que estão fora do pool gerenciado ficam <strong>somente leitura</strong> depois de adotadas: o
+          cliente vê estado e métricas, sem ligar/desligar/excluir.
         </p>
-        {discovered.length === 0 ? (
+        {tagCounts.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-slate-500">Filtrar por tag:</span>
+            {tagCounts.map(([tag, n]) => (
+              <button
+                key={tag}
+                onClick={() => setTagFilter(tagFilter === tag ? "" : tag)}
+                className={`rounded-full border px-2 py-0.5 ${
+                  tagFilter === tag
+                    ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                    : "border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                }`}
+              >
+                {tag} ({n})
+              </button>
+            ))}
+            {tagFilter && (
+              <button className="text-indigo-600 hover:underline dark:text-indigo-400" onClick={() => setTagFilter("")}>
+                limpar
+              </button>
+            )}
+          </div>
+        )}
+        {shown.length === 0 ? (
           <Empty>Nada a adotar.</Empty>
         ) : (
-          <InstanceTable rows={discovered} action={(i) => <Button variant="secondary" onClick={() => setAdopting(i)}>Adotar</Button>} />
+          <InstanceTable
+            rows={shown}
+            selected={selected}
+            onToggle={(ids, on) =>
+              setSelected((cur) => {
+                const next = new Set(cur);
+                ids.forEach((x) => (on ? next.add(x) : next.delete(x)));
+                return next;
+              })
+            }
+            action={(i) => (
+              <Button variant="secondary" onClick={() => setAdopting(i)}>
+                Adotar
+              </Button>
+            )}
+          />
         )}
       </Card>
 
@@ -333,6 +466,14 @@ export default function ClusterDetailPage() {
       </Card>
 
       <AdoptDialog instance={adopting} onClose={() => setAdopting(null)} />
+      <BulkAdoptDialog
+        ids={bulkAdopting ? [...selected] : []}
+        onClose={() => setBulkAdopting(false)}
+        onDone={() => {
+          setBulkAdopting(false);
+          setSelected(new Set());
+        }}
+      />
     </div>
   );
 }
@@ -453,43 +594,85 @@ function PoolEditor({ clusterId, pool }: { clusterId: string; pool: string }) {
 function InstanceTable({
   rows,
   action,
+  selected,
+  onToggle,
 }: {
   rows: AdminInstance[];
   action?: (i: AdminInstance) => React.ReactNode;
+  selected?: Set<string>;
+  onToggle?: (ids: string[], on: boolean) => void;
 }) {
+  const selectable = selected !== undefined && onToggle !== undefined;
+  const allOn = selectable && rows.length > 0 && rows.every((r) => selected.has(r.id));
   return (
-    <table className="w-full text-left text-sm">
-      <thead className="text-xs uppercase tracking-wide text-slate-500">
-        <tr>
-          <th className="py-2 pr-4 font-medium">VMID</th>
-          <th className="py-2 pr-4 font-medium">Nome</th>
-          <th className="py-2 pr-4 font-medium">Node</th>
-          <th className="py-2 pr-4 font-medium">Tipo</th>
-          <th className="py-2 pr-4 font-medium">Estado</th>
-          <th className="py-2 pr-4 font-medium">Recursos</th>
-          {action && <th className="py-2 font-medium" />}
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-        {rows.map((i) => (
-          <tr key={i.id}>
-            <td className="py-2 pr-4 tabular-nums">{i.vmid}</td>
-            <td className="py-2 pr-4">
-              {i.name}
-              {i.name !== i.provider_name && <span className="ml-1 text-xs text-slate-500">({i.provider_name})</span>}
-            </td>
-            <td className="py-2 pr-4">{i.node}</td>
-            <td className="py-2 pr-4">{i.kind === "vm" ? "VM" : "Container"}</td>
-            <td className="py-2 pr-4">
-              <PowerBadge state={i.power_state} />
-            </td>
-            <td className="py-2 pr-4 tabular-nums text-slate-600 dark:text-slate-400">
-              {i.vcpus} vCPU · {(i.memory_mb / 1024).toFixed(1)} GiB · {i.root_disk_gb} GiB
-            </td>
-            {action && <td className="py-2 text-right">{action(i)}</td>}
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            {selectable && (
+              <th className="py-2 pr-2">
+                <input
+                  type="checkbox"
+                  aria-label="Selecionar todas"
+                  checked={allOn}
+                  onChange={(e) => onToggle(rows.map((r) => r.id), e.target.checked)}
+                />
+              </th>
+            )}
+            <th className="py-2 pr-4 font-medium">VMID</th>
+            <th className="py-2 pr-4 font-medium">Nome</th>
+            <th className="py-2 pr-4 font-medium">Tags</th>
+            <th className="py-2 pr-4 font-medium">Pool</th>
+            <th className="py-2 pr-4 font-medium">Estado</th>
+            <th className="py-2 pr-4 font-medium">Recursos</th>
+            {action && <th className="py-2 font-medium" />}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          {rows.map((i) => (
+            <tr key={i.id}>
+              {selectable && (
+                <td className="py-2 pr-2">
+                  <input
+                    type="checkbox"
+                    aria-label={`Selecionar ${i.provider_name}`}
+                    checked={selected.has(i.id)}
+                    onChange={(e) => onToggle([i.id], e.target.checked)}
+                  />
+                </td>
+              )}
+              <td className="py-2 pr-4 tabular-nums">{i.vmid}</td>
+              <td className="py-2 pr-4">
+                {i.name}
+                {i.name !== i.provider_name && <span className="ml-1 text-xs text-slate-500">({i.provider_name})</span>}
+                <div className="text-xs text-slate-500">
+                  {i.kind === "vm" ? "VM" : "Container"} · {i.node}
+                </div>
+              </td>
+              <td className="py-2 pr-4">
+                <span className="flex flex-wrap gap-1">
+                  {i.tags.length ? i.tags.map((t) => <Badge key={t}>{t}</Badge>) : <span className="text-slate-400">—</span>}
+                </span>
+              </td>
+              <td className="py-2 pr-4">
+                {i.pool ?? <span className="text-slate-400">—</span>}
+                {i.read_only && (
+                  <div>
+                    <Badge tone="gray">somente leitura</Badge>
+                  </div>
+                )}
+              </td>
+              <td className="py-2 pr-4">
+                <PowerBadge state={i.power_state} />
+              </td>
+              <td className="py-2 pr-4 tabular-nums text-slate-600 dark:text-slate-400">
+                {i.vcpus} vCPU · {(i.memory_mb / 1024).toFixed(1)} GiB · {i.root_disk_gb} GiB
+              </td>
+              {action && <td className="py-2 text-right">{action(i)}</td>}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import TenantContext
 from app.audit import service as audit
-from app.compute.models import Instance
+from app.compute.models import Instance, operable
 from app.compute.schemas import InstanceCreate
 from app.core.config import Settings
 from app.core.errors import Conflict, NotFound, ValidationError
@@ -124,6 +124,7 @@ class ComputeService:
         )
         if instance.state != "active":
             raise Conflict(f"Instance is {instance.state}")
+        await self._require_operable(instance)
         job = await enqueue(
             self.db, "instance.power", tenant_id=self.ctx.tenant_id,
             project_id=instance.project_id, requested_by=self.actor,
@@ -214,6 +215,13 @@ class ComputeService:
         )
         return instance, job
 
+    async def _require_operable(self, instance: Instance) -> None:
+        cluster = await self.db.get_one(ProviderCluster, instance.cluster_id)
+        if not operable(instance, cluster.settings):
+            raise Conflict(
+                "This instance is read-only: it lives outside the pool the platform manages"
+            )
+
     async def _place(self, image: Image, zone_id: uuid.UUID) -> ProviderCluster:
         """ADR-0012: among the zone's servers that have a template of the image and a
         target pool, the one with the smallest share of its RAM already allocated."""
@@ -266,6 +274,7 @@ class ComputeService:
             )
         if instance.state not in ("active", "error"):
             raise Conflict(f"Instance is {instance.state}")
+        await self._require_operable(instance)
         instance.state = "deleting"
         job = await enqueue(
             self.db, "instance.delete", tenant_id=self.ctx.tenant_id,

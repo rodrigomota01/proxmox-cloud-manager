@@ -134,6 +134,17 @@
             "title": "Node",
             "type": "string"
           },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool"
+          },
           "power_state": {
             "title": "Power State",
             "type": "string"
@@ -153,6 +164,10 @@
           "provider_name": {
             "title": "Provider Name",
             "type": "string"
+          },
+          "read_only": {
+            "title": "Read Only",
+            "type": "boolean"
           },
           "root_disk_gb": {
             "title": "Root Disk Gb",
@@ -207,6 +222,8 @@
           "node",
           "tags",
           "managed",
+          "pool",
+          "read_only",
           "last_seen_at"
         ],
         "title": "AdminInstanceOut",
@@ -783,6 +800,39 @@
           "created_at"
         ],
         "title": "BindingOut",
+        "type": "object"
+      },
+      "BulkAdoptRequest": {
+        "additionalProperties": false,
+        "description": "Adopt many discovered guests at once (e.g. every VM tagged 'pluxee').",
+        "properties": {
+          "instance_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Instance Ids",
+            "type": "array"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instance_ids",
+          "tenant_id",
+          "project_id"
+        ],
+        "title": "BulkAdoptRequest",
         "type": "object"
       },
       "ClusterCreate": {
@@ -1701,6 +1751,10 @@
             "title": "Project Id",
             "type": "string"
           },
+          "read_only": {
+            "title": "Read Only",
+            "type": "boolean"
+          },
           "region_name": {
             "anyOf": [
               {
@@ -1771,6 +1825,7 @@
           "root_disk_gb",
           "tags",
           "image_id",
+          "read_only",
           "zone_id",
           "zone_name",
           "region_name",
@@ -4719,6 +4774,23 @@
               ],
               "title": "Cluster Id"
             }
+          },
+          {
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tag"
+            }
           }
         ],
         "responses": {
@@ -4748,6 +4820,51 @@
           }
         },
         "summary": "List Instances",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/instances/adopt": {
+      "post": {
+        "operationId": "adopt_instances_api_v1_admin_instances_adopt_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkAdoptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminInstanceOut"
+                  },
+                  "title": "Response Adopt Instances Api V1 Admin Instances Adopt Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Adopt Instances",
         "tags": [
           "admin"
         ]

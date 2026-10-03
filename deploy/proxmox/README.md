@@ -18,6 +18,15 @@ STORAGE=<storage> BRIDGE=<bridge> TEMPLATES="<vmid> <vmid>" bash setup-node.sh
 `STORAGE`: `pvesm status`. `BRIDGE` e se o template tem cloud-init: `qm config <vmid>`
 (`net0: ...bridge=vmbr0`, `ide2: ...cloudinit`).
 
+**Inventário completo (`AUDIT_ALL=1`)**: dá ao token só `VM.Audit` em `/vms` — todas as
+VMs do servidor aparecem na plataforma (tags, estado, métricas) e podem ser adotadas por
+clientes **somente leitura**; ligar/desligar/alterar/excluir continua possível apenas no
+pool. Rodar de novo sem a opção remove essa visão.
+
+```bash
+AUDIT_ALL=1 STORAGE=<storage> BRIDGE=<bridge> TEMPLATES="<vmid>" bash setup-node.sh
+```
+
 As seções abaixo documentam o passo a passo manual equivalente (usado no primeiro lab).
 
 Referência de privilégios em

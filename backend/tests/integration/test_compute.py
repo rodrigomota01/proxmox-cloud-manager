@@ -63,7 +63,8 @@ async def env(owner_db, client, app, registry):
     # cluster -> sync (discovers 10001 vm, 10002 container) -> adopt
     root = await e.h("root")
     r = await client.post(
-        "/api/v1/admin/clusters", json={"name": "lab", "api_url": "https://pve.test:8006"},
+        "/api/v1/admin/clusters",
+        json={"name": "lab", "api_url": "https://pve.test:8006", "pool": "cm-lab"},
         headers=root,
     )
     e.cluster = cid = r.json()["id"]
@@ -346,3 +347,51 @@ async def test_cross_tenant_compute_matrix(client, env, owner_db):
     assert failures == []
     assert (await owner_db.execute(select(Job).where(Job.type == "instance.power"))).first() is None
     assert (await owner_db.get(Instance, env.vm)).power_state == PowerState.STOPPED.value
+
+
+
+async def test_guests_outside_the_managed_pool_are_read_only(client, env, fake, owner_db):
+    """Full inventory (VM.Audit on /vms): customer VMs outside the pool can be adopted
+    and watched, but never operated by the platform."""
+    fake.add_instance(1109, "atnbr1109", node="tagima", pool=None, tags=("pluxee",),
+                      power=PowerState.RUNNING)
+    fake.add_instance(1110, "atnbr1110", node="tagima", pool="producao", tags=("Pluxee",))
+    fake.add_instance(1205, "other", node="tagima", pool=None)
+    root = await env.h("root")
+    await client.post(f"/api/v1/admin/clusters/{env.cluster}/sync", headers=root)
+    await env.drain()
+
+    tagged = (await client.get("/api/v1/admin/instances",
+                               params={"managed": "false", "tag": "PLUXEE"}, headers=root)).json()
+    assert sorted(i["vmid"] for i in tagged) == [1109, 1110]
+    assert all(i["read_only"] for i in tagged)
+    assert {i["pool"] for i in tagged} == {None, "producao"}
+
+    r = await client.post("/api/v1/admin/instances/adopt", headers=root, json={
+        "instance_ids": [i["id"] for i in tagged],
+        "tenant_id": str(env.acme.id), "project_id": str(env.web.id),
+    })
+    assert r.status_code == 200 and all(i["managed"] for i in r.json())
+    again = await client.post("/api/v1/admin/instances/adopt", headers=root, json={
+        "instance_ids": [tagged[0]["id"]],
+        "tenant_id": str(env.acme.id), "project_id": str(env.web.id),
+    })
+    assert again.status_code == 409  # all or nothing
+
+    h = await env.h("alice", env.acme)
+    vm = next(i for i in (await client.get("/api/v1/instances", headers=h)).json()["items"]
+              if i["name"] == "atnbr1109")
+    assert vm["read_only"] is True and vm["power_state"] == "running"
+    for method, path, body in (
+        ("POST", f"/api/v1/instances/{vm['id']}/stop", None),
+        ("DELETE", f"/api/v1/instances/{vm['id']}", {"confirm": "atnbr1109"}),
+    ):
+        r = await client.request(method, path, json=body, headers=h)
+        assert r.status_code == 409 and "read-only" in r.text
+    assert fake.calls == []  # nothing reached the provider
+    # metrics still work: VM.Audit allows reading its history
+    assert (await client.get(f"/api/v1/instances/{vm['id']}/metrics", headers=h)).status_code == 200
+    # the platform's own instances stay operable
+    own = next(i for i in (await client.get("/api/v1/instances", headers=h)).json()["items"]
+               if i["id"] == env.vm)
+    assert own["read_only"] is False

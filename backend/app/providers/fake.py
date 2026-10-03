@@ -61,12 +61,13 @@ class FakeProvider:
     def add_instance(
         self, vmid: int, name: str, *, node: str = "pve1", kind: str = "vm",
         power: PowerState = PowerState.STOPPED, vcpus: int = 2, memory_mb: int = 2048,
+        pool: str | None = "cm-lab", tags: tuple[str, ...] = (),
     ) -> InstanceObservation:
         pve_type = "qemu" if kind == "vm" else "lxc"
         obs = InstanceObservation(
             ref=ProviderRef({"vmid": vmid, "node": node, "type": pve_type}),
             kind=InstanceKind(kind), name=name, node=node, power_state=power,
-            vcpus=vcpus, memory_mb=memory_mb, disk_gb=20,
+            vcpus=vcpus, memory_mb=memory_mb, disk_gb=20, pool=pool, tags=tags,
         )
         self.instances[str(vmid)] = obs
         return obs

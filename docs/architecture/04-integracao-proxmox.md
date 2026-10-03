@@ -164,6 +164,11 @@ GET  /nodes/{node}/tasks/{upid}/log?start=N    → linhas de log (progresso de c
   criado, a instância sai do uso (quota e IP liberados) e o job registra o que foi feito.
 - **Salvaguarda de exclusão**: antes de apagar por VMID (exclusão ou compensação) o nome
   do guest no PVE precisa bater com o da instância; se não bater, nada é apagado.
+- **Somente leitura fora do pool**: com inventário completo (`VM.Audit` em `/vms`), VMs
+  fora do pool de destino aparecem, podem ser adotadas (inclusive em lote, por tag) e
+  mostram estado e métricas, mas a API recusa energia e exclusão (409) — o token só tem
+  escrita no pool. O pool observado fica em `instances.provider_pool`; tags são
+  normalizadas em minúsculas.
 - **IP**: informado pelo usuário (decisão do MVP); a plataforma impede o mesmo IP em duas
   instâncias vivas do mesmo cluster (índice único), mas não detecta uso fora dela.
 

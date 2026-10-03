@@ -74,6 +74,7 @@ class InstanceOut(BaseModel):
     root_disk_gb: int
     tags: list[str]
     image_id: uuid.UUID | None
+    read_only: bool  # outside the managed pool: visible, not operable
     zone_id: uuid.UUID | None  # from the server it runs on (ADR-0012)
     zone_name: str | None
     region_name: str | None

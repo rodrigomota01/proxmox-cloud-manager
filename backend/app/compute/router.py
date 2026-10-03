@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AppSettings, CurrentTenant, DbSession, RedisClient
-from app.compute.models import Instance
+from app.compute.models import Instance, operable
 from app.compute.schemas import (
     Accepted,
     DashboardSummary,
@@ -42,21 +42,21 @@ IdempotencyKey = Annotated[str | None, Header(alias="Idempotency-Key", max_lengt
 METRICS_TTL = {"hour": 30, "day": 300, "week": 300}
 
 
-Places = dict[uuid.UUID, tuple[uuid.UUID | None, str | None, str | None]]
+Places = dict[uuid.UUID, tuple[uuid.UUID | None, str | None, str | None, dict]]
 
 
 async def places(db: AsyncSession) -> Places:
-    """cluster id -> (zone id, zone name, region name); servers themselves stay hidden."""
+    """cluster id -> (zone id, zone name, region name, settings); servers stay hidden."""
     rows = await db.execute(
-        select(ProviderCluster.id, Zone.id, Zone.name, Region.name)
+        select(ProviderCluster.id, Zone.id, Zone.name, Region.name, ProviderCluster.settings)
         .outerjoin(Zone, Zone.id == ProviderCluster.zone_id)
         .outerjoin(Region, Region.id == Zone.region_id)
     )
-    return {cid: (zid, zname, rname) for cid, zid, zname, rname in rows}
+    return {cid: (zid, zname, rname, cfg) for cid, zid, zname, rname, cfg in rows}
 
 
 def instance_out(i: Instance, where: Places) -> InstanceOut:
-    zone_id, zone_name, region_name = where.get(i.cluster_id, (None, None, None))
+    zone_id, zone_name, region_name, settings = where.get(i.cluster_id, (None, None, None, {}))
     if i.project_id is None:  # DB constraint: managed instances always have a project
         raise RuntimeError(f"managed instance {i.id} without project")
     return InstanceOut(
@@ -64,6 +64,7 @@ def instance_out(i: Instance, where: Places) -> InstanceOut:
         power_state=i.power_state, vcpus=i.vcpus, memory_mb=i.memory_mb,
         root_disk_gb=i.root_disk_gb, tags=i.tags, image_id=i.image_id,
         zone_id=zone_id, zone_name=zone_name, region_name=region_name,
+        read_only=not operable(i, settings),
         cpu_usage=i.cpu_usage, memory_used_mb=i.memory_used_mb,
         uptime_seconds=i.uptime_seconds,
         ipv4=i.network.get("address"), gateway=i.network.get("gateway"),

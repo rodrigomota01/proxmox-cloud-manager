@@ -198,6 +198,13 @@ class AdminService:
 
     # --- instances ---------------------------------------------------------------------
 
+    async def adopt_many(
+        self, instance_ids: list[uuid.UUID], tenant_id: uuid.UUID, project_id: uuid.UUID
+    ) -> list[Instance]:
+        """All or nothing: one invalid id (gone, already managed) fails the whole request."""
+        body = AdoptRequest(tenant_id=tenant_id, project_id=project_id)
+        return [await self.adopt(i, body) for i in dict.fromkeys(instance_ids)]
+
     async def adopt(self, instance_id: uuid.UUID, body: AdoptRequest) -> Instance:
         instance = await self.db.get(Instance, instance_id)
         if instance is None or instance.deleted_at is not None:

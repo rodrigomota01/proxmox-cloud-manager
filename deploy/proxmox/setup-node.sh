@@ -8,11 +8,14 @@
 #   STORAGE    storage where new disks go (Datastore.Audit + AllocateSpace there only)
 #   BRIDGE     bridge the templates' NICs use (SDN.Use there only)
 #   TEMPLATES  template VMIDs the platform may clone (read + clone only, never change)
+#   AUDIT_ALL  1 = read-only view of EVERY guest (VM.Audit on /vms): full inventory, tags
+#              and metrics in the platform; still no power/config/delete outside POOL
 #
 # It never touches existing guests. The token secret is printed ONCE (on creation).
 set -euo pipefail
 
 POOL=${POOL:-cm-lab}
+AUDIT_ALL=${AUDIT_ALL:-0}
 STORAGE=${STORAGE:?set STORAGE (pvesm status)}
 BRIDGE=${BRIDGE:?set BRIDGE (bridge of the templates net0, e.g. vmbr0)}
 TEMPLATES=${TEMPLATES:-}
@@ -76,6 +79,7 @@ role CMNode "$(privs Sys.Audit)"
 role CMTemplate "$(privs VM.Audit VM.Clone)"
 role CMStorage "$(privs Datastore.Audit Datastore.AllocateSpace)"
 role CMNetwork "$(privs SDN.Use)"
+role CMAudit "$(privs VM.Audit)"
 
 say "token"
 if out=$(pveum user token add "$PVE_USER" "$TOKEN_ID" --privsep 1 --comment "cloud-manager" \
@@ -102,6 +106,15 @@ acl /nodes CMNode
 acl "/storage/$STORAGE" CMStorage
 acl "/sdn/zones/localnetwork/$BRIDGE" CMNetwork
 for vmid in $TEMPLATES; do acl "/vms/$vmid" CMTemplate; done
+if [[ $AUDIT_ALL == 1 ]]; then
+  # read-only on every guest; write privileges stay on the pool only
+  acl /vms CMAudit
+else
+  for who in --users --tokens; do  # turning the option off removes the view again
+    target=$PVE_USER; [[ $who == --tokens ]] && target=$TOKEN
+    pveum acl delete /vms "$who" "$target" --roles CMAudit 2>/dev/null || true
+  done
+fi
 
 say "permissões efetivas do token"
 pveum user token permissions "$PVE_USER" "$TOKEN_ID"

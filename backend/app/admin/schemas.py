@@ -208,6 +208,8 @@ class AdminInstanceOut(BaseModel):
     node: str
     tags: list[str]
     managed: bool
+    pool: str | None  # provider pool as last observed
+    read_only: bool  # outside the cluster's managed pool: visible, not operable
     last_seen_at: datetime | None
 
 
@@ -215,6 +217,14 @@ class AdoptRequest(Input):
     tenant_id: uuid.UUID
     project_id: uuid.UUID
     name: Name | None = None
+
+
+class BulkAdoptRequest(Input):
+    """Adopt many discovered guests at once (e.g. every VM tagged 'pluxee')."""
+
+    instance_ids: Annotated[list[uuid.UUID], Field(min_length=1, max_length=500)]
+    tenant_id: uuid.UUID
+    project_id: uuid.UUID
 
 
 class Confirm(Input):

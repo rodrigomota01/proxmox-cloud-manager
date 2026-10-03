@@ -72,7 +72,8 @@ async def env(owner_db, client, app, multi_registry):
     for name in ("hv08", "hv09"):
         r = await client.post(
             "/api/v1/admin/clusters",
-            json={"name": name, "api_url": f"https://{name}.example.test:8006"},
+            json={"name": name, "api_url": f"https://{name}.example.test:8006",
+                  "pool": "cm-lab"},
             headers=headers["root"],
         )
         clusters[name] = r.json()["id"]
