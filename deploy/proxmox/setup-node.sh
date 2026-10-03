@@ -101,7 +101,9 @@ pveum user token permissions "$PVE_USER" "$TOKEN_ID"
 cat <<EOF
 
 Pronto. Na plataforma: Clusters -> Novo cluster
-  URL: https://$(hostname -f):8006   Pool de destino: $POOL
-  Token ID: $TOKEN
+  URL: a mesma que você usa no navegador para este Proxmox (https://<host>:8006),
+       com o nome que consta no certificado TLS
+  Pool de destino: $POOL    Token ID: $TOKEN
+  Secret: o exibido acima. Cole direto na plataforma; não o compartilhe em chats/tickets.
 Depois: Testar conexão, Sincronizar e registrar os templates em Imagens.
 EOF
