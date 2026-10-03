@@ -26,6 +26,10 @@ Validado em PVE 8.4.19 (node único).
 
 ## Fase 1 — leitura + power, restrito a um pool
 
+> Versões antigas deste passo aplicavam o role `CloudManager` também em `/nodes`. Como
+> esse role passou a poder criar VMs (Fase 2a), aquela ACL ficaria ampla demais: use
+> `CMNode` (só `Sys.Audit`). O `setup-node.sh` remove a ACL antiga automaticamente.
+
 O token só enxerga e controla os guests do pool `cm-lab`. Guests fora do pool ficam
 invisíveis para a plataforma. Nenhum comando abaixo reinicia serviços ou altera guests
 existentes; tudo é desfeito com `pveum user delete cloudmgr@pve && pveum role delete CloudManager`.
@@ -44,8 +48,9 @@ pveum user token add cloudmgr@pve cm --privsep 1 --comment "cloud-manager"   # s
 
 pveum acl modify /pool/cm-lab --users  cloudmgr@pve      --roles CloudManager
 pveum acl modify /pool/cm-lab --tokens 'cloudmgr@pve!cm' --roles CloudManager
-pveum acl modify /nodes       --users  cloudmgr@pve      --roles CloudManager
-pveum acl modify /nodes       --tokens 'cloudmgr@pve!cm' --roles CloudManager
+pveum role add CMNode --privs "Sys.Audit"   # /nodes: leitura do status dos nodes, nada mais
+pveum acl modify /nodes       --users  cloudmgr@pve      --roles CMNode
+pveum acl modify /nodes       --tokens 'cloudmgr@pve!cm' --roles CMNode
 ```
 
 - `VM.Monitor` é necessário no PVE 8 para ler IP via guest agent; no PVE 9 ele foi

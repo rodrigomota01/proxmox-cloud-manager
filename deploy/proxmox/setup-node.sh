@@ -90,6 +90,13 @@ else
 fi
 
 say "ACLs (só onde precisa)"
+# Early manual setups (Phase 1 docs) bound CloudManager on /nodes when that role was
+# read/power only. With the role now able to create VMs, that binding would be wider
+# than needed: /nodes gets CMNode (Sys.Audit) only.
+for who in --users --tokens; do
+  target=$PVE_USER; [[ $who == --tokens ]] && target=$TOKEN
+  pveum acl delete /nodes "$who" "$target" --roles CloudManager 2>/dev/null || true
+done
 acl "/pool/$POOL" CloudManager
 acl /nodes CMNode
 acl "/storage/$STORAGE" CMStorage
