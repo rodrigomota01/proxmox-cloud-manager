@@ -1,9 +1,10 @@
 """Worker entrypoint: two concurrent loops.
 
-- jobs: drains the Postgres queue (FOR UPDATE SKIP LOCKED) and then sleeps until a
-  NOTIFY on the jobs channel (or a timeout, which also picks up retries whose run_after
-  has passed and jobs whose lease expired).
-- reconciler: every CM_RECONCILE_INTERVAL_SECONDS, per cluster with credentials.
+- jobs: CM_JOB_CONCURRENCY runners drain the Postgres queue (FOR UPDATE SKIP LOCKED)
+  and sleep until a NOTIFY on the jobs channel (or a poll timeout, which also picks up
+  retries whose run_after has passed and jobs whose lease expired).
+- reconciler: every CM_RECONCILE_INTERVAL_SECONDS, every cluster with credentials, in
+  parallel (CM_RECONCILE_CONCURRENCY), each bounded by CM_RECONCILE_TIMEOUT_SECONDS.
 
 Several workers may run: SKIP LOCKED spreads jobs, and a transaction-level advisory
 lock per cluster keeps one reconciler per cluster.
@@ -39,7 +40,11 @@ def _lock_key(cluster_id: uuid.UUID) -> int:
 
 
 async def reconcile_all(
-    sessionmaker: async_sessionmaker[AsyncSession], registry: ProviderRegistry
+    sessionmaker: async_sessionmaker[AsyncSession],
+    registry: ProviderRegistry,
+    *,
+    concurrency: int = 4,
+    cluster_timeout: float = 60.0,
 ) -> None:
     async with sessionmaker() as db, db.begin():
         await set_platform_scope(db)
@@ -53,32 +58,102 @@ async def reconcile_all(
                 .where(ProviderCluster.status != "auth_error")
             )
         ).scalars().all()
-    for cluster_id in ids:
-        async with sessionmaker() as db, db.begin():
-            await set_platform_scope(db)
-            got = await db.scalar(
-                select(func.pg_try_advisory_xact_lock(_lock_key(cluster_id)))
-            )
-            if not got:
-                continue  # another worker is on it
-            cluster = await db.get(ProviderCluster, cluster_id)
-            if cluster is None:
-                continue
+
+    slots = asyncio.Semaphore(concurrency)
+
+    async def one(cluster_id: uuid.UUID) -> None:
+        async with slots:
             try:
-                async with registry.open(db, cluster) as provider:
-                    run = await reconcile(db, cluster, provider, trigger="scheduled")
-                logger.info(
-                    "inventory synced",
-                    extra={"cluster": cluster.name, "status": run.status, "stats": run.stats},
+                async with asyncio.timeout(cluster_timeout):
+                    await _reconcile_cluster(sessionmaker, registry, cluster_id)
+            except TimeoutError:
+                # the sync transaction was rolled back; record why in a fresh one
+                await _set_status(
+                    sessionmaker, cluster_id, "offline",
+                    f"inventory sync timed out after {cluster_timeout:.0f}s",
                 )
-            except (ProviderError, SecretsError) as exc:
-                cluster.status, cluster.last_error = "error", str(exc)
-                logger.warning(
-                    "inventory sync skipped", extra={"cluster": cluster.name, "error": str(exc)}
-                )
+            except Exception:  # one broken cluster must not stop the others
+                logger.exception("inventory sync crashed", extra={"cluster_id": str(cluster_id)})
+
+    await asyncio.gather(*(one(cid) for cid in ids))
+
+
+async def _reconcile_cluster(
+    sessionmaker: async_sessionmaker[AsyncSession],
+    registry: ProviderRegistry,
+    cluster_id: uuid.UUID,
+) -> None:
+    async with sessionmaker() as db, db.begin():
+        await set_platform_scope(db)
+        got = await db.scalar(select(func.pg_try_advisory_xact_lock(_lock_key(cluster_id))))
+        if not got:
+            return  # another worker is on it
+        cluster = await db.get(ProviderCluster, cluster_id)
+        if cluster is None:
+            return
+        try:
+            async with registry.open(db, cluster) as provider:
+                run = await reconcile(db, cluster, provider, trigger="scheduled")
+            logger.info(
+                "inventory synced",
+                extra={"cluster": cluster.name, "status": run.status, "stats": run.stats},
+            )
+        except (ProviderError, SecretsError) as exc:
+            cluster.status, cluster.last_error = "error", str(exc)
+            logger.warning(
+                "inventory sync skipped", extra={"cluster": cluster.name, "error": str(exc)}
+            )
+
+
+async def _set_status(
+    sessionmaker: async_sessionmaker[AsyncSession],
+    cluster_id: uuid.UUID,
+    status: str,
+    error: str,
+) -> None:
+    async with sessionmaker() as db, db.begin():
+        await set_platform_scope(db)
+        cluster = await db.get(ProviderCluster, cluster_id)
+        if cluster is not None:
+            cluster.status, cluster.last_error = status, error
+    logger.warning("inventory sync failed", extra={"cluster_id": str(cluster_id), "error": error})
 
 
 JOB_POLL_SECONDS = 5.0
+
+
+async def run_job_pool(
+    sessionmaker: async_sessionmaker[AsyncSession],
+    registry: ProviderRegistry,
+    *,
+    worker_id: str,
+    concurrency: int,
+    wake: asyncio.Event,
+    stop: asyncio.Event,
+    poll_seconds: float = JOB_POLL_SECONDS,
+) -> None:
+    """`concurrency` runners claiming jobs independently (SKIP LOCKED keeps them apart).
+
+    An idle runner sleeps until a NOTIFY (wake), a stop, or the poll timeout — the timeout
+    also picks up retries whose run_after passed and jobs whose lease expired.
+    """
+
+    async def runner(n: int) -> None:
+        while not stop.is_set():
+            wake.clear()
+            try:
+                got = await run_one(sessionmaker, registry, f"{worker_id}#{n}")
+            except Exception:  # keep the runner alive; the next round retries
+                logger.exception("job runner error")
+                got = False
+            if got:
+                continue
+            waiters = [asyncio.create_task(wake.wait()), asyncio.create_task(stop.wait())]
+            await asyncio.wait(waiters, timeout=poll_seconds, return_when=asyncio.FIRST_COMPLETED)
+            for task in waiters:
+                task.cancel()
+
+    await asyncio.gather(*(runner(n) for n in range(concurrency)))
 
 
 async def job_loop(
@@ -87,23 +162,15 @@ async def job_loop(
     registry: ProviderRegistry,
     stop: asyncio.Event,
 ) -> None:
-    worker_id = f"{socket.gethostname()}:{os.getpid()}"
     wake = asyncio.Event()
     listener = await asyncpg.connect(str(settings.database_url))
     await listener.add_listener(CHANNEL, lambda *_: wake.set())
     try:
-        while not stop.is_set():
-            wake.clear()
-            try:
-                while not stop.is_set() and await run_one(sessionmaker, registry, worker_id):
-                    pass
-            except Exception:  # keep the loop alive; the next wake-up retries
-                logger.exception("job loop error")
-            waiters = [asyncio.create_task(wake.wait()), asyncio.create_task(stop.wait())]
-            await asyncio.wait(waiters, timeout=JOB_POLL_SECONDS,
-                               return_when=asyncio.FIRST_COMPLETED)
-            for task in waiters:
-                task.cancel()
+        await run_job_pool(
+            sessionmaker, registry,
+            worker_id=f"{socket.gethostname()}:{os.getpid()}",
+            concurrency=settings.job_concurrency, wake=wake, stop=stop,
+        )
     finally:
         await listener.close()
 
@@ -116,7 +183,11 @@ async def reconcile_loop(
 ) -> None:
     while not stop.is_set():
         try:
-            await reconcile_all(sessionmaker, registry)
+            await reconcile_all(
+                sessionmaker, registry,
+                concurrency=settings.reconcile_concurrency,
+                cluster_timeout=settings.reconcile_timeout_seconds,
+            )
         except Exception:  # keep the loop alive; the next tick retries
             logger.exception("reconcile loop error")
         try:

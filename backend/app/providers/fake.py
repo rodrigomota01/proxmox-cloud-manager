@@ -1,5 +1,6 @@
 """In-memory, deterministic CloudProvider for tests."""
 
+import asyncio
 from dataclasses import dataclass, field, replace
 from typing import ClassVar
 
@@ -38,6 +39,8 @@ class FakeProvider:
     storage: list[StorageObservation] = field(default_factory=list)
     available: bool = True
     task_error: str | None = None  # make wait() report a failed provider task
+    inventory_delay: float = 0.0  # simulate a slow server
+    wait_gate: asyncio.Event | None = None  # wait() blocks until set (a long task)
     calls: list[tuple[str, str]] = field(default_factory=list)
 
     def add_node(self, name: str, *, online: bool = True) -> None:
@@ -66,6 +69,8 @@ class FakeProvider:
 
     async def inventory(self) -> Inventory:
         self._check()
+        if self.inventory_delay:
+            await asyncio.sleep(self.inventory_delay)
         return Inventory(list(self.nodes), list(self.instances.values()), list(self.storage))
 
     async def get_instance(self, ref: ProviderRef) -> InstanceObservation:
@@ -82,6 +87,8 @@ class FakeProvider:
     async def wait(
         self, op: OperationHandle, on_progress: ProgressCb | None = None
     ) -> OperationResult:
+        if self.wait_gate is not None:
+            await self.wait_gate.wait()
         if self.task_error:
             return OperationResult(ok=False, message=self.task_error)
         return OperationResult(ok=True, message="OK")

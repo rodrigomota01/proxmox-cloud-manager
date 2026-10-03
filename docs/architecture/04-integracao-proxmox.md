@@ -163,6 +163,12 @@ cobre backup/fencing/replicação, não lifecycle de VM). Por isso:
 
 - **Reconciliador** no worker: a cada 15s (configurável) faz `GET /cluster/resources` por
   cluster e compara com o banco (custo: 1 request por ciclo, independente do nº de VMs).
+  Os clusters são sincronizados **em paralelo** (`CM_RECONCILE_CONCURRENCY`), cada um
+  com prazo próprio (`CM_RECONCILE_TIMEOUT_SECONDS`): um servidor lento ou fora do ar
+  vira `offline` sem atrasar os demais. Clusters com token rejeitado (`auth_error`)
+  saem do ciclo até a credencial ser trocada.
+- **Jobs** rodam em `CM_JOB_CONCURRENCY` runners por worker: um shutdown demorado em um
+  servidor não segura operações em outro.
 - Busca `config` completa só para guests cujo `maxcpu/maxmem/maxdisk/tags/name` mudou.
 - Casos:
   - **Guest novo fora da plataforma** → `instances.managed = false` (descoberto). Aparece

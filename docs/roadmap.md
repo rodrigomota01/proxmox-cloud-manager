@@ -49,9 +49,11 @@ matrizes cross-tenant e RBAC); `pytest -m lab` (conexão, isolamento do pool, ci
 energia) e `scripts/e2e-lab.sh` (cluster → sync → adoção → start/stop como jobs do
 tenant) contra PVE 8.4.19; `scripts/security-scan.sh` sem achados altos corrigíveis.
 
-**Pendências levadas adiante:** reconciliação de vários clusters em paralelo e teste
-com dois clusters (há vários PVE independentes); `Idempotency-Key` só em ações de
-energia por enquanto; pin de fingerprint TLS descartado (ver 04-integracao-proxmox).
+**Pendências levadas adiante:** `Idempotency-Key` só em ações de energia por enquanto; pin de fingerprint TLS descartado (ver 04-integracao-proxmox).
+
+**Pós-fase (multi-Proxmox):** vários servidores independentes — sync paralelo com prazo
+por cluster, pool de runners de jobs, testes com dois clusters (mesmo VMID em ambos,
+isolamento de ações, servidor lento/fora do ar, operação longa).
 
 ## Fase 2 — Provisionamento
 
