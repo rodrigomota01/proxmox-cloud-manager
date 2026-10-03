@@ -153,9 +153,10 @@ export default function RegionsPage() {
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Os usuários escolhem região e zona ao criar instâncias; a plataforma escolhe o servidor
             dentro da zona. Vincule servidores às zonas em{" "}
-            <Link href="/admin/clusters" className="text-indigo-600 hover:underline dark:text-indigo-400">
-              Clusters
-            </Link>
+            <Link href="/admin/nodes" className="text-indigo-600 hover:underline dark:text-indigo-400">
+              Hypervisors
+            </Link>{" "}
+            (aba Configuração de cada servidor)
             .
           </p>
         </div>

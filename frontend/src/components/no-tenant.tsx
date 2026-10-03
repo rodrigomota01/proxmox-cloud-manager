@@ -16,8 +16,8 @@ export function NoTenant() {
           <>
             {" "}
             Como administrador da plataforma, comece pelos{" "}
-            <Link href="/admin/clusters" className="text-indigo-600 hover:underline dark:text-indigo-400">
-              clusters
+            <Link href="/admin/nodes" className="text-indigo-600 hover:underline dark:text-indigo-400">
+              hypervisors
             </Link>
             .
           </>

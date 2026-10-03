@@ -2,28 +2,55 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
+import { ConnectionInstances, ConnectionSettings } from "@/components/admin/connection";
 import { NodeMetrics } from "@/components/metrics-panel";
 import { Card, ErrorBox, formatBytes } from "@/components/ui";
 import { Allocation, Meter, mib, uptime } from "@/components/viz";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
 
+const TABS = [
+  { key: "overview", label: "Visão geral" },
+  { key: "vms", label: "VMs" },
+  { key: "config", label: "Configuração" },
+] as const;
+type Tab = (typeof TABS)[number]["key"];
+
 export default function NodeDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const params = useSearchParams();
+  const tab: Tab = TABS.some((t) => t.key === params.get("tab")) ? (params.get("tab") as Tab) : "overview";
+  const nodes = useQuery({
+    queryKey: ["admin", "nodes"],
+    queryFn: async () => unwrap(await api.GET("/api/v1/admin/nodes")),
+    refetchInterval: 15_000,
+  });
   const node = useQuery({
     queryKey: ["admin", "node", id],
     queryFn: async () =>
       unwrap(await api.GET("/api/v1/admin/nodes/{node_id}", { params: { path: { node_id: id } } })),
     refetchInterval: 15_000,
   });
-  if (node.isError) return <ErrorBox message={errorMessage(node.error)} />;
   const n = node.data;
+  const cluster = useQuery({
+    queryKey: ["admin", "cluster", n?.cluster_id],
+    queryFn: async () =>
+      unwrap(await api.GET("/api/v1/admin/clusters/{cluster_id}", { params: { path: { cluster_id: n!.cluster_id } } })),
+    enabled: !!n,
+    refetchInterval: 15_000,
+  });
+  if (node.isError) return <ErrorBox message={errorMessage(node.error)} />;
   if (!n) return null;
   const online = n.status === "online";
+  // a standalone server is a one-node connection: the admin's label is its name
+  const siblings = (nodes.data ?? []).filter((x) => x.cluster_id === n.cluster_id).length;
+  const multi = siblings > 1;
 
   const rows: [string, React.ReactNode][] = [
-    ["Cluster", n.cluster_name],
+    ...(multi ? ([["Cluster", n.cluster_name]] as [string, React.ReactNode][]) : []),
+    ["Zona", n.region_name ? `${n.region_name} · ${n.zone_name}` : "sem zona"],
     ["Status", online ? "Online" : n.status],
     ["Ligado há", online ? uptime(n.uptime_seconds) : "—"],
     ["CPU em uso", online ? <Meter value={n.cpu_usage} title="CPU" /> : "—"],
@@ -66,18 +93,45 @@ export default function NodeDetailPage() {
       <Link href="/admin/nodes" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
         ← Hypervisors
       </Link>
-      <h1 className="text-lg font-semibold">{n.name}</h1>
-      <Card title="Agora">
-        <dl className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
-          {rows.map(([label, value]) => (
-            <div key={label} className="grid grid-cols-3 items-center gap-4 text-sm">
-              <dt className="text-slate-500">{label}</dt>
-              <dd className="col-span-2">{value}</dd>
-            </div>
-          ))}
-        </dl>
-      </Card>
-      {online && <NodeMetrics nodeId={n.id} />}
+      <div>
+        <h1 className="text-lg font-semibold">{multi ? n.name : n.cluster_name}</h1>
+        {!multi && n.name !== n.cluster_name && (
+          <p className="text-sm text-slate-500">Nome no Proxmox: {n.name}</p>
+        )}
+      </div>
+      <nav className="flex gap-1 border-b border-slate-200 dark:border-slate-800" aria-label="Seções">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => router.replace(t.key === "overview" ? `/admin/nodes/${id}` : `/admin/nodes/${id}?tab=${t.key}`)}
+            aria-current={tab === t.key ? "page" : undefined}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm ${
+              tab === t.key
+                ? "border-indigo-600 font-medium text-indigo-700 dark:text-indigo-300"
+                : "border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+      {tab === "vms" && <ConnectionInstances clusterId={n.cluster_id} nodeName={n.name} />}
+      {tab === "config" && cluster.data && <ConnectionSettings cluster={cluster.data} nodeCount={siblings} />}
+      {tab === "overview" && (
+        <>
+          <Card title="Agora">
+            <dl className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
+              {rows.map(([label, value]) => (
+                <div key={label} className="grid grid-cols-3 items-center gap-4 text-sm">
+                  <dt className="text-slate-500">{label}</dt>
+                  <dd className="col-span-2">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </Card>
+          {online && <NodeMetrics nodeId={n.id} />}
+        </>
+      )}
     </div>
   );
 }

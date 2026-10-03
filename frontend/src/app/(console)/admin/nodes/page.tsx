@@ -2,10 +2,13 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { Badge, Card, Empty, ErrorBox, Select, formatBytes } from "@/components/ui";
+import { AddHypervisorDialog } from "@/components/admin/connection";
+import { ClusterStatus } from "@/components/cluster-status";
+
+import { Badge, Button, Card, Empty, ErrorBox, Select, formatBytes } from "@/components/ui";
 import { Allocation, Meter, SortHeader, mib, ratioLabel, uptime, useSorted } from "@/components/viz";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 
@@ -47,7 +50,41 @@ function Totals({ nodes }: { nodes: Node[] }) {
   );
 }
 
+/** Connections with no node yet: just added, waiting for the first sync, or a bad token. */
+function PendingConnections({ nodes }: { nodes: Node[] }) {
+  const clusters = useQuery({
+    queryKey: ["admin", "clusters"],
+    queryFn: async () => unwrap(await api.GET("/api/v1/admin/clusters")),
+    refetchInterval: 15_000,
+  });
+  const pending = (clusters.data ?? []).filter((c) => !nodes.some((n) => n.cluster_id === c.id));
+  if (pending.length === 0) return null;
+  return (
+    <Card title="Aguardando sincronização">
+      <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+        {pending.map((c) => (
+          <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+            <span>
+              <Link href={`/admin/clusters/${c.id}`} className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                {c.name}
+              </Link>{" "}
+              <span className="text-xs text-slate-500">{c.api_url}</span>
+              {c.last_error && <div className="text-xs text-rose-600 dark:text-rose-400">{c.last_error}</div>}
+            </span>
+            <span className="flex items-center gap-2">
+              {!c.has_credentials && <Badge tone="amber">sem token</Badge>}
+              <ClusterStatus status={c.status} />
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 export default function NodesPage() {
+  const router = useRouter();
+  const [adding, setAdding] = useState(false);
   const nodes = useQuery({
     queryKey: ["admin", "nodes"],
     queryFn: async () => unwrap(await api.GET("/api/v1/admin/nodes")),
@@ -78,17 +115,26 @@ export default function NodesPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold">Hypervisors</h1>
-        <Select aria-label="Região" value={region} onChange={(e) => setRegion(e.target.value)}>
-          <option value="">Todas as regiões</option>
-          {regionNames.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select aria-label="Região" value={region} onChange={(e) => setRegion(e.target.value)}>
+            <option value="">Todas as regiões</option>
+            {regionNames.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </Select>
+          <Button onClick={() => setAdding(true)}>Adicionar hypervisor</Button>
+        </div>
       </div>
+      <AddHypervisorDialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        onCreated={() => setAdding(false)}
+      />
       <ErrorBox message={nodes.isError ? errorMessage(nodes.error) : null} />
       {nodes.data && <Totals nodes={visible} />}
+      {nodes.data && <PendingConnections nodes={nodes.data} />}
 
       <Card title="Nodes">
         {nodes.data?.length === 0 && <Empty>Nenhum node sincronizado ainda.</Empty>}
@@ -110,15 +156,17 @@ export default function NodesPage() {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {sorted.map((n) => {
                   const online = n.status === "online";
+                  // standalone server = one-node connection: show the admin's label first
+                  const multi = (nodes.data ?? []).filter((x) => x.cluster_id === n.cluster_id).length > 1;
                   return (
                     <tr key={n.id}>
                       <td className="py-2.5 pr-4">
                         <Link href={`/admin/nodes/${n.id}`} className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-                          {n.name}
+                          {multi ? n.name : n.cluster_name}
                         </Link>
                         <div className="text-xs text-slate-500">
-                          {n.region_name ? `${n.region_name} · ${n.zone_name}` : "sem zona"} · {n.cluster_name} ·{" "}
-                          {n.cpu_count} núcleos · {formatBytes(n.memory_bytes)}
+                          {n.region_name ? `${n.region_name} · ${n.zone_name}` : "sem zona"} ·{" "}
+                          {multi ? `cluster ${n.cluster_name}` : n.name} · {n.cpu_count} núcleos · {formatBytes(n.memory_bytes)}
                         </div>
                       </td>
                       <td className="py-2.5 pr-4">

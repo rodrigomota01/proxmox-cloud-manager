@@ -16,7 +16,6 @@ const NAV = [
 const ADMIN_NAV = [
   { href: "/admin/nodes", label: "Hypervisors" },
   { href: "/admin/regions", label: "Regiões e zonas" },
-  { href: "/admin/clusters", label: "Clusters" },
   { href: "/admin/images", label: "Imagens" },
   { href: "/admin/tenants", label: "Clientes e quotas" },
   { href: "/admin/users", label: "Usuários" },
