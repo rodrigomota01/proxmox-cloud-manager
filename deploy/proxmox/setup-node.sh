@@ -37,7 +37,15 @@ done
 pvesm status --storage "$STORAGE" >/dev/null 2>&1 \
   || { echo "storage $STORAGE not found (pvesm status)" >&2; exit 1; }
 
-say "PVE $(pveversion | cut -d/ -f2)"
+PVE_VERSION=$(pveversion | cut -d/ -f2)   # e.g. 8.4.19, 6.4-14
+say "PVE $PVE_VERSION"
+IFS='.-' read -r PVE_MAJOR PVE_MINOR _ <<<"$PVE_VERSION"
+if (( PVE_MAJOR < 6 || (PVE_MAJOR == 6 && PVE_MINOR < 2) )); then
+  echo "PVE $PVE_VERSION has no API tokens (needs >= 6.2); upgrade first" >&2; exit 1
+fi
+if (( PVE_MAJOR < 8 )); then
+  echo "  aviso: PVE $PVE_MAJOR está sem suporte (sem correções de segurança); planeje o upgrade"
+fi
 
 # Privilege names differ between PVE 8 and 9 (guest agent). Keep only names this node
 # knows: the built-in Administrator role holds every privilege of the installed version.
@@ -46,6 +54,7 @@ known=$(pveum role list --output-format json | perl -MJSON -e '
   for my $r (@{ decode_json(join "", <STDIN>) }) {
     print $r->{privs} if $r->{roleid} eq "Administrator";
   }')
+[[ -n $known ]] || { echo "cannot read the privilege list (pveum role list)" >&2; exit 1; }
 privs() {
   local out=() p
   for p in "$@"; do
@@ -60,6 +69,7 @@ ROLE_PRIVS=$(privs VM.Audit VM.PowerMgmt VM.Console VM.Monitor VM.GuestAgent.Aud
   VM.Config.Cloudinit VM.Config.Options)
 
 role() {  # create, or reset an existing role to exactly these privileges
+  [[ -n $2 ]] || { echo "role $1: nada a conceder nesta versão (ignorado)"; return; }
   pveum role add "$1" --privs "$2" 2>/dev/null || pveum role modify "$1" --privs "$2"
   echo "role $1: $2"
 }
@@ -108,7 +118,11 @@ done
 acl "/pool/$POOL" CloudManager
 acl /nodes CMNode
 acl "/storage/$STORAGE" CMStorage
-acl "/sdn/zones/localnetwork/$BRIDGE" CMNetwork
+if [[ ",$known," == *",SDN.Use,"* ]]; then
+  acl "/sdn/zones/localnetwork/$BRIDGE" CMNetwork
+else  # PVE < 7: bridges need no permission (no SDN privileges yet)
+  echo "acl /sdn: não existe nesta versão; a bridge $BRIDGE é usável sem permissão"
+fi
 for vmid in $TEMPLATES; do acl "/vms/$vmid" CMTemplate; done
 if [[ $AUDIT_ALL == 1 ]]; then
   # read-only on every guest; write privileges stay on the pool only

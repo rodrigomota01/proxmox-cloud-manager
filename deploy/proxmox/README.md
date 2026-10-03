@@ -51,7 +51,10 @@ As seções abaixo documentam o passo a passo manual equivalente (usado no prime
 
 Referência de privilégios em
 [04-integracao-proxmox.md](../../docs/architecture/04-integracao-proxmox.md#identidade-técnica-e-permissões-no-proxmox).
-Validado em PVE 8.4.19 (node único).
+Validado em PVE 8.4.19 (node único). Funciona a partir do **PVE 6.2** (primeira versão com
+API tokens): no 6.x/7.x não há privilégios de SDN, então a bridge é usada sem ACL, e o
+script avisa que a versão está sem suporte. Uma VM nova num PVE antigo herda as
+limitações dele (cloud-init e guest agent mais antigos).
 
 ## Fase 1 — leitura + power, restrito a um pool
 
