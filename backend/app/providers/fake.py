@@ -67,6 +67,10 @@ class FakeProvider:
         self._check()
         return Inventory(list(self.nodes), list(self.instances.values()), list(self.storage))
 
+    async def get_instance(self, ref: ProviderRef) -> InstanceObservation:
+        self._check()
+        return self.instances[ref.key]
+
     async def power(self, ref: ProviderRef, action: PowerAction) -> OperationHandle:
         self._check()
         self.calls.append((ref.key, action.value))

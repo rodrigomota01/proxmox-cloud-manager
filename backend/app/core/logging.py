@@ -46,6 +46,7 @@ def configure_logging(service: str, level: str = "INFO") -> None:
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(level.upper())
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # per-request INFO lines are noise
     # uvicorn installs its own handlers; route them through ours
     for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
         lg = logging.getLogger(name)

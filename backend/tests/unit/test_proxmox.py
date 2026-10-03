@@ -180,3 +180,21 @@ async def test_container_suspend_rejected():
     provider = ProxmoxProvider(_client())
     with pytest.raises(ProviderError):
         await provider.power(mapper.instance_ref(300, "tagima", "lxc"), PowerAction.SUSPEND)
+
+
+@respx.mock
+@pytest.mark.parametrize(
+    ("status", "qmp", "expected"),
+    [("running", "running", PowerState.RUNNING), ("running", "paused", PowerState.PAUSED),
+     ("stopped", None, PowerState.STOPPED)],
+)
+async def test_get_instance_reads_live_status(status, qmp, expected):
+    route = respx.get(f"{API}/nodes/tagima/qemu/10001/status/current").respond(
+        json={"data": {"status": status, "qmpstatus": qmp, "name": "cm-test-1", "cpus": 2,
+                       "maxmem": 4294967296, "maxdisk": 34359738368, "uptime": 5}}
+    )
+    ref = mapper.instance_ref(10001, "tagima", "qemu")
+    obs = await ProxmoxProvider(_client()).get_instance(ref)
+    assert route.called
+    assert obs.power_state is expected and obs.vcpus == 2 and obs.memory_mb == 4096
+    assert obs.node == "tagima" and obs.name == "cm-test-1"

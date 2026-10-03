@@ -5,6 +5,7 @@ from typing import ClassVar
 from urllib.parse import quote
 
 from app.providers.base import (
+    InstanceObservation,
     Inventory,
     OperationHandle,
     OperationResult,
@@ -43,6 +44,15 @@ class ProxmoxProvider:
 
     async def inventory(self) -> Inventory:
         return mapper.inventory(await self.client.get("/cluster/resources") or [])
+
+    async def get_instance(self, ref: ProviderRef) -> InstanceObservation:
+        # /cluster/resources is refreshed by pvestatd every ~10s; right after a task it
+        # can still show the old state. status/current asks the node directly.
+        pve_type, node, vmid = ref.data["type"], ref.data["node"], int(ref.data["vmid"])
+        item = await self.client.get(
+            f"/nodes/{quote(node, safe='')}/{pve_type}/{vmid}/status/current"
+        )
+        return mapper.instance_status(ref, item or {})
 
     async def power(self, ref: ProviderRef, action: PowerAction) -> OperationHandle:
         pve_type, node, vmid = ref.data["type"], ref.data["node"], int(ref.data["vmid"])

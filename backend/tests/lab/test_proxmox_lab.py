@@ -54,18 +54,19 @@ async def test_inventory_is_limited_to_the_pool(provider):
 
 @pytest.mark.skipif(not POWER_VMID, reason="CM_LAB_POWER_VMID not set")
 async def test_power_cycle(provider):
-    async def state() -> PowerState:
-        inv = await provider.inventory()
-        return next(i.power_state for i in inv.instances if str(i.ref.data["vmid"]) == POWER_VMID)
-
     inv = await provider.inventory()
     guest = next(i for i in inv.instances if str(i.ref.data["vmid"]) == POWER_VMID)
     assert guest.pool == POOL, "refusing to touch a guest outside the lab pool"
 
-    if guest.power_state is not PowerState.RUNNING:
-        result = await provider.wait(await provider.power(guest.ref, PowerAction.START))
-        assert result.ok, result.message
-        assert await state() is PowerState.RUNNING
-    result = await provider.wait(await provider.power(guest.ref, PowerAction.STOP))
+    async def state() -> PowerState:
+        return (await provider.get_instance(guest.ref)).power_state
+
+    try:
+        if await state() is not PowerState.RUNNING:
+            result = await provider.wait(await provider.power(guest.ref, PowerAction.START))
+            assert result.ok, result.message
+            assert await state() is PowerState.RUNNING
+    finally:  # leave the lab as we found it (stopped), even if an assertion failed
+        result = await provider.wait(await provider.power(guest.ref, PowerAction.STOP))
     assert result.ok, result.message
     assert await state() is PowerState.STOPPED

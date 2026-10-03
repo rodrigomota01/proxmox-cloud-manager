@@ -63,6 +63,21 @@ def instance(item: dict[str, Any]) -> InstanceObservation:
     )
 
 
+def instance_status(ref: ProviderRef, item: dict[str, Any]) -> InstanceObservation:
+    """From GET /nodes/{node}/{type}/{vmid}/status/current (live, not cached)."""
+    power = _POWER.get(str(item.get("status")), PowerState.UNKNOWN)
+    if power is PowerState.RUNNING and item.get("qmpstatus") in ("paused", "suspended"):
+        power = PowerState.PAUSED
+    return instance(
+        {
+            **item,
+            "type": ref.data["type"], "vmid": ref.data["vmid"], "node": ref.data["node"],
+            "status": power.value,
+            "maxcpu": item.get("cpus", item.get("maxcpu")),
+        }
+    )
+
+
 def storage(item: dict[str, Any]) -> StorageObservation:
     return StorageObservation(
         node=item["node"],
