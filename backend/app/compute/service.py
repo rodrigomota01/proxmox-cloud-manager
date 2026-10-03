@@ -8,17 +8,25 @@ authorized against the instance loaded from the database and run as jobs.
 import uuid
 
 from sqlalchemy import ColumnElement, Select, and_, false, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import TenantContext
 from app.audit import service as audit
 from app.compute.models import Instance
-from app.core.errors import Conflict, NotFound
+from app.compute.schemas import InstanceCreate
+from app.core.config import Settings
+from app.core.errors import Conflict, NotFound, ValidationError
 from app.core.pagination import PageParams, paginate
 from app.iam.authz import Scope, authorize, effective_permissions, projects_with_permission
+from app.iam.service import live_project
+from app.images.models import Image
+from app.inventory.models import ProviderCluster
 from app.jobs.models import ACTIVE, Job, JobEvent
 from app.jobs.queue import enqueue
 from app.providers.base import PowerAction
+from app.sshkeys.models import SshPublicKey
+from app.tenancy import quota
 from app.tenancy.models import Project
 
 KINDS = ("vm", "container")
@@ -32,8 +40,10 @@ POWER_ACTIONS = {
 
 
 class ComputeService:
-    def __init__(self, db: AsyncSession, ctx: TenantContext) -> None:
-        self.db, self.ctx = db, ctx
+    def __init__(
+        self, db: AsyncSession, ctx: TenantContext, settings: Settings | None = None
+    ) -> None:
+        self.db, self.ctx, self.settings = db, ctx, settings
         self._tenant_perms: set[str] | None = None
 
     @property
@@ -123,6 +133,114 @@ class ComputeService:
             self.db, "INSTANCE_POWER_REQUESTED", actor_user_id=self.actor,
             tenant_id=self.ctx.tenant_id, resource_type="instance", resource_id=instance.id,
             details={"action": action, "job_id": str(job.id)},
+        )
+        return job
+
+    # --- create / delete -------------------------------------------------------------------
+
+    async def create(
+        self, body: InstanceCreate, idempotency_key: str | None
+    ) -> tuple[Instance, Job]:
+        if self.settings is None:  # wiring error, not input
+            raise RuntimeError("ComputeService.create needs settings")
+        scope = Scope(self.ctx.tenant_id, body.project_id)
+        await live_project(self.db, self.ctx.tenant_id, body.project_id)
+        await authorize(self.db, self.actor, "vm:create", scope)
+
+        # RLS: only public images and this tenant's are visible
+        image = await self.db.scalar(
+            select(Image).where(
+                Image.id == body.image_id, Image.active,
+                (Image.tenant_id.is_(None)) | (Image.tenant_id == self.ctx.tenant_id),
+            )
+        )
+        if image is None:
+            raise ValidationError(errors=[{"field": "image_id", "message": "unknown image"}])
+        if body.root_disk_gb < image.min_disk_gb:
+            raise ValidationError(errors=[{
+                "field": "root_disk_gb",
+                "message": f"the image needs at least {image.min_disk_gb} GB",
+            }])
+        cluster = await self.db.get(ProviderCluster, image.cluster_id)
+        if cluster is None or not cluster.settings.get("pool"):
+            raise Conflict("The image's cluster is not ready for new instances (no target pool)")
+
+        keys = (
+            await self.db.execute(
+                select(SshPublicKey).where(
+                    SshPublicKey.id.in_(body.ssh_key_ids),
+                    SshPublicKey.user_id == self.actor,
+                )
+            )
+        ).scalars().all()
+        if len(keys) != len(set(body.ssh_key_ids)):
+            raise ValidationError(errors=[{"field": "ssh_key_ids", "message": "unknown key"}])
+
+        await quota.reserve(self.db, self.ctx.tenant_id, self.settings, {
+            "instances": 1, "vcpus": body.vcpus, "memory_mb": body.memory_mb,
+            "storage_gb": body.root_disk_gb,
+        })
+        instance = Instance(
+            tenant_id=self.ctx.tenant_id, project_id=body.project_id, cluster_id=cluster.id,
+            kind="vm", name=body.name, provider_name=body.name, state="provisioning",
+            power_state="stopped", vcpus=body.vcpus, memory_mb=body.memory_mb,
+            root_disk_gb=body.root_disk_gb, tags=body.tags, managed=True, image_id=image.id,
+            ipv4=body.ipv4.address.split("/")[0], network=body.ipv4.model_dump(),
+            provider_ref={},  # the job allocates the guest id
+        )
+        try:
+            async with self.db.begin_nested():
+                self.db.add(instance)
+        except IntegrityError as exc:
+            raise Conflict(
+                f"IP {instance.ipv4} is already used by another instance on this server"
+            ) from exc
+        job = await enqueue(
+            self.db, "instance.create", tenant_id=self.ctx.tenant_id,
+            project_id=body.project_id, requested_by=self.actor,
+            resource_type="instance", resource_id=instance.id,
+            # public keys are copied: deleting a key later must not break the job
+            payload={"ssh_keys": [k.public_key for k in keys], "user": image.default_user},
+            idempotency_key=idempotency_key,
+        )
+        await audit.record(
+            self.db, "INSTANCE_CREATE_REQUESTED", actor_user_id=self.actor,
+            tenant_id=self.ctx.tenant_id, resource_type="instance", resource_id=instance.id,
+            details={
+                "name": body.name, "image_id": str(image.id), "vcpus": body.vcpus,
+                "memory_mb": body.memory_mb, "root_disk_gb": body.root_disk_gb,
+                "ipv4": body.ipv4.address, "job_id": str(job.id),
+                "ssh_keys": [k.fingerprint for k in keys],
+            },
+        )
+        return instance, job
+
+    async def delete(
+        self, instance_id: uuid.UUID, confirm: str, idempotency_key: str | None
+    ) -> Job:
+        instance = await self._load(instance_id)
+        await authorize(
+            self.db, self.actor, f"{instance.kind}:delete",
+            Scope(self.ctx.tenant_id, instance.project_id),
+        )
+        if confirm != instance.name:
+            raise ValidationError(
+                f"Type '{instance.name}' to confirm",
+                errors=[{"field": "confirm", "message": "does not match the instance name"}],
+            )
+        if instance.state not in ("active", "error"):
+            raise Conflict(f"Instance is {instance.state}")
+        instance.state = "deleting"
+        job = await enqueue(
+            self.db, "instance.delete", tenant_id=self.ctx.tenant_id,
+            project_id=instance.project_id, requested_by=self.actor,
+            resource_type="instance", resource_id=instance.id,
+            idempotency_key=idempotency_key,
+        )
+        await audit.record(
+            self.db, "INSTANCE_DELETE_REQUESTED", actor_user_id=self.actor,
+            tenant_id=self.ctx.tenant_id, resource_type="instance", resource_id=instance.id,
+            details={"name": instance.name, "job_id": str(job.id)},
         )
         return job
 

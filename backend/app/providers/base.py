@@ -109,12 +109,59 @@ class StorageObservation:
 
 
 @dataclass(frozen=True)
+class TemplateObservation:
+    ref: ProviderRef
+    name: str
+    node: str
+    vcpus: int
+    memory_mb: int
+    disk_gb: int
+    pool: str | None = None
+
+
+@dataclass(frozen=True)
+class TemplateDetails:
+    """What image registration needs to know about a template."""
+
+    ref: ProviderRef  # enriched with provider data needed to clone (e.g. boot disk)
+    name: str
+    disk_gb: int
+    has_cloudinit: bool
+    has_guest_agent: bool
+
+
+@dataclass(frozen=True)
 class Inventory:
     """One consistent snapshot (Proxmox: a single /cluster/resources call)."""
 
     nodes: list[NodeInfo] = field(default_factory=list)
     instances: list[InstanceObservation] = field(default_factory=list)
     storage: list[StorageObservation] = field(default_factory=list)
+    templates: list[TemplateObservation] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class StaticIPv4:
+    address: str  # "203.0.113.10/28"
+    gateway: str
+    dns: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class InstanceSpec:
+    """Everything a new instance gets. The provider must set all of it explicitly:
+    nothing identity- or access-related may be inherited from the template
+    (keys, passwords, IPs)."""
+
+    name: str
+    vcpus: int
+    memory_mb: int
+    disk_gb: int
+    user: str
+    ssh_keys: tuple[str, ...]
+    ipv4: StaticIPv4
+    tags: tuple[str, ...] = ()
+    description: str = ""
 
 
 @dataclass(frozen=True)
@@ -138,6 +185,18 @@ class CloudProvider(Protocol):
     async def inventory(self) -> Inventory: ...
     async def get_instance(self, ref: ProviderRef) -> InstanceObservation:
         """Live state of one guest (not the cached bulk listing)."""
+        ...
+    async def describe_template(self, ref: ProviderRef) -> TemplateDetails: ...
+    async def slot_available(self, ref: ProviderRef) -> bool:
+        """Whether the target id is free in the whole provider (also where we cannot see)."""
+        ...
+    async def clone_template(
+        self, template: ProviderRef, target: ProviderRef, spec: InstanceSpec
+    ) -> OperationHandle: ...
+    async def configure_instance(self, ref: ProviderRef, spec: InstanceSpec) -> None: ...
+    async def grow_disk(self, ref: ProviderRef, template: ProviderRef, size_gb: int) -> None: ...
+    async def delete_instance(self, ref: ProviderRef) -> OperationHandle | None:
+        """None when the guest no longer exists (deleting is then already done)."""
         ...
     async def power(self, ref: ProviderRef, action: PowerAction) -> OperationHandle: ...
     async def wait(

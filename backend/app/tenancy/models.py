@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Text, UniqueConstraint, func, text
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, Timestamps, UUIDPk
@@ -42,3 +42,14 @@ class Project(UUIDPk, Timestamps, Base):
     name: Mapped[str] = mapped_column(Text)
     description: Mapped[str] = mapped_column(Text, server_default="")
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class TenantQuota(UUIDPk, Base):
+    """Limit per tenant and resource. Missing row -> the platform default (settings)."""
+
+    __tablename__ = "tenant_quotas"
+    __table_args__ = (UniqueConstraint("tenant_id", "resource"),)
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"))
+    resource: Mapped[str] = mapped_column(Text)  # vcpus|memory_mb|storage_gb|instances
+    limit_value: Mapped[int] = mapped_column(BigInteger)

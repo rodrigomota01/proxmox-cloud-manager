@@ -263,6 +263,12 @@ export default function ClusterDetailPage() {
               <dt className="text-slate-500">TLS</dt>
               <dd>{c.insecure_skip_verify ? "sem verificação (dev)" : c.has_custom_ca ? "CA própria" : "CAs do sistema"}</dd>
             </div>
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-slate-500">Pool de destino</dt>
+              <dd>
+                <PoolEditor clusterId={c.id} pool={(c.settings.pool as string | undefined) ?? ""} />
+              </dd>
+            </div>
             <div className="flex justify-between gap-4">
               <dt className="text-slate-500">Versão</dt>
               <dd>{c.version ?? "—"}</dd>
@@ -321,6 +327,36 @@ export default function ClusterDetailPage() {
 
       <AdoptDialog instance={adopting} onClose={() => setAdopting(null)} />
     </div>
+  );
+}
+
+function PoolEditor({ clusterId, pool }: { clusterId: string; pool: string }) {
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState(pool);
+  const save = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.PATCH("/api/v1/admin/clusters/{cluster_id}", {
+          params: { path: { cluster_id: clusterId } },
+          body: { pool: value.trim() || null },
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "cluster", clusterId] }),
+  });
+  return (
+    <span className="flex items-center gap-2">
+      <Input
+        aria-label="Pool de destino"
+        className="w-32"
+        value={value}
+        placeholder="nenhum"
+        onChange={(e) => setValue(e.target.value)}
+      />
+      <Button variant="secondary" disabled={save.isPending || value === pool} onClick={() => save.mutate()}>
+        Salvar
+      </Button>
+      {save.isError && <span className="text-xs text-rose-600">{errorMessage(save.error)}</span>}
+    </span>
   );
 }
 

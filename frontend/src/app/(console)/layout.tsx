@@ -10,8 +10,13 @@ import { SessionProvider, useSession } from "@/lib/session";
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/instances", label: "Instâncias" },
+  { href: "/ssh-keys", label: "Chaves SSH" },
 ];
-const ADMIN_NAV = [{ href: "/admin/clusters", label: "Clusters" }];
+const ADMIN_NAV = [
+  { href: "/admin/clusters", label: "Clusters" },
+  { href: "/admin/images", label: "Imagens" },
+  { href: "/admin/tenants", label: "Tenants e quotas" },
+];
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
@@ -32,7 +37,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
 
 function Shell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { me, tenantId, selectTenant, isPlatformAdmin } = useSession();
+  const { me, tenants, tenantId, selectTenant, isPlatformAdmin } = useSession();
 
   async function signOut() {
     await logout();
@@ -66,13 +71,13 @@ function Shell({ children }: { children: React.ReactNode }) {
         <header className="flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-6 py-3 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex items-center gap-2 text-sm">
             <span className="text-slate-500">Tenant</span>
-            {me.tenants.length > 0 ? (
+            {tenants.length > 0 ? (
               <Select
                 aria-label="Tenant ativo"
                 value={tenantId ?? ""}
                 onChange={(e) => selectTenant(e.target.value)}
               >
-                {me.tenants.map((t) => (
+                {tenants.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
                   </option>

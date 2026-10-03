@@ -133,6 +133,23 @@ export function PowerBadge({ state }: { state: string }) {
   return <Badge tone={powerTone[state] ?? "gray"}>{powerLabel[state] ?? state}</Badge>;
 }
 
+const stateTone: Record<string, keyof typeof tones> = {
+  provisioning: "blue",
+  deleting: "amber",
+  error: "red",
+  active: "green",
+};
+const stateLabel: Record<string, string> = {
+  provisioning: "Criando…",
+  deleting: "Excluindo…",
+  error: "Erro",
+  active: "Ativa",
+};
+
+export function StateBadge({ state }: { state: string }) {
+  return <Badge tone={stateTone[state] ?? "gray"}>{stateLabel[state] ?? state}</Badge>;
+}
+
 const jobTone: Record<string, keyof typeof tones> = {
   pending: "blue",
   running: "blue",

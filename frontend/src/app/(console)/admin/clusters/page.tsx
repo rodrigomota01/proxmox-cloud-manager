@@ -13,7 +13,7 @@ function CreateClusterDialog({ open, onClose }: { open: boolean; onClose: () => 
   const router = useRouter();
   const queryClient = useQueryClient();
   const create = useMutation({
-    mutationFn: async (body: { name: string; api_url: string; ca_pem?: string }) =>
+    mutationFn: async (body: { name: string; api_url: string; ca_pem?: string; pool?: string }) =>
       unwrap(await api.POST("/api/v1/admin/clusters", { body })),
     onSuccess: (cluster) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "clusters"] });
@@ -25,10 +25,12 @@ function CreateClusterDialog({ open, onClose }: { open: boolean; onClose: () => 
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const ca = String(form.get("ca_pem") ?? "").trim();
+    const pool = String(form.get("pool") ?? "").trim();
     create.mutate({
       name: String(form.get("name")),
       api_url: String(form.get("api_url")),
       ...(ca ? { ca_pem: ca } : {}),
+      ...(pool ? { pool } : {}),
     });
   }
 
@@ -40,6 +42,12 @@ function CreateClusterDialog({ open, onClose }: { open: boolean; onClose: () => 
         </Field>
         <Field label="URL da API" hint="Ex.: https://hv08.exemplo.com:8006">
           <Input name="api_url" type="url" required placeholder="https://host:8006" />
+        </Field>
+        <Field
+          label="Pool de destino"
+          hint="Pool do Proxmox onde as VMs novas nascem (o escopo das ACLs do token), ex.: cm-lab."
+        >
+          <Input name="pool" maxLength={64} pattern="[A-Za-z0-9._\-]+" placeholder="cm-lab" />
         </Field>
         <Field
           label="CA própria (opcional)"

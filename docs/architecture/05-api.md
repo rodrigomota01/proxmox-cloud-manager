@@ -114,9 +114,9 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | GET | `/instances/{id}` | `vm:view` | 1 |
 | POST | `/instances/{id}/start` · `/stop` · `/shutdown` · `/restart` | `vm:start` / `vm:stop` / `vm:restart` (`container:*` para LXC) → 202 + job; uma operação ativa por instância (409); `Idempotency-Key` aceito | 1 |
 | POST | `/instances/{id}/suspend` · `/resume` | `vm:stop` / `vm:start` | 2 |
-| POST | `/instances` | `vm:create` / `container:create` | 2 |
+| POST | `/instances` | `vm:create` no projeto → 202 + job `instance.create`; imagem visível ao tenant, chaves do próprio usuário, IP estático único no cluster, quota | 2a ✅ |
 | PATCH | `/instances/{id}` | `vm:configure` (nome, tags, vCPU, RAM) | 2 |
-| DELETE | `/instances/{id}` | `vm:delete` + confirm | 2 |
+| DELETE | `/instances/{id}` | `vm:delete` + `confirm` (nome) → 202 + job `instance.delete` | 2a ✅ |
 | POST | `/instances/{id}/clone` | `vm:create` + `vm:view` origem | 2 |
 | GET/POST | `/instances/{id}/volumes` | `vm:configure` | 2 |
 | POST | `/instances/{id}/volumes/{volId}/resize` | `vm:configure` | 2 |
@@ -132,18 +132,18 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 
 | Método | Rota | Permissão |
 |---|---|---|
-| GET | `/images` | autenticado (públicas + do tenant) |
+| GET | `/images` | membro do tenant (públicas + do tenant, ativas; sem ids do provider) |
 | POST | `/images` | `template:create` (a partir de instância parada) |
 | PATCH/DELETE | `/images/{id}` | `template:create` / `template:publish` |
 | GET | `/storage-classes` | `storage:view` (storage pools oferecidos, sem detalhes do PVE) |
 | GET/POST/DELETE | `/networks` | `network:view` / `network:manage` |
-| GET/POST/DELETE | `/ssh-keys` | dono |
+| GET/POST/DELETE | `/ssh-keys` | dono (só chaves públicas; tipo e base64 validados, fingerprint SHA256) |
 
 ### Quota, preço, billing (Fase 4)
 
 | Método | Rota | Permissão |
 |---|---|---|
-| GET | `/quotas` | `quota:view` → `{resource, limit, used, reserved, available}` |
+| GET | `/quotas` | membro do tenant → `{resource, limit, used, available}` (2a ✅) |
 | POST | `/pricing/estimate` | autenticado (calcula custo de um spec) |
 | GET | `/billing/usage?from=&to=&group_by=project` | `billing:view` |
 
@@ -174,7 +174,9 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | GET | `/admin/instances?managed=false` | `node:view` (descobertos) |
 | POST | `/admin/instances/{id}/adopt` | `cluster:manage` → atribui tenant/projeto |
 | GET | `/admin/storage` · `/admin/networks` | `cluster:manage` |
-| GET/PUT | `/admin/tenants/{id}/quotas` | `quota:manage` |
+| GET/PUT | `/admin/tenants/{id}/quotas` | `quota:manage` (sem linha = padrão da plataforma) |
+| GET | `/admin/clusters/{id}/templates` | `template:publish` (templates visíveis ao token) |
+| GET/POST/PATCH | `/admin/images` · `/admin/images/{id}` | `template:publish` (exige drive de cloud-init) |
 | GET/POST | `/admin/price-tables` | `billing:manage` |
 | GET | `/admin/jobs` · `/admin/jobs/{id}` | `cluster:manage` (inclui dados dos eventos: UPID, node) |
 | GET | `/admin/audit-logs` | `platform:admin` ou `audit:view` (platform) |

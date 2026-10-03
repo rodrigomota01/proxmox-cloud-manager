@@ -33,6 +33,33 @@ pveum acl modify /nodes       --tokens 'cloudmgr@pve!cm' --roles CloudManager
 - Privilégios de criação (`VM.Allocate`, `VM.Clone`, `VM.Config.*`,
   `Datastore.AllocateSpace`) entram na Fase 2, junto com ACL no template e no storage.
 
+## Fase 2a — criar e excluir VMs a partir de um template
+
+Roles separados por alvo, cada um com o mínimo. O token **clona** o template mas não o
+altera nem apaga; cria/configura/apaga VMs só **dentro do pool**; usa só o storage e a
+bridge necessários. Ajuste `9998`, `storage-vz` e `vmbr0` ao seu ambiente
+(`qm config <template>`).
+
+```bash
+pveum role add CMTemplate --privs "VM.Audit,VM.Clone"
+pveum role add CMStorage  --privs "Datastore.Audit,Datastore.AllocateSpace"
+pveum role add CMNetwork  --privs "SDN.Use"
+pveum role modify CloudManager --append 1 --privs "VM.Allocate,VM.Clone,VM.Config.CPU,VM.Config.Memory,VM.Config.Disk,VM.Config.Network,VM.Config.Cloudinit,VM.Config.Options"
+
+pveum acl modify /vms/9998                     --users cloudmgr@pve      --roles CMTemplate
+pveum acl modify /vms/9998                     --tokens 'cloudmgr@pve!cm' --roles CMTemplate
+pveum acl modify /storage/storage-vz           --users cloudmgr@pve      --roles CMStorage
+pveum acl modify /storage/storage-vz           --tokens 'cloudmgr@pve!cm' --roles CMStorage
+pveum acl modify /sdn/zones/localnetwork/vmbr0 --users cloudmgr@pve      --roles CMNetwork
+pveum acl modify /sdn/zones/localnetwork/vmbr0 --tokens 'cloudmgr@pve!cm' --roles CMNetwork
+
+pveum user token permissions cloudmgr@pve cm   # conferência
+```
+
+Na plataforma: defina o **pool de destino** do cluster (ex.: `cm-lab`) e registre o
+template em *Admin → Imagens*. O template precisa de drive de cloud-init; chaves, senha e
+IP dele **não** são herdados pelas VMs criadas.
+
 ## Verificação
 
 ```bash

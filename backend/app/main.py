@@ -21,9 +21,11 @@ from app.core.request_id import RequestIdMiddleware
 from app.core.security import signing_key
 from app.db.session import create_engine, create_sessionmaker
 from app.iam import router as iam
+from app.images import router as images
 from app.infra.mailer import build_mailer
 from app.infra.secrets import SecretsError, build_secrets_backend
 from app.providers.registry import ProviderRegistry
+from app.sshkeys import router as sshkeys
 from app.tenancy import router as tenancy
 
 API_PREFIX = "/api"
@@ -81,6 +83,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     v1.include_router(tenancy.router)
     v1.include_router(iam.router)
     v1.include_router(compute.router)
+    v1.include_router(images.router)
+    v1.include_router(sshkeys.router)
     v1.include_router(admin.router)
     app.include_router(v1)
 

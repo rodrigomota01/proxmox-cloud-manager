@@ -9,7 +9,10 @@ from app.providers.base import (
     NodeInfo,
     PowerState,
     ProviderRef,
+    StaticIPv4,
     StorageObservation,
+    TemplateDetails,
+    TemplateObservation,
 )
 
 _KIND = {"qemu": InstanceKind.VM, "lxc": InstanceKind.CONTAINER}
@@ -91,15 +94,73 @@ def storage(item: dict[str, Any]) -> StorageObservation:
     )
 
 
+def template(item: dict[str, Any]) -> TemplateObservation:
+    return TemplateObservation(
+        ref=instance_ref(int(item["vmid"]), item["node"], item["type"]),
+        name=item.get("name") or f"template-{item['vmid']}",
+        node=item["node"],
+        vcpus=_int(item.get("maxcpu")),
+        memory_mb=_int(item.get("maxmem")) // _MIB,
+        disk_gb=_int(item.get("maxdisk")) // _GIB,
+        pool=item.get("pool"),
+    )
+
+
 def inventory(resources: list[dict[str, Any]]) -> Inventory:
-    """From GET /cluster/resources. Templates are images (Phase 2), not instances."""
+    """From GET /cluster/resources. Templates are listed apart: they become images."""
     inv = Inventory()
     for item in resources:
         kind = item.get("type")
         if kind == "node":
             inv.nodes.append(node(item))
+        elif kind == "qemu" and _int(item.get("template")):
+            inv.templates.append(template(item))
         elif kind in _KIND and not _int(item.get("template")):
             inv.instances.append(instance(item))
         elif kind == "storage":
             inv.storage.append(storage(item))
     return inv
+
+
+_SIZE_UNITS = {"K": 1 / 1024**2, "M": 1 / 1024, "G": 1, "T": 1024}
+
+
+def disk_size_gb(spec: str) -> int:
+    """'storage-vz:9998/disk.qcow2,size=32G' -> 32"""
+    for part in spec.split(","):
+        if part.startswith("size="):
+            value = part[5:]
+            unit = value[-1].upper()
+            if unit in _SIZE_UNITS:
+                return int(float(value[:-1]) * _SIZE_UNITS[unit])
+            return int(value) // _GIB
+    return 0
+
+
+def boot_disk(config: dict[str, Any]) -> str | None:
+    """First disk of 'boot: order=scsi0;ide2;net0' that is not a CD-ROM."""
+    order = str(config.get("boot", ""))
+    candidates = order.removeprefix("order=").split(";") if "order=" in order else []
+    disk_keys = ("scsi", "virt", "sata")
+    candidates += [k for k in sorted(config) if k[:4] in disk_keys and k[-1:].isdigit()]
+    for key in candidates:
+        value = str(config.get(key, ""))
+        if value and "media=cdrom" not in value and "cloudinit" not in value:
+            return key
+    return None
+
+
+def template_details(ref: ProviderRef, config: dict[str, Any]) -> TemplateDetails:
+    disk = boot_disk(config)
+    agent = str(config.get("agent", "0"))
+    return TemplateDetails(
+        ref=ProviderRef({**ref.data, "disk": disk}),
+        name=str(config.get("name", "")),
+        disk_gb=disk_size_gb(str(config.get(disk, ""))) if disk else 0,
+        has_cloudinit=any("cloudinit" in str(v) for v in config.values()),
+        has_guest_agent=agent.startswith("1") or "enabled=1" in agent,
+    )
+
+
+def ipconfig(ip: StaticIPv4) -> str:
+    return f"ip={ip.address},gw={ip.gateway}"

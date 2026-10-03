@@ -69,7 +69,11 @@ class AdminService:
         cluster = ProviderCluster(
             id=uuid7(), name=body.name, provider="proxmox", api_url=body.api_url,
             ca_pem=body.ca_pem, insecure_skip_verify=body.insecure_skip_verify,
-            settings={"vmid_range": body.vmid_range.model_dump()}, status="unknown",
+            settings={
+                "vmid_range": body.vmid_range.model_dump(),
+                **({"pool": body.pool} if body.pool else {}),
+            },
+            status="unknown",
         )
         try:
             async with self.db.begin_nested():
@@ -85,8 +89,9 @@ class AdminService:
     async def update_cluster(self, cluster_id: uuid.UUID, body: ClusterUpdate) -> ProviderCluster:
         cluster = await self.get_cluster(cluster_id)
         changes = body.model_dump(exclude_unset=True)
-        if "vmid_range" in changes:
-            cluster.settings = {**cluster.settings, "vmid_range": changes.pop("vmid_range")}
+        for key in ("vmid_range", "pool"):  # these live in settings
+            if key in changes:
+                cluster.settings = {**cluster.settings, key: changes.pop(key)}
         for field, value in changes.items():
             setattr(cluster, field, value)
         self._check_tls(cluster.insecure_skip_verify, cluster.api_url)

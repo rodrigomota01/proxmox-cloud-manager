@@ -12,7 +12,7 @@ from sqlalchemy import (
     Text,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, Timestamps, UUIDPk
@@ -29,6 +29,11 @@ class Instance(UUIDPk, Timestamps, Base):
             unique=True, postgresql_where=text("deleted_at IS NULL"),
         ),
         Index("ix_instances_tenant_project", "tenant_id", "project_id"),
+        # IPs are typed by users: never hand the same one to two live instances
+        Index(
+            "uq_instances_cluster_ipv4_live", "cluster_id", "ipv4", unique=True,
+            postgresql_where=text("deleted_at IS NULL AND ipv4 IS NOT NULL"),
+        ),
         CheckConstraint(
             "NOT managed OR (tenant_id IS NOT NULL AND project_id IS NOT NULL)",
             name="managed_has_owner",
@@ -54,6 +59,11 @@ class Instance(UUIDPk, Timestamps, Base):
     vcpus: Mapped[int] = mapped_column(Integer)
     memory_mb: Mapped[int] = mapped_column(Integer)
     root_disk_gb: Mapped[int] = mapped_column(Integer)
+    image_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("images.id", ondelete="SET NULL")
+    )
+    ipv4: Mapped[str | None] = mapped_column(INET)  # address without prefix
+    network: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     provider_ref: Mapped[dict[str, Any]] = mapped_column(JSONB)
     provider_name: Mapped[str] = mapped_column(Text)  # name as seen in the provider
     tags: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")

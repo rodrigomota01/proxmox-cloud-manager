@@ -16,6 +16,8 @@ type Me = Schemas["MeResponse"];
 
 type SessionValue = {
   me: Me;
+  /** memberships, plus every tenant for platform admins */
+  tenants: Me["tenants"];
   tenantId: string | null;
   tenant: Me["tenants"][number] | null;
   selectTenant: (id: string) => void;
@@ -73,15 +75,33 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     staleTime: 60_000,
   });
 
-  // pick the stored tenant if still a member, else the first one
+  const isPlatformAdmin = !!me.data?.platform_roles.some((r) =>
+    ["SUPER_ADMIN", "PLATFORM_ADMIN"].includes(r),
+  );
+  // platform admins may act in any tenant (the API audits it as PLATFORM_SCOPE_ACCESS)
+  const allTenants = useQuery({
+    queryKey: ["admin", "tenants"],
+    queryFn: async () => unwrap(await api.GET("/api/v1/admin/tenants")),
+    enabled: isPlatformAdmin,
+    staleTime: 60_000,
+  });
+  const tenants = useMemo(() => {
+    const byId = new Map((me.data?.tenants ?? []).map((t) => [t.id, t]));
+    for (const t of allTenants.data ?? []) {
+      if (!byId.has(t.id)) byId.set(t.id, { id: t.id, slug: t.slug, name: t.name, status: t.status });
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [me.data, allTenants.data]);
+
+  // pick the stored tenant if still reachable, else the first one
   useEffect(() => {
     if (!me.data) return;
-    const ids = me.data.tenants.map((t) => t.id);
+    const ids = tenants.map((t) => t.id);
     const preferred = storedTenant();
     const next = preferred && ids.includes(preferred) ? preferred : (ids[0] ?? null);
     setActiveTenant(next);
     setTenantId(next);
-  }, [me.data]);
+  }, [me.data, tenants]);
 
   const selectTenant = useCallback(
     (id: string) => {
@@ -100,17 +120,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<SessionValue | null>(() => {
     if (!me.data) return null;
-    const tenant = me.data.tenants.find((t) => t.id === tenantId) ?? null;
-    return {
-      me: me.data,
-      tenantId,
-      tenant,
-      selectTenant,
-      isPlatformAdmin: me.data.platform_roles.some((r) =>
-        ["SUPER_ADMIN", "PLATFORM_ADMIN"].includes(r),
-      ),
-    };
-  }, [me.data, tenantId, selectTenant]);
+    const tenant = tenants.find((t) => t.id === tenantId) ?? null;
+    return { me: me.data, tenants, tenantId, tenant, selectTenant, isPlatformAdmin };
+  }, [me.data, tenants, tenantId, selectTenant, isPlatformAdmin]);
 
   if (!value) {
     return (

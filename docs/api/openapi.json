@@ -13,6 +13,85 @@
         "title": "Accepted",
         "type": "object"
       },
+      "AdminImageOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "cluster_id": {
+            "format": "uuid",
+            "title": "Cluster Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "default_user": {
+            "title": "Default User",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "min_disk_gb": {
+            "title": "Min Disk Gb",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "os_family": {
+            "title": "Os Family",
+            "type": "string"
+          },
+          "template_vmid": {
+            "title": "Template Vmid",
+            "type": "integer"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "visibility": {
+            "title": "Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "os_family",
+          "default_user",
+          "min_disk_gb",
+          "visibility",
+          "cluster_id",
+          "template_vmid",
+          "tenant_id",
+          "active",
+          "created_at"
+        ],
+        "title": "AdminImageOut",
+        "type": "object"
+      },
       "AdminInstanceOut": {
         "description": "Admin view: includes provider identifiers (vmid/node), never shown to tenants.",
         "properties": {
@@ -481,6 +560,18 @@
             "title": "Name",
             "type": "string"
           },
+          "pool": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9._-]{1,64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool"
+          },
           "vmid_range": {
             "$ref": "#/components/schemas/VmidRange",
             "default": {
@@ -669,6 +760,18 @@
               }
             ],
             "title": "Name"
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9._-]{1,64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool"
           },
           "vmid_range": {
             "anyOf": [
@@ -875,6 +978,309 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "IPv4Config": {
+        "additionalProperties": false,
+        "description": "Static IPv4 typed by the user (no IPAM in the MVP).",
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "dns": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Dns",
+            "type": "array"
+          },
+          "gateway": {
+            "title": "Gateway",
+            "type": "string"
+          }
+        },
+        "required": [
+          "address",
+          "gateway"
+        ],
+        "title": "IPv4Config",
+        "type": "object"
+      },
+      "ImageCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "format": "uuid",
+            "title": "Cluster Id",
+            "type": "string"
+          },
+          "default_user": {
+            "default": "debian",
+            "pattern": "^[a-z_][a-z0-9_-]{0,31}$",
+            "title": "Default User",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "os_family": {
+            "default": "linux",
+            "enum": [
+              "linux",
+              "windows"
+            ],
+            "title": "Os Family",
+            "type": "string"
+          },
+          "template_vmid": {
+            "minimum": 100.0,
+            "title": "Template Vmid",
+            "type": "integer"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "visibility": {
+            "default": "public",
+            "enum": [
+              "public",
+              "tenant"
+            ],
+            "title": "Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cluster_id",
+          "template_vmid",
+          "name"
+        ],
+        "title": "ImageCreate",
+        "type": "object"
+      },
+      "ImageOut": {
+        "description": "Tenant view: no provider identifiers.",
+        "properties": {
+          "default_user": {
+            "title": "Default User",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "min_disk_gb": {
+            "title": "Min Disk Gb",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "os_family": {
+            "title": "Os Family",
+            "type": "string"
+          },
+          "visibility": {
+            "title": "Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "os_family",
+          "default_user",
+          "min_disk_gb",
+          "visibility"
+        ],
+        "title": "ImageOut",
+        "type": "object"
+      },
+      "ImageUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          },
+          "default_user": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z_][a-z0-9_-]{0,31}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default User"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "ImageUpdate",
+        "type": "object"
+      },
+      "InstanceAccepted": {
+        "properties": {
+          "instance": {
+            "$ref": "#/components/schemas/InstanceOut"
+          },
+          "job": {
+            "$ref": "#/components/schemas/JobOut"
+          }
+        },
+        "required": [
+          "job",
+          "instance"
+        ],
+        "title": "InstanceAccepted",
+        "type": "object"
+      },
+      "InstanceCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "image_id": {
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          },
+          "ipv4": {
+            "$ref": "#/components/schemas/IPv4Config"
+          },
+          "memory_mb": {
+            "maximum": 262144.0,
+            "minimum": 512.0,
+            "multipleOf": 256.0,
+            "title": "Memory Mb",
+            "type": "integer"
+          },
+          "name": {
+            "pattern": "^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "root_disk_gb": {
+            "maximum": 2048.0,
+            "minimum": 1.0,
+            "title": "Root Disk Gb",
+            "type": "integer"
+          },
+          "ssh_key_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Ssh Key Ids",
+            "type": "array"
+          },
+          "tags": {
+            "default": [],
+            "items": {
+              "pattern": "^[a-z0-9][a-z0-9_.-]{0,31}$",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Tags",
+            "type": "array"
+          },
+          "vcpus": {
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Vcpus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "project_id",
+          "name",
+          "image_id",
+          "vcpus",
+          "memory_mb",
+          "root_disk_gb",
+          "ssh_key_ids",
+          "ipv4"
+        ],
+        "title": "InstanceCreate",
+        "type": "object"
+      },
+      "InstanceDelete": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm": {
+            "title": "Confirm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "title": "InstanceDelete",
+        "type": "object"
+      },
       "InstanceOut": {
         "description": "Tenant view. No provider identifiers (vmid/node/cluster) — ADR-0010.",
         "properties": {
@@ -883,10 +1289,44 @@
             "title": "Created At",
             "type": "string"
           },
+          "gateway": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gateway"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "image_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Id"
+          },
+          "ipv4": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ipv4"
           },
           "kind": {
             "title": "Kind",
@@ -952,6 +1392,9 @@
           "memory_mb",
           "root_disk_gb",
           "tags",
+          "image_id",
+          "ipv4",
+          "gateway",
           "created_at",
           "last_seen_at"
         ],
@@ -1272,6 +1715,63 @@
           "finished_at"
         ],
         "title": "JobOut",
+        "type": "object"
+      },
+      "KeyCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "public_key": {
+            "maxLength": 16384,
+            "title": "Public Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "public_key"
+        ],
+        "title": "KeyCreate",
+        "type": "object"
+      },
+      "KeyOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "public_key": {
+            "title": "Public Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "fingerprint",
+          "public_key",
+          "created_at"
+        ],
+        "title": "KeyOut",
         "type": "object"
       },
       "LoginRequest": {
@@ -1765,6 +2265,94 @@
         "title": "ProjectUpdate",
         "type": "object"
       },
+      "QuotaLineOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "integer"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "resource": {
+            "title": "Resource",
+            "type": "string"
+          },
+          "used": {
+            "title": "Used",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "resource",
+          "limit",
+          "used",
+          "available"
+        ],
+        "title": "QuotaLineOut",
+        "type": "object"
+      },
+      "QuotaUpdate": {
+        "additionalProperties": false,
+        "description": "Absent field: unchanged. null: back to the platform default.",
+        "properties": {
+          "instances": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instances"
+          },
+          "memory_mb": {
+            "anyOf": [
+              {
+                "maximum": 100000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Mb"
+          },
+          "storage_gb": {
+            "anyOf": [
+              {
+                "maximum": 10000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Gb"
+          },
+          "vcpus": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vcpus"
+          }
+        },
+        "title": "QuotaUpdate",
+        "type": "object"
+      },
       "ResetPasswordRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1950,6 +2538,47 @@
           "error"
         ],
         "title": "SyncRunOut",
+        "type": "object"
+      },
+      "TemplateOut": {
+        "properties": {
+          "disk_gb": {
+            "title": "Disk Gb",
+            "type": "integer"
+          },
+          "image_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "vmid": {
+            "title": "Vmid",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "vmid",
+          "name",
+          "node",
+          "disk_gb",
+          "image_id"
+        ],
+        "title": "TemplateOut",
         "type": "object"
       },
       "TenantCreate": {
@@ -2591,6 +3220,53 @@
         ]
       }
     },
+    "/api/v1/admin/clusters/{cluster_id}/templates": {
+      "get": {
+        "operationId": "list_templates_api_v1_admin_clusters__cluster_id__templates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TemplateOut"
+                  },
+                  "title": "Response List Templates Api V1 Admin Clusters  Cluster Id  Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Templates",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/clusters/{cluster_id}/test": {
       "post": {
         "operationId": "test_cluster_api_v1_admin_clusters__cluster_id__test_post",
@@ -2629,6 +3305,123 @@
           }
         },
         "summary": "Test Cluster",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/images": {
+      "get": {
+        "operationId": "admin_list_images_api_v1_admin_images_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminImageOut"
+                  },
+                  "title": "Response Admin List Images Api V1 Admin Images Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Admin List Images",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "register_image_api_v1_admin_images_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminImageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Image",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/images/{image_id}": {
+      "patch": {
+        "operationId": "update_image_api_v1_admin_images__image_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Image Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminImageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Image",
         "tags": [
           "admin"
         ]
@@ -2941,6 +3734,108 @@
         ]
       }
     },
+    "/api/v1/admin/tenants/{tenant_id}/quotas": {
+      "get": {
+        "operationId": "get_tenant_quotas_api_v1_admin_tenants__tenant_id__quotas_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QuotaLineOut"
+                  },
+                  "title": "Response Get Tenant Quotas Api V1 Admin Tenants  Tenant Id  Quotas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Tenant Quotas",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "operationId": "put_tenant_quotas_api_v1_admin_tenants__tenant_id__quotas_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QuotaLineOut"
+                  },
+                  "title": "Response Put Tenant Quotas Api V1 Admin Tenants  Tenant Id  Quotas Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Tenant Quotas",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/auth/.well-known/jwks.json": {
       "get": {
         "operationId": "jwks_api_v1_auth__well_known_jwks_json_get",
@@ -3222,6 +4117,41 @@
         ]
       }
     },
+    "/api/v1/images": {
+      "get": {
+        "operationId": "list_images_api_v1_images_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ImageOut"
+                  },
+                  "title": "Response List Images Api V1 Images Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Images",
+        "tags": [
+          "images"
+        ]
+      }
+    },
     "/api/v1/instances": {
       "get": {
         "operationId": "list_instances_api_v1_instances_get",
@@ -3341,9 +4271,135 @@
         "tags": [
           "instances"
         ]
+      },
+      "post": {
+        "operationId": "create_instance_api_v1_instances_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstanceAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Instance",
+        "tags": [
+          "instances"
+        ]
       }
     },
     "/api/v1/instances/{instance_id}": {
+      "delete": {
+        "operationId": "delete_instance_api_v1_instances__instance_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instance_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Instance Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstanceDelete"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Instance",
+        "tags": [
+          "instances"
+        ]
+      },
       "get": {
         "operationId": "get_instance_api_v1_instances__instance_id__get",
         "parameters": [
@@ -3912,6 +4968,41 @@
         ]
       }
     },
+    "/api/v1/quotas": {
+      "get": {
+        "operationId": "tenant_quotas_api_v1_quotas_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QuotaLineOut"
+                  },
+                  "title": "Response Tenant Quotas Api V1 Quotas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tenant Quotas",
+        "tags": [
+          "quotas"
+        ]
+      }
+    },
     "/api/v1/role-bindings": {
       "get": {
         "operationId": "list_bindings_api_v1_role_bindings_get",
@@ -4080,6 +5171,106 @@
         "summary": "List Roles",
         "tags": [
           "iam"
+        ]
+      }
+    },
+    "/api/v1/ssh-keys": {
+      "get": {
+        "operationId": "list_keys_api_v1_ssh_keys_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/KeyOut"
+                  },
+                  "title": "Response List Keys Api V1 Ssh Keys Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Keys",
+        "tags": [
+          "ssh-keys"
+        ]
+      },
+      "post": {
+        "operationId": "add_key_api_v1_ssh_keys_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KeyCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Key",
+        "tags": [
+          "ssh-keys"
+        ]
+      }
+    },
+    "/api/v1/ssh-keys/{key_id}": {
+      "delete": {
+        "operationId": "delete_key_api_v1_ssh_keys__key_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Key Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Key",
+        "tags": [
+          "ssh-keys"
         ]
       }
     },

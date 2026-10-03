@@ -6,7 +6,8 @@ import { useParams } from "next/navigation";
 
 import { NoTenant } from "@/components/no-tenant";
 import { PowerActions } from "@/components/power-actions";
-import { Badge, Card, Empty, ErrorBox, JobBadge, PowerBadge, formatDate } from "@/components/ui";
+import { DeleteInstance } from "@/components/delete-instance";
+import { Badge, Card, Empty, ErrorBox, JobBadge, PowerBadge, StateBadge, formatDate } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
 import { useProjectNames } from "@/lib/queries";
 import { useSession } from "@/lib/session";
@@ -17,6 +18,11 @@ const ACTION_LABEL: Record<string, string> = {
   shutdown: "Desligar",
   reboot: "Reiniciar",
 };
+const JOB_LABEL: Record<string, string> = {
+  "instance.create": "Criação",
+  "instance.delete": "Exclusão",
+};
+const BUSY = ["provisioning", "deleting"];
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -37,7 +43,8 @@ export default function InstanceDetailPage() {
     queryFn: async () =>
       unwrap(await api.GET("/api/v1/instances/{instance_id}", { params: { path: { instance_id: id } } })),
     enabled: tenantId !== null,
-    refetchInterval: 15_000,
+    // poll faster while a job is creating/deleting it
+    refetchInterval: (q) => (q.state.data && BUSY.includes(q.state.data.state) ? 2_000 : 15_000),
   });
   const jobs = useQuery({
     queryKey: ["jobs", tenantId, id],
@@ -70,10 +77,12 @@ export default function InstanceDetailPage() {
         <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold">{i.name}</h1>
-            <PowerBadge state={i.power_state} />
-            {i.state !== "active" && <Badge tone="amber">{i.state}</Badge>}
+            {i.state === "active" ? <PowerBadge state={i.power_state} /> : <StateBadge state={i.state} />}
           </div>
-          <PowerActions instance={i} />
+          <div className="flex flex-wrap items-center gap-2">
+            <PowerActions instance={i} />
+            <DeleteInstance instance={i} />
+          </div>
         </div>
       </div>
 
@@ -85,6 +94,15 @@ export default function InstanceDetailPage() {
             <Row label="vCPUs">{i.vcpus}</Row>
             <Row label="Memória">{(i.memory_mb / 1024).toFixed(1)} GiB</Row>
             <Row label="Disco raiz">{i.root_disk_gb} GiB</Row>
+            <Row label="IP">
+              {i.ipv4 ? (
+                <span className="font-mono">
+                  {i.ipv4} <span className="text-slate-500">via {i.gateway}</span>
+                </span>
+              ) : (
+                "—"
+              )}
+            </Row>
             <Row label="Tags">
               {i.tags.length ? (
                 <span className="flex flex-wrap gap-1">
@@ -105,11 +123,12 @@ export default function InstanceDetailPage() {
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {jobs.data?.map((job) => {
               const action = String(job.payload.action ?? "");
+              const label = JOB_LABEL[job.type] ?? ACTION_LABEL[action] ?? "Energia";
               return (
                 <li key={job.id} className="flex items-start justify-between gap-4 py-2 text-sm">
                   <div>
                     <div className="font-medium">
-                      {ACTION_LABEL[action] ?? "Energia"}
+                      {label}
                     </div>
                     <div className="text-xs text-slate-500">{formatDate(job.created_at)}</div>
                     {job.error_message && (

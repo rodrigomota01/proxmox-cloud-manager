@@ -137,7 +137,7 @@ GET  /nodes/{node}/tasks/{upid}/log?start=N    → linhas de log (progresso de c
 | Listar inventário | `GET /cluster/resources` (VM+LXC+node+storage em **uma** chamada) |
 | Start/Stop/Shutdown/Reboot | `POST …/status/{start\|stop\|shutdown\|reboot}` |
 | Suspend/Resume | `POST …/status/{suspend\|resume}` |
-| Criar de imagem | `POST …/{template}/clone` (`newid`, `name`, `pool`, `full`, `storage`, `target`) → `PUT …/{vmid}/config` (`cores`, `memory`, `ciuser`, `sshkeys`, `ipconfig0`, `nameserver`, `tags`, `description`) → `PUT …/{vmid}/resize` → `status/start` |
+| Criar de imagem | `GET /cluster/nextid?vmid=N` (id livre no cluster todo) → `POST …/{template}/clone` (`newid`, `name`, `pool`, `full=1`) → `PUT …/{vmid}/config` (`cores`, `memory`, `ciuser`, `sshkeys`, `ipconfig0`, `nameserver`, `tags`, `description`, `delete=cipassword`) → `PUT …/{vmid}/resize` (só cresce) → `status/start` |
 | Resize CPU/RAM | `PUT …/config` (hotplug se habilitado; senão marca `pending_reboot`) |
 | Resize disco | `PUT …/resize` (`size=+NG`) — **só cresce**; a UI não oferece redução |
 | Snapshot / Rollback | `POST …/snapshot` · `POST …/snapshot/{name}/rollback` |
@@ -147,6 +147,25 @@ GET  /nodes/{node}/tasks/{upid}/log?start=N    → linhas de log (progresso de c
 | Console VGA | `POST …/vncproxy` (`websocket=1`) → `GET …/vncwebsocket` |
 | Terminal (LXC / serial) | `POST …/termproxy` → `GET …/vncwebsocket` |
 | Excluir | `DELETE /nodes/{n}/qemu/{vmid}?purge=1&destroy-unreferenced-disks=1` |
+
+## Provisionamento (Fase 2a)
+
+- **Nada de acesso é herdado do template.** O clone recebe explicitamente as chaves
+  escolhidas pelo usuário, o usuário da imagem e o IP informado; o `cipassword` do
+  template é apagado. (O template do lab trazia chaves da equipe de operação e um IP
+  público fixo — herdá-los daria acesso indevido e conflito de IP.)
+- **Pool de destino por cluster** (`settings.pool`): a VM nasce no pool onde o token tem
+  ACL; fora dele o token perderia acesso à própria VM logo após o clone.
+- **VMID**: menor id livre da faixa reservada do cluster que não esteja em uso por
+  instância conhecida *e* que o PVE confirme livre (`/cluster/nextid?vmid=`), sob advisory
+  lock por cluster; gravado antes do clone.
+- **Job `instance.create` retomável** por etapa (id → clone → config → disco → start); as
+  tasks do PVE ficam em `job_events`. Falha definitiva → compensação: destrói o guest
+  criado, a instância sai do uso (quota e IP liberados) e o job registra o que foi feito.
+- **Salvaguarda de exclusão**: antes de apagar por VMID (exclusão ou compensação) o nome
+  do guest no PVE precisa bater com o da instância; se não bater, nada é apagado.
+- **IP**: informado pelo usuário (decisão do MVP); a plataforma impede o mesmo IP em duas
+  instâncias vivas do mesmo cluster (índice único), mas não detecta uso fora dela.
 
 ## Sincronização e fonte de verdade
 

@@ -52,6 +52,21 @@ class JobContext:
         await set_platform_scope(db)
         return db
 
+    @staticmethod
+    async def checkpoint(db: AsyncSession) -> None:
+        """Commit progress (e.g. an allocated id) and keep working in a new transaction
+        with the platform scope re-applied (SET LOCAL does not survive a commit)."""
+        await db.commit()
+        await db.begin()
+        await set_platform_scope(db)
+
+    async def provider_task(self, step: str) -> dict[str, Any] | None:
+        """The provider operation recorded for `step` by a previous attempt, if any."""
+        for event in reversed(await self.events("provider_task")):
+            if event.data.get("step") == step:
+                return event.data["operation"]
+        return None
+
     async def event(self, kind: str, message: str = "", **data: Any) -> None:
         db = await self.session()
         try:
@@ -77,12 +92,23 @@ class JobContext:
 
 
 Handler = Callable[[JobContext], Awaitable[dict[str, Any]]]
+# Runs once when a job fails for good (not between retries): undo partial work.
+FailureHook = Callable[[JobContext, str, str], Awaitable[None]]
 HANDLERS: dict[str, Handler] = {}
+FAILURE_HOOKS: dict[str, FailureHook] = {}
 
 
 def handler(job_type: str) -> Callable[[Handler], Handler]:
     def register(fn: Handler) -> Handler:
         HANDLERS[job_type] = fn
+        return fn
+
+    return register
+
+
+def on_failure(job_type: str) -> Callable[[FailureHook], FailureHook]:
+    def register(fn: FailureHook) -> FailureHook:
+        FAILURE_HOOKS[job_type] = fn
         return fn
 
     return register
@@ -209,6 +235,13 @@ async def run_one(
 async def _fail(
     ctx: JobContext, sessionmaker: async_sessionmaker[AsyncSession], code: str, message: str
 ) -> None:
+    hook = FAILURE_HOOKS.get(ctx.job.type)
+    if hook is not None:
+        try:
+            await hook(ctx, code, message)
+        except Exception as exc:  # the job still fails; leave a trace for operators
+            logger.exception("job failure hook crashed", extra={"job_id": str(ctx.job.id)})
+            await ctx.event("compensation_failed", type(exc).__name__)
     await ctx.event("failed", message, code=code)
     await _finish(
         sessionmaker, ctx.job.id, status="failed", error_code=code,

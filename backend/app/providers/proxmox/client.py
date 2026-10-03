@@ -101,6 +101,12 @@ class ProxmoxClient:
     async def post(self, path: str, data: dict[str, Any] | None = None) -> Any:
         return await self._request("POST", path, data=data, retry=False)
 
+    async def put(self, path: str, data: dict[str, Any] | None = None) -> Any:
+        return await self._request("PUT", path, data=data, retry=False)
+
+    async def delete(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        return await self._request("DELETE", path, params=params, retry=False)
+
     async def _request(
         self, method: str, path: str, *, retry: bool, params: Any = None, data: Any = None
     ) -> Any:

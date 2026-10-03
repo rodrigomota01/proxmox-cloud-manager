@@ -22,7 +22,7 @@
 | Network | `networks` | Rede do tenant (MVP: mapeia para bridge/VLAN; Fase 2: SDN VNet). |
 | IpAllocation | `ip_allocations` | IPAM simples da plataforma. |
 | Quota | `quotas` | Limites por tenant (e opcionalmente por projeto). |
-| QuotaReservation | `quota_reservations` | Reserva transacional durante criação. |
+| QuotaReservation | — | Na implementação (Fase 2a) a própria linha da instância em `provisioning` é a reserva: criada na mesma transação, sob advisory lock por tenant; falha definitiva a retira do uso. Tabela separada só se surgirem recursos reservados sem instância. |
 | PriceTable / PriceItem | `price_tables`, `price_items` | Tabela de preço versionada; tenant pode ter tabela própria. |
 | UsageRecord | `usage_records` | Amostras horárias de alocação para custo (Fase 4). |
 | Job | `jobs`, `job_events` | Operações assíncronas e seu histórico. |

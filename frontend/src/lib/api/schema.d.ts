@@ -129,6 +129,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/clusters/{cluster_id}/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Templates */
+        get: operations["list_templates_api_v1_admin_clusters__cluster_id__templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/clusters/{cluster_id}/test": {
         parameters: {
             query?: never;
@@ -144,6 +161,41 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin List Images */
+        get: operations["admin_list_images_api_v1_admin_images_get"];
+        put?: never;
+        /** Register Image */
+        post: operations["register_image_api_v1_admin_images_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/images/{image_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Image */
+        patch: operations["update_image_api_v1_admin_images__image_id__patch"];
         trace?: never;
     };
     "/api/v1/admin/instances": {
@@ -261,6 +313,24 @@ export interface paths {
          */
         get: operations["list_all_tenants_api_v1_admin_tenants_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/tenants/{tenant_id}/quotas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Tenant Quotas */
+        get: operations["get_tenant_quotas_api_v1_admin_tenants__tenant_id__quotas_get"];
+        /** Put Tenant Quotas */
+        put: operations["put_tenant_quotas_api_v1_admin_tenants__tenant_id__quotas_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -404,6 +474,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Images */
+        get: operations["list_images_api_v1_images_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/instances": {
         parameters: {
             query?: never;
@@ -414,7 +501,8 @@ export interface paths {
         /** List Instances */
         get: operations["list_instances_api_v1_instances_get"];
         put?: never;
-        post?: never;
+        /** Create Instance */
+        post: operations["create_instance_api_v1_instances_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -432,7 +520,8 @@ export interface paths {
         get: operations["get_instance_api_v1_instances__instance_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete Instance */
+        delete: operations["delete_instance_api_v1_instances__instance_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -563,6 +652,23 @@ export interface paths {
         patch: operations["update_project_api_v1_projects__project_id__patch"];
         trace?: never;
     };
+    "/api/v1/quotas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tenant Quotas */
+        get: operations["tenant_quotas_api_v1_quotas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/role-bindings": {
         parameters: {
             query?: never;
@@ -610,6 +716,41 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ssh-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Keys */
+        get: operations["list_keys_api_v1_ssh_keys_get"];
+        put?: never;
+        /** Add Key */
+        post: operations["add_key_api_v1_ssh_keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ssh-keys/{key_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Key */
+        delete: operations["delete_key_api_v1_ssh_keys__key_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -694,6 +835,42 @@ export interface components {
         /** Accepted */
         Accepted: {
             job: components["schemas"]["JobOut"];
+        };
+        /** AdminImageOut */
+        AdminImageOut: {
+            /** Active */
+            active: boolean;
+            /**
+             * Cluster Id
+             * Format: uuid
+             */
+            cluster_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Default User */
+            default_user: string;
+            /** Description */
+            description: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Min Disk Gb */
+            min_disk_gb: number;
+            /** Name */
+            name: string;
+            /** Os Family */
+            os_family: string;
+            /** Template Vmid */
+            template_vmid: number;
+            /** Tenant Id */
+            tenant_id: string | null;
+            /** Visibility */
+            visibility: string;
         };
         /**
          * AdminInstanceOut
@@ -871,6 +1048,8 @@ export interface components {
             insecure_skip_verify?: boolean;
             /** Name */
             name: string;
+            /** Pool */
+            pool?: string | null;
             /**
              * @default {
              *       "end": 19999,
@@ -930,6 +1109,8 @@ export interface components {
             insecure_skip_verify?: boolean | null;
             /** Name */
             name?: string | null;
+            /** Pool */
+            pool?: string | null;
             vmid_range?: components["schemas"]["VmidRange"] | null;
         };
         /** Confirm */
@@ -998,6 +1179,130 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /**
+         * IPv4Config
+         * @description Static IPv4 typed by the user (no IPAM in the MVP).
+         */
+        IPv4Config: {
+            /** Address */
+            address: string;
+            /**
+             * Dns
+             * @default []
+             */
+            dns?: string[];
+            /** Gateway */
+            gateway: string;
+        };
+        /** ImageCreate */
+        ImageCreate: {
+            /**
+             * Cluster Id
+             * Format: uuid
+             */
+            cluster_id: string;
+            /**
+             * Default User
+             * @default debian
+             */
+            default_user?: string;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Name */
+            name: string;
+            /**
+             * Os Family
+             * @default linux
+             * @enum {string}
+             */
+            os_family?: "linux" | "windows";
+            /** Template Vmid */
+            template_vmid: number;
+            /** Tenant Id */
+            tenant_id?: string | null;
+            /**
+             * Visibility
+             * @default public
+             * @enum {string}
+             */
+            visibility?: "public" | "tenant";
+        };
+        /**
+         * ImageOut
+         * @description Tenant view: no provider identifiers.
+         */
+        ImageOut: {
+            /** Default User */
+            default_user: string;
+            /** Description */
+            description: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Min Disk Gb */
+            min_disk_gb: number;
+            /** Name */
+            name: string;
+            /** Os Family */
+            os_family: string;
+            /** Visibility */
+            visibility: string;
+        };
+        /** ImageUpdate */
+        ImageUpdate: {
+            /** Active */
+            active?: boolean | null;
+            /** Default User */
+            default_user?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name?: string | null;
+        };
+        /** InstanceAccepted */
+        InstanceAccepted: {
+            instance: components["schemas"]["InstanceOut"];
+            job: components["schemas"]["JobOut"];
+        };
+        /** InstanceCreate */
+        InstanceCreate: {
+            /**
+             * Image Id
+             * Format: uuid
+             */
+            image_id: string;
+            ipv4: components["schemas"]["IPv4Config"];
+            /** Memory Mb */
+            memory_mb: number;
+            /** Name */
+            name: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Root Disk Gb */
+            root_disk_gb: number;
+            /** Ssh Key Ids */
+            ssh_key_ids: string[];
+            /**
+             * Tags
+             * @default []
+             */
+            tags?: string[];
+            /** Vcpus */
+            vcpus: number;
+        };
+        /** InstanceDelete */
+        InstanceDelete: {
+            /** Confirm */
+            confirm: string;
+        };
+        /**
          * InstanceOut
          * @description Tenant view. No provider identifiers (vmid/node/cluster) — ADR-0010.
          */
@@ -1007,11 +1312,17 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Gateway */
+            gateway: string | null;
             /**
              * Id
              * Format: uuid
              */
             id: string;
+            /** Image Id */
+            image_id: string | null;
+            /** Ipv4 */
+            ipv4: string | null;
             /** Kind */
             kind: string;
             /** Last Seen At */
@@ -1131,6 +1442,32 @@ export interface components {
             status: string;
             /** Type */
             type: string;
+        };
+        /** KeyCreate */
+        KeyCreate: {
+            /** Name */
+            name: string;
+            /** Public Key */
+            public_key: string;
+        };
+        /** KeyOut */
+        KeyOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Fingerprint */
+            fingerprint: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Public Key */
+            public_key: string;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -1313,6 +1650,31 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /** QuotaLineOut */
+        QuotaLineOut: {
+            /** Available */
+            available: number;
+            /** Limit */
+            limit: number;
+            /** Resource */
+            resource: string;
+            /** Used */
+            used: number;
+        };
+        /**
+         * QuotaUpdate
+         * @description Absent field: unchanged. null: back to the platform default.
+         */
+        QuotaUpdate: {
+            /** Instances */
+            instances?: number | null;
+            /** Memory Mb */
+            memory_mb?: number | null;
+            /** Storage Gb */
+            storage_gb?: number | null;
+            /** Vcpus */
+            vcpus?: number | null;
+        };
         /** ResetPasswordRequest */
         ResetPasswordRequest: {
             /** New Password */
@@ -1389,6 +1751,19 @@ export interface components {
             status: string;
             /** Trigger */
             trigger: string;
+        };
+        /** TemplateOut */
+        TemplateOut: {
+            /** Disk Gb */
+            disk_gb: number;
+            /** Image Id */
+            image_id: string | null;
+            /** Name */
+            name: string;
+            /** Node */
+            node: string;
+            /** Vmid */
+            vmid: number;
         };
         /** TenantCreate */
         TenantCreate: {
@@ -1792,6 +2167,37 @@ export interface operations {
             };
         };
     };
+    list_templates_api_v1_admin_clusters__cluster_id__templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     test_cluster_api_v1_admin_clusters__cluster_id__test_post: {
         parameters: {
             query?: never;
@@ -1810,6 +2216,94 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConnectionTest"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_list_images_api_v1_admin_images_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminImageOut"][];
+                };
+            };
+        };
+    };
+    register_image_api_v1_admin_images_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminImageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_image_api_v1_admin_images__image_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminImageOut"];
                 };
             };
             /** @description Validation Error */
@@ -2009,6 +2503,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenantOut"][];
+                };
+            };
+        };
+    };
+    get_tenant_quotas_api_v1_admin_tenants__tenant_id__quotas_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaLineOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_tenant_quotas_api_v1_admin_tenants__tenant_id__quotas_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuotaUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaLineOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2241,6 +2801,35 @@ export interface operations {
             };
         };
     };
+    list_images_api_v1_images_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_instances_api_v1_instances_get: {
         parameters: {
             query?: {
@@ -2276,6 +2865,41 @@ export interface operations {
             };
         };
     };
+    create_instance_api_v1_instances_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstanceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstanceAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_instance_api_v1_instances__instance_id__get: {
         parameters: {
             query?: never;
@@ -2294,6 +2918,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InstanceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_instance_api_v1_instances__instance_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstanceDelete"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Accepted"];
                 };
             };
             /** @description Validation Error */
@@ -2622,6 +3283,35 @@ export interface operations {
             };
         };
     };
+    tenant_quotas_api_v1_quotas_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuotaLineOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_bindings_api_v1_role_bindings_get: {
         parameters: {
             query?: {
@@ -2732,6 +3422,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RoleOut"][];
+                };
+            };
+        };
+    };
+    list_keys_api_v1_ssh_keys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyOut"][];
+                };
+            };
+        };
+    };
+    add_key_api_v1_ssh_keys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_key_api_v1_ssh_keys__key_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

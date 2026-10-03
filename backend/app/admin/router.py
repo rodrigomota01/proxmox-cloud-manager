@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from app.admin.schemas import (
@@ -30,9 +30,10 @@ from app.api.deps import (
     Principal,
     require_platform,
 )
+from app.audit import service as audit
 from app.compute.models import Instance
 from app.compute.router import job_out
-from app.compute.schemas import Accepted, JobOut
+from app.compute.schemas import Accepted, JobOut, QuotaLineOut
 from app.core.errors import NotFound
 from app.inventory.models import (
     Node,
@@ -43,7 +44,8 @@ from app.inventory.models import (
 )
 from app.jobs.models import Job, JobEvent
 from app.providers.registry import ProviderRegistry
-from app.tenancy.models import Tenant
+from app.tenancy import quota
+from app.tenancy.models import Tenant, TenantQuota
 from app.tenancy.router import tenant_out
 from app.tenancy.schemas import TenantOut
 
@@ -53,6 +55,7 @@ ClusterManager = Annotated[Principal, require_platform("cluster:manage")]
 ClusterSyncer = Annotated[Principal, require_platform("cluster:sync")]
 NodeViewer = Annotated[Principal, require_platform("node:view")]
 TenantAdmin = Annotated[Principal, require_platform("tenant:create")]
+QuotaAdmin = Annotated[Principal, require_platform("quota:manage")]
 
 
 def get_registry(request: Request) -> ProviderRegistry:
@@ -229,6 +232,61 @@ async def list_all_tenants(_: TenantAdmin, db: DbSession) -> list[TenantOut]:
     """Every tenant (platform scope); /tenants lists only the caller's memberships."""
     tenants = (await db.execute(select(Tenant).order_by(Tenant.slug))).scalars()
     return [tenant_out(t) for t in tenants]
+
+
+class QuotaUpdate(BaseModel):
+    """Absent field: unchanged. null: back to the platform default."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    instances: Annotated[int | None, Field(ge=0, le=10_000)] = None
+    vcpus: Annotated[int | None, Field(ge=0, le=100_000)] = None
+    memory_mb: Annotated[int | None, Field(ge=0, le=100_000_000)] = None
+    storage_gb: Annotated[int | None, Field(ge=0, le=10_000_000)] = None
+
+
+@router.get("/tenants/{tenant_id}/quotas")
+async def get_tenant_quotas(
+    tenant_id: uuid.UUID, _: QuotaAdmin, db: DbSession, settings: AppSettings
+) -> list[QuotaLineOut]:
+    if await db.get(Tenant, tenant_id) is None:
+        raise NotFound()
+    return [
+        QuotaLineOut(resource=q.resource, limit=q.limit, used=q.used, available=q.available)
+        for q in await quota.report(db, tenant_id, settings)
+    ]
+
+
+@router.put("/tenants/{tenant_id}/quotas")
+async def put_tenant_quotas(
+    tenant_id: uuid.UUID, body: QuotaUpdate, principal: QuotaAdmin, db: DbSession,
+    settings: AppSettings,
+) -> list[QuotaLineOut]:
+    if await db.get(Tenant, tenant_id) is None:
+        raise NotFound()
+    changes = body.model_dump(exclude_unset=True)
+    for resource, value in changes.items():
+        row = await db.scalar(
+            select(TenantQuota).where(
+                TenantQuota.tenant_id == tenant_id, TenantQuota.resource == resource
+            )
+        )
+        if value is None:
+            if row is not None:
+                await db.delete(row)
+        elif row is None:
+            db.add(TenantQuota(tenant_id=tenant_id, resource=resource, limit_value=value))
+        else:
+            row.limit_value = value
+    await db.flush()
+    await audit.record(
+        db, "QUOTA_UPDATE", actor_user_id=principal.user_id, tenant_id=tenant_id,
+        resource_type="tenant", resource_id=tenant_id, details=changes,
+    )
+    return [
+        QuotaLineOut(resource=q.resource, limit=q.limit, used=q.used, available=q.available)
+        for q in await quota.report(db, tenant_id, settings)
+    ]
 
 
 # --- jobs ------------------------------------------------------------------------------

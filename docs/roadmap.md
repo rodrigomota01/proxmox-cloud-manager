@@ -57,7 +57,9 @@ isolamento de ações, servidor lento/fora do ar, operação longa).
 
 ## Fase 2 — Provisionamento
 
-**2a (MVP):** imagens (registro de templates existentes no PVE, visibilidade
+**2a (MVP)** — implementada; falta validar contra o lab real (`deploy/proxmox`, ACLs da
+Fase 2). Rede: IP estático informado pelo usuário (decisão do MVP; IPAM fica para 2b).
+Imagens (registro de templates existentes no PVE, visibilidade
 pública/tenant), criação por template com cloud-init (usuário, chave SSH, IP
 DHCP/estático), quota mínima com reserva transacional, exclusão com confirmação,
 chaves SSH públicas do usuário.

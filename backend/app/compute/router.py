@@ -5,19 +5,24 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, Response, status
 
-from app.api.deps import CurrentTenant, DbSession
+from app.api.deps import AppSettings, CurrentTenant, DbSession
 from app.compute.models import Instance
 from app.compute.schemas import (
     Accepted,
     DashboardSummary,
+    InstanceAccepted,
+    InstanceCreate,
+    InstanceDelete,
     InstanceOut,
     JobDetail,
     JobEventOut,
     JobOut,
+    QuotaLineOut,
 )
 from app.compute.service import ComputeService
 from app.core.pagination import PageParams, page_params
 from app.jobs.models import Job
+from app.tenancy import quota
 from app.tenancy.schemas import Page
 
 router = APIRouter()
@@ -32,8 +37,9 @@ def instance_out(i: Instance) -> InstanceOut:
     return InstanceOut(
         id=i.id, project_id=i.project_id, kind=i.kind, name=i.name, state=i.state,
         power_state=i.power_state, vcpus=i.vcpus, memory_mb=i.memory_mb,
-        root_disk_gb=i.root_disk_gb, tags=i.tags, created_at=i.created_at,
-        last_seen_at=i.last_seen_at,
+        root_disk_gb=i.root_disk_gb, tags=i.tags, image_id=i.image_id,
+        ipv4=i.network.get("address"), gateway=i.network.get("gateway"),
+        created_at=i.created_at, last_seen_at=i.last_seen_at,
     )
 
 
@@ -57,6 +63,42 @@ async def list_instances(
 @router.get("/instances/{instance_id}", tags=["instances"])
 async def get_instance(instance_id: uuid.UUID, ctx: CurrentTenant, db: DbSession) -> InstanceOut:
     return instance_out(await ComputeService(db, ctx).get(instance_id))
+
+
+@router.post("/instances", status_code=status.HTTP_202_ACCEPTED, tags=["instances"])
+async def create_instance(
+    body: InstanceCreate, response: Response, ctx: CurrentTenant, db: DbSession,
+    settings: AppSettings, idempotency_key: IdempotencyKey = None,
+) -> InstanceAccepted:
+    instance, job = await ComputeService(db, ctx, settings).create(body, idempotency_key)
+    await db.refresh(instance)
+    await db.refresh(job)
+    response.headers["Location"] = f"/api/v1/jobs/{job.id}"
+    return InstanceAccepted(instance=instance_out(instance), job=job_out(job))
+
+
+@router.delete(
+    "/instances/{instance_id}", status_code=status.HTTP_202_ACCEPTED, tags=["instances"]
+)
+async def delete_instance(
+    instance_id: uuid.UUID, body: InstanceDelete, response: Response, ctx: CurrentTenant,
+    db: DbSession, idempotency_key: IdempotencyKey = None,
+) -> Accepted:
+    job = await ComputeService(db, ctx).delete(instance_id, body.confirm, idempotency_key)
+    await db.refresh(job)
+    response.headers["Location"] = f"/api/v1/jobs/{job.id}"
+    return Accepted(job=job_out(job))
+
+
+@router.get("/quotas", tags=["quotas"])
+async def tenant_quotas(
+    ctx: CurrentTenant, db: DbSession, settings: AppSettings
+) -> list[QuotaLineOut]:
+    lines = await quota.report(db, ctx.tenant_id, settings)
+    return [
+        QuotaLineOut(resource=q.resource, limit=q.limit, used=q.used, available=q.available)
+        for q in lines
+    ]
 
 
 @router.post(

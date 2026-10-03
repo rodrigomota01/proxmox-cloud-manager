@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     # hold back operations on another)
     job_concurrency: int = 4
 
+    # Quota applied when a tenant has no explicit limit (admin sets per tenant)
+    default_quota_instances: int = 5
+    default_quota_vcpus: int = 8
+    default_quota_memory_mb: int = 16 * 1024
+    default_quota_storage_gb: int = 200
+
     smtp_host: str | None = None  # unset -> e-mails are only logged (without the token)
     smtp_port: int = 1025
     smtp_from: str = "Cloud Manager <no-reply@cloud-manager.local>"

@@ -238,7 +238,8 @@ async def test_job_resumes_recorded_provider_task(client, env, fake, owner_db):
     job_id = (await client.post(f"/api/v1/instances/{env.vm}/start", headers=h)).json()["job"]["id"]
     job = await owner_db.get(Job, job_id)
     owner_db.add(JobEvent(job_id=job.id, tenant_id=job.tenant_id, kind="provider_task",
-                          data={"operation": {"key": "10001", "action": "start"}}))
+                          data={"step": "power",
+                                "operation": {"key": "10001", "action": "start"}}))
     # simulate a crashed worker: running with an expired lease
     job.status, job.attempts = "running", 1
     job.locked_until = datetime.now(UTC) - timedelta(minutes=1)

@@ -37,6 +37,7 @@ from app.providers.base import (
 logger = logging.getLogger(__name__)
 
 MISSING_THRESHOLD = 2
+BUSY_STATES = ("provisioning", "deleting")
 
 
 @dataclass
@@ -109,6 +110,7 @@ async def reconcile(
                 )
             )
         ).scalars()
+        if "vmid" in i.provider_ref  # still being created: no guest id yet
     }
     for obs in inv.instances:
         vmid = obs.ref.data["vmid"]
@@ -125,6 +127,8 @@ async def reconcile(
         _observe(instance, obs, node.id if node else None, offline, now)
 
     for instance in live.values():  # not in this snapshot
+        if instance.state in BUSY_STATES:
+            continue  # its job is creating/deleting the guest right now
         instance.missing_count += 1
         stats.missing += 1
         if instance.missing_count >= MISSING_THRESHOLD:

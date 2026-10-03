@@ -36,9 +36,14 @@ class VmidRange(BaseModel):
     end: Annotated[int, Field(ge=100, le=999_999_999)] = 19_999
 
 
+# Proxmox pool where new instances are created (the token's ACL scope)
+Pool = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[A-Za-z0-9._-]{1,64}$")]
+
+
 class ClusterCreate(Input):
     name: Name
     api_url: Annotated[str, Field(max_length=255)]
+    pool: Pool | None = None
     ca_pem: Annotated[str | None, Field(max_length=65_536)] = None
     insecure_skip_verify: bool = False
     vmid_range: VmidRange = VmidRange()
@@ -49,6 +54,7 @@ class ClusterCreate(Input):
 
 class ClusterUpdate(Input):
     name: Name | None = None
+    pool: Pool | None = None
     api_url: Annotated[str | None, Field(max_length=255)] = None
     ca_pem: Annotated[str | None, Field(max_length=65_536)] = None
     insecure_skip_verify: bool | None = None

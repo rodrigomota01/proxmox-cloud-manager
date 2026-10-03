@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { NoTenant } from "@/components/no-tenant";
 import { PowerActions } from "@/components/power-actions";
-import { Button, Card, Empty, ErrorBox, PowerBadge, Select } from "@/components/ui";
+import { Button, Card, Empty, ErrorBox, PowerBadge, Select, StateBadge } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
 import { useProjectNames, useProjects } from "@/lib/queries";
 import { useSession } from "@/lib/session";
@@ -52,6 +52,9 @@ export default function InstancesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold">Instâncias</h1>
         <div className="flex flex-wrap gap-2">
+          <Link href="/instances/new">
+            <Button>Nova instância</Button>
+          </Link>
           <Select aria-label="Projeto" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
             <option value="">Todos os projetos</option>
             {projects.data?.map((p) => (
@@ -87,6 +90,7 @@ export default function InstancesPage() {
                   <th className="py-2 pr-4 font-medium">Projeto</th>
                   <th className="py-2 pr-4 font-medium">Tipo</th>
                   <th className="py-2 pr-4 font-medium">Estado</th>
+                  <th className="py-2 pr-4 font-medium">IP</th>
                   <th className="py-2 pr-4 font-medium">vCPU / RAM / Disco</th>
                   <th className="py-2 font-medium">Ações</th>
                 </tr>
@@ -105,8 +109,9 @@ export default function InstancesPage() {
                     <td className="py-2 pr-4">{projectNames.get(i.project_id) ?? "—"}</td>
                     <td className="py-2 pr-4">{i.kind === "vm" ? "VM" : "Container"}</td>
                     <td className="py-2 pr-4">
-                      <PowerBadge state={i.power_state} />
+                      {i.state === "active" ? <PowerBadge state={i.power_state} /> : <StateBadge state={i.state} />}
                     </td>
+                    <td className="py-2 pr-4 font-mono text-xs">{i.ipv4?.split("/")[0] ?? "—"}</td>
                     <td className="py-2 pr-4 tabular-nums text-slate-600 dark:text-slate-400">
                       {i.vcpus} · {(i.memory_mb / 1024).toFixed(1)} GiB · {i.root_disk_gb} GiB
                     </td>
