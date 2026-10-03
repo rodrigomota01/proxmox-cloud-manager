@@ -1,7 +1,6 @@
 """Clusters, credentials, inventory sync, discovered instances and adoption."""
 
 import logging
-import os
 from dataclasses import replace
 
 import pytest
@@ -9,10 +8,9 @@ from sqlalchemy import func, select
 
 from app.compute.models import Instance
 from app.db.session import set_tenant_scope
-from app.infra.secrets import LocalKek
 from app.inventory.models import ProviderCluster, ProviderCredential
-from app.providers.base import PowerState
-from app.providers.fake import FakeProvider
+from app.jobs import handlers  # noqa: F401 - registers job handlers
+from app.jobs.queue import run_one
 from app.providers.registry import ProviderRegistry
 from app.worker.main import reconcile_all
 from tests.integration.factories import (
@@ -29,29 +27,6 @@ pytestmark = [pytest.mark.anyio, pytest.mark.integration]
 SECRET = "8c1b7f2e-5a4d-4e8b-9f3c-2d6a1b0e7c55"
 CLUSTER = {"name": "lab", "api_url": "https://hv08.example.test:8006"}
 CREDS = {"token_id": "cloudmgr@pve!cm", "secret": SECRET}
-
-
-@pytest.fixture
-def fake() -> FakeProvider:
-    f = FakeProvider()
-    f.add_node("tagima")
-    f.add_instance(10001, "cm-test-1", node="tagima")
-    f.add_instance(10002, "cm-test-2", node="tagima", kind="container", power=PowerState.RUNNING)
-    return f
-
-
-@pytest.fixture
-def registry(app, settings, fake) -> ProviderRegistry:
-    received: dict[str, str] = {}
-
-    def factory(cluster, token_id, secret):
-        received.update(token_id=token_id, secret=secret)
-        return fake
-
-    reg = ProviderRegistry(settings, LocalKek(os.urandom(32)), factory=factory)
-    reg.received = received  # type: ignore[attr-defined]
-    app.state.providers = reg
-    return reg
 
 
 async def _login(client, email):
@@ -86,9 +61,20 @@ async def _cluster_with_creds(client, root) -> str:
 
 
 async def _sync(client, root, cid) -> dict:
+    """POST /sync (202 + job), run the queue like the worker would, return the outcome."""
     r = await client.post(f"/api/v1/admin/clusters/{cid}/sync", headers=root)
-    assert r.status_code == 200, r.text
-    return r.json()
+    assert r.status_code == 202, r.text
+    job_id = r.json()["job"]["id"]
+    assert r.headers["location"] == f"/api/v1/admin/jobs/{job_id}"
+    app = client._transport.app
+    while await run_one(app.state.sessionmaker, app.state.providers, "test-worker"):
+        pass
+    job = (await client.get(f"/api/v1/admin/jobs/{job_id}", headers=root)).json()
+    return {
+        "status": job["status"],
+        "stats": (job["result"] or {}).get("stats", {}),
+        "error": job["error_message"],
+    }
 
 
 # --- access ----------------------------------------------------------------------------
@@ -98,7 +84,7 @@ async def _sync(client, root, cid) -> dict:
     ("method", "path"),
     [("GET", "/api/v1/admin/clusters"), ("POST", "/api/v1/admin/clusters"),
      ("GET", "/api/v1/admin/nodes"), ("GET", "/api/v1/admin/instances"),
-     ("GET", "/api/v1/admin/storage")],
+     ("GET", "/api/v1/admin/storage"), ("GET", "/api/v1/admin/tenants")],
 )
 async def test_admin_requires_platform_role(client, ctx, method, path):
     r = await client.request(method, path, json=CLUSTER, headers=ctx["alice"])
@@ -295,3 +281,8 @@ async def test_worker_reconciles_all_clusters(client, ctx, app, registry, owner_
     await reconcile_all(app.state.sessionmaker, registry)
     count = await owner_db.scalar(select(func.count()).select_from(Instance))
     assert count == 2
+
+
+async def test_admin_lists_all_tenants(client, ctx):
+    r = await client.get("/api/v1/admin/tenants", headers=ctx["root"])
+    assert [t["slug"] for t in r.json()] == ["acme", "globex"]

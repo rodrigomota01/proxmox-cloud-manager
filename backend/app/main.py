@@ -13,6 +13,7 @@ from redis.asyncio import Redis
 from app.admin import router as admin
 from app.api import health
 from app.auth import router as auth
+from app.compute import router as compute
 from app.core.config import Settings, get_settings
 from app.core.errors import install_error_handlers, problem
 from app.core.logging import configure_logging
@@ -73,6 +74,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     v1.include_router(auth.router)
     v1.include_router(tenancy.router)
     v1.include_router(iam.router)
+    v1.include_router(compute.router)
     v1.include_router(admin.router)
     app.include_router(v1)
 

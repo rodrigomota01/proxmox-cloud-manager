@@ -112,7 +112,7 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 |---|---|---|---|
 | GET | `/instances` | `vm:view` / `container:view` | 1 |
 | GET | `/instances/{id}` | `vm:view` | 1 |
-| POST | `/instances/{id}/start` · `/stop` · `/shutdown` · `/restart` | `vm:start` / `vm:stop` / `vm:restart` | 1 |
+| POST | `/instances/{id}/start` · `/stop` · `/shutdown` · `/restart` | `vm:start` / `vm:stop` / `vm:restart` (`container:*` para LXC) → 202 + job; uma operação ativa por instância (409); `Idempotency-Key` aceito | 1 |
 | POST | `/instances/{id}/suspend` · `/resume` | `vm:stop` / `vm:start` | 2 |
 | POST | `/instances` | `vm:create` / `container:create` | 2 |
 | PATCH | `/instances/{id}` | `vm:configure` (nome, tags, vCPU, RAM) | 2 |
@@ -151,7 +151,7 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 
 | Método | Rota | Permissão | Fase |
 |---|---|---|---|
-| GET | `/jobs` · `/jobs/{id}` | dono do job ou `vm:view` no escopo | 1 |
+| GET | `/jobs` · `/jobs/{id}` | dono do job ou `vm:view`/`container:view` no projeto; eventos sem dados do provider | 1 |
 | POST | `/jobs/{id}/cancel` | dono | 2 |
 | GET | `/audit-logs` | `audit:view` (tenant) | 1 (gravação) / 5 (UI) |
 | GET | `/dashboard/summary` | autenticado (escopo do tenant) | 1 |
@@ -167,14 +167,17 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | GET/PATCH/DELETE | `/admin/clusters/{id}` | `cluster:manage` |
 | PUT | `/admin/clusters/{id}/credentials` | `cluster:manage` (write-only; nunca retorna o segredo) |
 | POST | `/admin/clusters/{id}/test` | `cluster:manage` |
-| POST | `/admin/clusters/{id}/sync` | `cluster:sync` → 202 job |
+| POST | `/admin/clusters/{id}/sync` | `cluster:sync` → 202 job (`cluster.sync`) |
+| GET | `/admin/clusters/{id}/sync-runs` | `cluster:manage` |
+| GET | `/admin/tenants` | `tenant:create` (todos os tenants; `/tenants` lista só memberships) |
 | GET | `/admin/nodes` · `/admin/nodes/{id}` | `node:view` |
 | GET | `/admin/instances?managed=false` | `node:view` (descobertos) |
 | POST | `/admin/instances/{id}/adopt` | `cluster:manage` → atribui tenant/projeto |
 | GET | `/admin/storage` · `/admin/networks` | `cluster:manage` |
 | GET/PUT | `/admin/tenants/{id}/quotas` | `quota:manage` |
 | GET/POST | `/admin/price-tables` | `billing:manage` |
-| GET | `/admin/jobs` · `/admin/audit-logs` | `platform:admin` ou `audit:view` (platform) |
+| GET | `/admin/jobs` · `/admin/jobs/{id}` | `cluster:manage` (inclui dados dos eventos: UPID, node) |
+| GET | `/admin/audit-logs` | `platform:admin` ou `audit:view` (platform) |
 
 ### Operacional (sem auth, não roteado publicamente para `/metrics`)
 

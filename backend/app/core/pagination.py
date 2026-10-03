@@ -38,11 +38,18 @@ def decode_cursor(cursor: str) -> uuid.UUID:
 
 
 async def paginate[T](
-    db: AsyncSession, stmt: Select[tuple[T]], id_column: InstrumentedAttribute, params: PageParams
+    db: AsyncSession,
+    stmt: Select[tuple[T]],
+    id_column: InstrumentedAttribute,
+    params: PageParams,
+    *,
+    descending: bool = False,
 ) -> tuple[list[T], str | None]:
     if params.cursor:
-        stmt = stmt.where(id_column > decode_cursor(params.cursor))
-    rows = list((await db.execute(stmt.order_by(id_column).limit(params.limit + 1))).scalars())
+        after = decode_cursor(params.cursor)
+        stmt = stmt.where(id_column < after if descending else id_column > after)
+    order = id_column.desc() if descending else id_column
+    rows = list((await db.execute(stmt.order_by(order).limit(params.limit + 1))).scalars())
     if len(rows) <= params.limit:
         return rows, None
     rows = rows[: params.limit]

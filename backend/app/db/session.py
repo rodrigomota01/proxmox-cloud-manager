@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+import app.db.models  # noqa: F401 - register every mapper: FKs span modules (CLI, worker)
 from app.core.config import Settings
 
 

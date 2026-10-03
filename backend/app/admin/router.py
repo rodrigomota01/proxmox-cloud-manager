@@ -1,9 +1,11 @@
 """/api/v1/admin/* — platform administration (docs/architecture/05-api.md)."""
 
 import uuid
-from typing import Annotated
+from datetime import datetime
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.admin.schemas import (
@@ -29,6 +31,9 @@ from app.api.deps import (
     require_platform,
 )
 from app.compute.models import Instance
+from app.compute.router import job_out
+from app.compute.schemas import Accepted, JobOut
+from app.core.errors import NotFound
 from app.inventory.models import (
     Node,
     ProviderCluster,
@@ -36,13 +41,18 @@ from app.inventory.models import (
     StoragePool,
     SyncRun,
 )
+from app.jobs.models import Job, JobEvent
 from app.providers.registry import ProviderRegistry
+from app.tenancy.models import Tenant
+from app.tenancy.router import tenant_out
+from app.tenancy.schemas import TenantOut
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 ClusterManager = Annotated[Principal, require_platform("cluster:manage")]
 ClusterSyncer = Annotated[Principal, require_platform("cluster:sync")]
 NodeViewer = Annotated[Principal, require_platform("node:view")]
+TenantAdmin = Annotated[Principal, require_platform("tenant:create")]
 
 
 def get_registry(request: Request) -> ProviderRegistry:
@@ -151,14 +161,14 @@ async def test_cluster(
     return await svc.test_connection(cluster_id)
 
 
-@router.post("/clusters/{cluster_id}/sync")
+@router.post("/clusters/{cluster_id}/sync", status_code=status.HTTP_202_ACCEPTED)
 async def sync_cluster(
-    cluster_id: uuid.UUID, _: ClusterSyncer, svc: Admin, db: DbSession,
-) -> SyncRunOut:
-    """Runs inline for now; becomes 202 + job when the job queue lands."""
-    run = await svc.sync(cluster_id)
-    await db.refresh(run)
-    return run_out(run)
+    cluster_id: uuid.UUID, response: Response, _: ClusterSyncer, svc: Admin, db: DbSession,
+) -> Accepted:
+    job = await svc.sync(cluster_id)
+    await db.refresh(job)
+    response.headers["Location"] = f"/api/v1/admin/jobs/{job.id}"
+    return Accepted(job=job_out(job))
 
 
 @router.get("/clusters/{cluster_id}/sync-runs")
@@ -209,3 +219,58 @@ async def adopt_instance(
 ) -> AdminInstanceOut:
     instance = await svc.adopt(instance_id, body)
     return admin_instance_out(instance)
+
+
+# --- tenants ---------------------------------------------------------------------------
+
+
+@router.get("/tenants")
+async def list_all_tenants(_: TenantAdmin, db: DbSession) -> list[TenantOut]:
+    """Every tenant (platform scope); /tenants lists only the caller's memberships."""
+    tenants = (await db.execute(select(Tenant).order_by(Tenant.slug))).scalars()
+    return [tenant_out(t) for t in tenants]
+
+
+# --- jobs ------------------------------------------------------------------------------
+
+
+class AdminJobEvent(BaseModel):
+    kind: str
+    message: str
+    occurred_at: datetime
+    data: dict[str, Any]
+
+
+class AdminJobDetail(JobOut):
+    tenant_id: uuid.UUID | None
+    requested_by: uuid.UUID | None
+    events: list[AdminJobEvent]
+
+
+@router.get("/jobs")
+async def list_jobs(
+    _: ClusterManager, db: DbSession,
+    status_filter: Annotated[str | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list[JobOut]:
+    stmt = select(Job).order_by(Job.id.desc()).limit(limit)
+    if status_filter:
+        stmt = stmt.where(Job.status == status_filter)
+    return [job_out(j) for j in (await db.execute(stmt)).scalars()]
+
+
+@router.get("/jobs/{job_id}")
+async def get_job(job_id: uuid.UUID, _: ClusterManager, db: DbSession) -> AdminJobDetail:
+    job = await db.get(Job, job_id)
+    if job is None:
+        raise NotFound()
+    events = await db.execute(
+        select(JobEvent).where(JobEvent.job_id == job.id).order_by(JobEvent.id)
+    )
+    return AdminJobDetail(
+        **job_out(job).model_dump(), tenant_id=job.tenant_id, requested_by=job.requested_by,
+        events=[
+            AdminJobEvent(kind=e.kind, message=e.message, occurred_at=e.occurred_at, data=e.data)
+            for e in events.scalars()
+        ],
+    )

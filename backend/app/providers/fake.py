@@ -37,6 +37,7 @@ class FakeProvider:
     instances: dict[str, InstanceObservation] = field(default_factory=dict)
     storage: list[StorageObservation] = field(default_factory=list)
     available: bool = True
+    task_error: str | None = None  # make wait() report a failed provider task
     calls: list[tuple[str, str]] = field(default_factory=list)
 
     def add_node(self, name: str, *, online: bool = True) -> None:
@@ -81,6 +82,8 @@ class FakeProvider:
     async def wait(
         self, op: OperationHandle, on_progress: ProgressCb | None = None
     ) -> OperationResult:
+        if self.task_error:
+            return OperationResult(ok=False, message=self.task_error)
         return OperationResult(ok=True, message="OK")
 
     async def aclose(self) -> None:

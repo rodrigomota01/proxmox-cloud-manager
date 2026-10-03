@@ -89,3 +89,21 @@ async def authorize(
     )
     await db.commit()
     raise Forbidden() if visible else NotFound()
+
+
+async def projects_with_permission(
+    db: AsyncSession, user_id: uuid.UUID, tenant_id: uuid.UUID, permission: str
+) -> set[uuid.UUID]:
+    """Projects of the tenant where `permission` comes from a project-level binding.
+    (Tenant/platform-level grants cover every project; check those separately.)"""
+    rows = await db.execute(
+        select(RoleBinding.scope_id)
+        .join(RolePermission, RolePermission.role_id == RoleBinding.role_id)
+        .where(
+            RoleBinding.user_id == user_id,
+            RoleBinding.tenant_id == tenant_id,
+            RoleBinding.scope_type == "project",
+            RolePermission.permission == permission,
+        )
+    )
+    return {pid for pid in rows.scalars() if pid is not None}

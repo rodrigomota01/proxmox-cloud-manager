@@ -6,6 +6,7 @@ grants are exercised exactly as in deployment.
 """
 
 import asyncio
+import os
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,7 +23,11 @@ from app.cli import ALEMBIC_INI
 from app.core.config import Settings
 from app.iam.catalog import sync_catalog
 from app.infra.mailer import Mail
+from app.infra.secrets import LocalKek
 from app.main import create_app, lifespan
+from app.providers.base import PowerState
+from app.providers.fake import FakeProvider
+from app.providers.registry import ProviderRegistry
 
 INIT_DIR = Path(__file__).resolve().parents[3] / "deploy" / "docker" / "postgres" / "init"
 OWNER_PW, APP_PW = "owner-test-pw", "app-test-pw"
@@ -142,3 +147,29 @@ async def client(app) -> AsyncIterator[AsyncClient]:
         base_url="http://localhost",
     ) as c:
         yield c
+
+
+# --- providers ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def fake() -> FakeProvider:
+    f = FakeProvider()
+    f.add_node("tagima")
+    f.add_instance(10001, "cm-test-1", node="tagima")
+    f.add_instance(10002, "cm-test-2", node="tagima", kind="container", power=PowerState.RUNNING)
+    return f
+
+
+@pytest.fixture
+def registry(app, settings, fake) -> ProviderRegistry:
+    received: dict[str, str] = {}
+
+    def factory(cluster, token_id, secret):
+        received.update(token_id=token_id, secret=secret)
+        return fake
+
+    reg = ProviderRegistry(settings, LocalKek(os.urandom(32)), factory=factory)
+    reg.received = received  # type: ignore[attr-defined]
+    app.state.providers = reg
+    return reg

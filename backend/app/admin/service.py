@@ -22,8 +22,9 @@ from app.core.config import Settings
 from app.core.errors import Conflict, NotFound, ValidationError
 from app.core.ids import uuid7
 from app.infra.secrets import seal
-from app.inventory.models import ProviderCluster, ProviderCredential, SyncRun
-from app.inventory.reconciler import reconcile
+from app.inventory.models import ProviderCluster, ProviderCredential
+from app.jobs.models import Job
+from app.jobs.queue import enqueue
 from app.providers.base import ProviderError
 from app.providers.registry import ProviderRegistry
 from app.tenancy.models import Project
@@ -163,24 +164,17 @@ class AdminService:
             nodes_total=health.nodes_total, guests_visible=len(inv.instances),
         )
 
-    async def sync(self, cluster_id: uuid.UUID) -> SyncRun:
+    async def sync(self, cluster_id: uuid.UUID) -> Job:
         cluster = await self.get_cluster(cluster_id)
-        try:
-            async with self.registry.open(self.db, cluster) as provider:
-                run = await reconcile(self.db, cluster, provider, trigger="manual")
-        except ProviderError as exc:  # e.g. missing credentials
-            run = SyncRun(
-                cluster_id=cluster.id, trigger="manual", status="failed", error=str(exc),
-                finished_at=datetime.now(UTC),
-            )
-            self.db.add(run)
-            await self.db.flush()
-        await self._audit(
-            "CLUSTER_SYNC", resource_type="cluster", resource_id=cluster.id,
-            outcome="success" if run.status == "succeeded" else "failure",
-            details={"sync_run": str(run.id)},
+        job = await enqueue(
+            self.db, "cluster.sync", tenant_id=None, requested_by=self.actor,
+            resource_type="cluster", resource_id=cluster.id,
         )
-        return run
+        await self._audit(
+            "CLUSTER_SYNC_REQUESTED", resource_type="cluster", resource_id=cluster.id,
+            details={"job_id": str(job.id)},
+        )
+        return job
 
     # --- instances ---------------------------------------------------------------------
 

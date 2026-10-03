@@ -4,10 +4,11 @@ Plataforma de cloud management multi-tenant sobre **Proxmox VE**: tenants, proje
 RBAC, quotas, preço, catálogo de imagens, console/SSH no browser e auditoria — sem que
 o usuário final precise acessar o Proxmox.
 
-> **Status: Fase 1 em andamento.** Pronto: banco com RLS, autenticação, auditoria,
-> IAM (tenants, projetos, membros, RBAC), provider Proxmox, cadastro de cluster com
-> credencial cifrada, inventário (reconciliador + adoção). Próximo: fila de jobs,
-> compute (listar instâncias, power) e frontend — ver [roadmap](docs/roadmap.md).
+> **Status: Fase 1 — backend pronto.** Banco com RLS, autenticação, auditoria, IAM
+> (tenants, projetos, membros, RBAC), provider Proxmox, clusters com credencial
+> cifrada, inventário (reconciliador + adoção), fila de jobs em Postgres e instâncias
+> (listar, detalhar, power). Próximo: frontend — ver [roadmap](docs/roadmap.md).
+> Validação ponta a ponta contra um Proxmox real: `scripts/e2e-lab.sh`.
 
 ## Documentação
 

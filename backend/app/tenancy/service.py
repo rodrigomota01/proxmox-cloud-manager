@@ -132,7 +132,7 @@ class MemberService:
     def actor(self) -> uuid.UUID:
         return self.ctx.principal.user_id
 
-    async def list(self) -> list[MemberOut]:
+    async def list_members(self) -> list[MemberOut]:
         await authorize(self.db, self.actor, "member:manage", Scope(self.ctx.tenant_id))
         users = (
             await self.db.execute(
@@ -253,7 +253,7 @@ class ProjectService:
     def actor(self) -> uuid.UUID:
         return self.ctx.principal.user_id
 
-    async def list(self, params: PageParams) -> tuple[list[Project], str | None]:
+    async def list_projects(self, params: PageParams) -> tuple[list[Project], str | None]:
         stmt = select(Project).where(
             Project.tenant_id == self.ctx.tenant_id, Project.deleted_at.is_(None)
         )

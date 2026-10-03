@@ -119,7 +119,7 @@ class MemberAdded(BaseModel):
 
 @router.get("/tenants/{tenant_id}/members", tags=["members"])
 async def list_members(ctx: PathTenant, db: DbSession, auth: Auth) -> list[MemberOut]:
-    return await MemberService(db, ctx, auth).list()
+    return await MemberService(db, ctx, auth).list_members()
 
 
 @router.post(
@@ -149,7 +149,7 @@ async def remove_member(
 
 @router.get("/projects", tags=["projects"])
 async def list_projects(ctx: CurrentTenant, db: DbSession, page: Pagination) -> Page[ProjectOut]:
-    items, cursor = await ProjectService(db, ctx).list(page)
+    items, cursor = await ProjectService(db, ctx).list_projects(page)
     return Page(items=[project_out(p) for p in items], next_cursor=cursor)
 
 
