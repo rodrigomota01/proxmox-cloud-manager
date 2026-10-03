@@ -284,6 +284,14 @@ export function ConnectionSettings({ cluster: c, nodeCount }: { cluster: Schemas
           {nodeCount} servidores dele.
         </div>
       )}
+      {(!c.settings.pool || !c.zone_id) && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          ⚠ Este servidor <strong>não recebe VMs novas</strong>: falta{" "}
+          {!c.zone_id && !c.settings.pool ? "zona e pool de destino" : !c.zone_id ? "zona" : "pool de destino"}. Ele
+          continua sincronizado e monitorado, mas a zona não aparece em “Nova instância” até isso ser preenchido
+          abaixo (e haver templates dele em Imagens).
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <ClusterStatus status={c.status} />
