@@ -27,7 +27,8 @@ IdempotencyKey = Annotated[str | None, Header(alias="Idempotency-Key", max_lengt
 
 
 def instance_out(i: Instance) -> InstanceOut:
-    assert i.project_id is not None  # managed instances always have one
+    if i.project_id is None:  # DB constraint: managed instances always have a project
+        raise RuntimeError(f"managed instance {i.id} without project")
     return InstanceOut(
         id=i.id, project_id=i.project_id, kind=i.kind, name=i.name, state=i.state,
         power_state=i.power_state, vcpus=i.vcpus, memory_mb=i.memory_mb,

@@ -24,7 +24,7 @@ inventário → power → criar instância a partir de template → dashboard.
 
 **Saída:** `docker compose up` sobe tudo; arquitetura revisada e aprovada por você.
 
-## Fase 1 — Fundação, identidade e inventário
+## Fase 1 — Fundação, identidade e inventário ✅ (concluída em 2026-10-02)
 
 | Bloco | Conteúdo |
 |---|---|
@@ -43,6 +43,15 @@ inventário → power → criar instância a partir de template → dashboard.
 - Testes cross-tenant (GET/POST/DELETE) para todos os endpoints e RBAC por role.
 - Testado contra o lab Proxmox real (inventário + power) com token de privilégio mínimo.
 - Token do PVE nunca aparece em resposta, log ou frontend (teste automatizado).
+
+**Como foi validada:** 156 testes (unitários + integração com Postgres/Redis reais,
+matrizes cross-tenant e RBAC); `pytest -m lab` (conexão, isolamento do pool, ciclo de
+energia) e `scripts/e2e-lab.sh` (cluster → sync → adoção → start/stop como jobs do
+tenant) contra PVE 8.4.19; `scripts/security-scan.sh` sem achados altos corrigíveis.
+
+**Pendências levadas adiante:** reconciliação de vários clusters em paralelo e teste
+com dois clusters (há vários PVE independentes); `Idempotency-Key` só em ações de
+energia por enquanto; pin de fingerprint TLS descartado (ver 04-integracao-proxmox).
 
 ## Fase 2 — Provisionamento
 

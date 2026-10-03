@@ -109,7 +109,9 @@ class ProxmoxClient:
         last: ProviderError | None = None
         for attempt in range(attempts):
             if attempt:
-                await asyncio.sleep(min(0.25 * 2**attempt, 4.0) * (0.5 + random.random()))  # noqa: S311
+                # jitter only, not security-sensitive
+                jitter = 0.5 + random.random()  # noqa: S311  # nosec B311
+                await asyncio.sleep(min(0.25 * 2**attempt, 4.0) * jitter)
             try:
                 async with self._sem:
                     response = await self._http.request(method, path, params=params, data=data)
@@ -122,7 +124,8 @@ class ProxmoxClient:
             self.breaker.success()
             return self._unwrap(method, path, response)
         self.breaker.failure()
-        assert last is not None
+        if last is None:  # unreachable: attempts >= 1 and every failed one sets it
+            last = ProviderUnavailable(f"{method} {path}: no attempt made")
         logger.warning("proxmox request failed", extra={"error": str(last)})
         raise last
 

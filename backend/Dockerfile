@@ -13,6 +13,10 @@ FROM python:3.12-slim AS runtime
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
+# pick up Debian security fixes released after the base image was built
+RUN apt-get update \
+ && apt-get upgrade -y --no-install-recommends \
+ && rm -rf /var/lib/apt/lists/*
 RUN useradd --system --uid 10001 --home-dir /app --shell /usr/sbin/nologin cm
 WORKDIR /app
 COPY --from=build /opt/venv /opt/venv

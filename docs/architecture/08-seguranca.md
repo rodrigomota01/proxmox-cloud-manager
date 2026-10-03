@@ -86,5 +86,11 @@ Cada fase só fecha quando:
 1. Testes de isolamento cross-tenant passam para todos os endpoints novos.
 2. Testes de RBAC (permitido/negado) por role para cada endpoint novo.
 3. Nenhum segredo em log (teste que captura logs e procura padrões).
-4. `pip-audit`, `npm audit --omit=dev`, `bandit`, `trivy` sem achados altos.
+4. `pip-audit`, `npm audit --omit=dev`, `bandit`, `trivy` sem achados altos —
+   `scripts/security-scan.sh`. Política: falha em HIGH/CRITICAL **com correção
+   disponível**; achados sem correção publicada pela distro (Debian
+   `affected`/`fix_deferred`) são reportados e saem com o rebuild quando o fix sair.
+   Imagens finais só com o necessário (sem npm/yarn/corepack no frontend; pacotes do
+   Debian atualizados no build do backend). Reduzir os achados sem correção exige trocar
+   a base do backend por distroless — avaliar junto com as imagens assinadas (Fase 6).
 5. Novos endpoints listados no inventário de [05](05-api.md) com permissão.
