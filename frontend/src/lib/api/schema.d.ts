@@ -1647,6 +1647,35 @@ export interface components {
             /** Recent Jobs */
             recent_jobs: components["schemas"]["JobOut"][];
         };
+        /**
+         * DiskUsageOut
+         * @description Space used inside the guest. VMs need the QEMU guest agent; containers do not.
+         */
+        DiskUsageOut: {
+            /** Agent */
+            agent: string | null;
+            /** Checked At */
+            checked_at: string | null;
+            /** Filesystems */
+            filesystems: components["schemas"]["FilesystemOut"][];
+            /** Total Bytes */
+            total_bytes: number | null;
+            /** Usage */
+            usage: number | null;
+            /** Used Bytes */
+            used_bytes: number | null;
+        };
+        /** FilesystemOut */
+        FilesystemOut: {
+            /** Mountpoint */
+            mountpoint: string;
+            /** Total Bytes */
+            total_bytes: number;
+            /** Type */
+            type: string;
+            /** Used Bytes */
+            used_bytes: number;
+        };
         /** ForgotPasswordRequest */
         ForgotPasswordRequest: {
             /** Email */
@@ -1800,6 +1829,7 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            disk: components["schemas"]["DiskUsageOut"];
             /** Gateway */
             gateway: string | null;
             /**
@@ -1821,6 +1851,10 @@ export interface components {
             memory_used_mb: number;
             /** Name */
             name: string;
+            /** Net In Bps */
+            net_in_bps: number;
+            /** Net Out Bps */
+            net_out_bps: number;
             /** Power State */
             power_state: string;
             /**
@@ -2128,6 +2162,10 @@ export interface components {
             cpu_count: number;
             /** Cpu Usage */
             cpu_usage: number;
+            /** Guests Net In Bps */
+            guests_net_in_bps: number;
+            /** Guests Net Out Bps */
+            guests_net_out_bps: number;
             /**
              * Id
              * Format: uuid

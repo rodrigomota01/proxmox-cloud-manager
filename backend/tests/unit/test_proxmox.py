@@ -8,6 +8,7 @@ import pytest
 import respx
 
 from app.providers.base import (
+    GuestAgentUnavailable,
     InstanceKind,
     OperationHandle,
     PowerAction,
@@ -228,3 +229,49 @@ async def test_metrics_asks_rrd_and_sorts():
     )
     assert [p.time for p in points] == [10, 20]
     assert route.calls[0].request.url.params["timeframe"] == "day"
+
+
+def test_mapper_counters_and_container_disk():
+    vm, ct = mapper.inventory([
+        {"type": "qemu", "vmid": 1, "node": "n", "status": "running", "maxdisk": 32 * 1024**3,
+         "disk": 0, "netin": 5000, "netout": 700},
+        {"type": "lxc", "vmid": 2, "node": "n", "status": "running", "maxdisk": 8 * 1024**3,
+         "disk": 2 * 1024**3},
+    ]).instances
+    assert (vm.net_in_bytes, vm.net_out_bytes) == (5000, 700)
+    assert vm.disk_used_bytes is None  # a VM disk is opaque to the host
+    assert ct.disk_used_bytes == 2 * 1024**3
+
+
+def test_filesystems_skip_pseudo_and_bind_mounts():
+    fs = mapper.filesystems([
+        {"mountpoint": "/", "type": "ext4", "used-bytes": 9, "total-bytes": 10},
+        {"mountpoint": "/var/lib/docker/x", "type": "ext4", "used-bytes": 9, "total-bytes": 10},
+        {"mountpoint": "/snap/core", "type": "squashfs", "used-bytes": 5, "total-bytes": 5},
+        {"mountpoint": "/boot/efi", "type": "vfat", "used-bytes": 1, "total-bytes": 4},
+        {"mountpoint": "/mnt/cd", "type": "ext4"},  # no size reported
+    ])
+    assert [(f.mountpoint, f.used_bytes, f.total_bytes) for f in fs] == [
+        ("/", 9, 10), ("/boot/efi", 1, 4),
+    ]
+
+
+@respx.mock
+async def test_guest_filesystems_reads_agent_and_maps_missing_agent():
+    ref = mapper.instance_ref(10001, "tagima", "qemu")
+    route = respx.get(f"{API}/nodes/tagima/qemu/10001/agent/get-fsinfo")
+    route.respond(json={"data": {"result": [
+        {"mountpoint": "/", "type": "xfs", "used-bytes": 3, "total-bytes": 4},
+    ]}})
+    [root] = await ProxmoxProvider(_client()).guest_filesystems(ref)
+    assert root.mountpoint == "/" and root.used_bytes == 3
+
+    route.mock(return_value=httpx.Response(
+        500, extensions={"reason_phrase": b"QEMU guest agent is not running"}
+    ))
+    with pytest.raises(GuestAgentUnavailable):
+        await ProxmoxProvider(_client()).guest_filesystems(ref)
+
+    route.respond(403)
+    with pytest.raises(ProviderAuthError):
+        await ProxmoxProvider(_client()).guest_filesystems(ref)

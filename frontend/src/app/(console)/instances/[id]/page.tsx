@@ -8,7 +8,8 @@ import { NoTenant } from "@/components/no-tenant";
 import { PowerActions } from "@/components/power-actions";
 import { DeleteInstance } from "@/components/delete-instance";
 import { InstanceMetrics } from "@/components/metrics-panel";
-import { Meter, mib, uptime } from "@/components/viz";
+import { DiskUsage } from "@/components/disk-usage";
+import { Meter, mib, rate, uptime } from "@/components/viz";
 import { ActivityRow } from "@/components/activity";
 import { Badge, Card, Empty, ErrorBox, PowerBadge, StateBadge, formatDate } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
@@ -99,6 +100,14 @@ export default function InstanceDetailPage() {
                     label={`${mib(i.memory_used_mb)} / ${mib(i.memory_mb)}`}
                     title="Memória"
                   />
+                </Row>
+                <Row label="Disco usado">
+                  <DiskUsage disk={i.disk} detailed />
+                </Row>
+                <Row label="Rede agora">
+                  <span className="text-sm tabular-nums">
+                    ↓ {rate(i.net_in_bps)} · ↑ {rate(i.net_out_bps)}
+                  </span>
                 </Row>
                 <Row label="Ligada há">{uptime(i.uptime_seconds)}</Row>
               </>

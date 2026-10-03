@@ -53,6 +53,8 @@ class Settings(BaseSettings):
     # so one slow/unreachable server never delays the others
     reconcile_concurrency: int = 4
     reconcile_timeout_seconds: float = 60.0
+    # disk usage inside VMs comes from the guest agent: one call per running VM, so slower
+    guest_disk_interval_seconds: float = 300.0
     # concurrent job runners per worker process (a slow shutdown on one server must not
     # hold back operations on another)
     job_concurrency: int = 4

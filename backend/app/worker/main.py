@@ -25,6 +25,7 @@ from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.db.session import create_engine, create_sessionmaker, set_platform_scope
 from app.infra.secrets import SecretsError, build_secrets_backend
+from app.inventory.guest_disk import poll_guest_disks
 from app.inventory.models import ProviderCluster, ProviderCredential
 from app.inventory.reconciler import reconcile
 from app.jobs import handlers  # noqa: F401 - registers job handlers
@@ -181,6 +182,8 @@ async def reconcile_loop(
     registry: ProviderRegistry,
     stop: asyncio.Event,
 ) -> None:
+    loop = asyncio.get_running_loop()
+    next_disk_poll = 0.0
     while not stop.is_set():
         try:
             await reconcile_all(
@@ -188,6 +191,9 @@ async def reconcile_loop(
                 concurrency=settings.reconcile_concurrency,
                 cluster_timeout=settings.reconcile_timeout_seconds,
             )
+            if loop.time() >= next_disk_poll:
+                next_disk_poll = loop.time() + settings.guest_disk_interval_seconds
+                await poll_guest_disks(sessionmaker, registry)
         except Exception:  # keep the loop alive; the next tick retries
             logger.exception("reconcile loop error")
         try:

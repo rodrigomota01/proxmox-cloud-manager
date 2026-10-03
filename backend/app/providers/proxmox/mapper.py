@@ -3,6 +3,7 @@
 from typing import Any
 
 from app.providers.base import (
+    FilesystemUsage,
     InstanceKind,
     InstanceObservation,
     Inventory,
@@ -67,7 +68,32 @@ def instance(item: dict[str, Any]) -> InstanceObservation:
         uptime_seconds=_int(item.get("uptime")),
         cpu_usage=float(item.get("cpu") or 0.0),
         memory_used_mb=_int(item.get("mem")) // _MIB,
+        net_in_bytes=_int(item.get("netin")),
+        net_out_bytes=_int(item.get("netout")),
+        # for qemu "disk" is always 0: only the guest agent knows what is used inside
+        disk_used_bytes=_int(item.get("disk")) if pve_type == "lxc" else None,
     )
+
+
+# pseudo/read-only filesystems that say nothing about the guest running out of space
+_SKIP_FS = {"squashfs", "tmpfs", "devtmpfs", "overlay", "iso9660", "udf", "ramfs", "autofs"}
+
+
+def filesystems(result: list[dict[str, Any]]) -> list[FilesystemUsage]:
+    """From GET .../agent/get-fsinfo. A disk mounted twice (bind mounts) counts once."""
+    seen: set[tuple[int, int]] = set()
+    out: list[FilesystemUsage] = []
+    for fs in result:
+        total, used = _int(fs.get("total-bytes")), _int(fs.get("used-bytes"))
+        if not total or str(fs.get("type")) in _SKIP_FS:
+            continue
+        key = (total, used)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(FilesystemUsage(str(fs.get("mountpoint") or fs.get("name") or "?"),
+                                   str(fs.get("type") or ""), used, total))
+    return sorted(out, key=lambda f: f.mountpoint)
 
 
 def metric_point(item: dict[str, Any]) -> MetricPoint | None:

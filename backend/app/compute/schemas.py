@@ -60,6 +60,24 @@ class InstanceDelete(Input):
     confirm: str  # must equal the instance name
 
 
+class FilesystemOut(BaseModel):
+    mountpoint: str
+    type: str
+    used_bytes: int
+    total_bytes: int
+
+
+class DiskUsageOut(BaseModel):
+    """Space used inside the guest. VMs need the QEMU guest agent; containers do not."""
+
+    usage: float | None  # fullest filesystem, 0..1; None = unknown
+    used_bytes: int | None
+    total_bytes: int | None
+    filesystems: list[FilesystemOut]
+    agent: str | None  # ok|unavailable|forbidden (VMs); None for containers
+    checked_at: datetime | None
+
+
 class InstanceOut(BaseModel):
     """Tenant view. No provider identifiers (vmid/node/cluster) — ADR-0010."""
 
@@ -81,6 +99,9 @@ class InstanceOut(BaseModel):
     cpu_usage: float  # 0..1 of the allocated vCPUs, as of last_seen_at
     memory_used_mb: int
     uptime_seconds: int
+    net_in_bps: float  # bytes/s between the last two syncs
+    net_out_bps: float
+    disk: DiskUsageOut
     ipv4: str | None  # with prefix, as configured (e.g. 203.0.113.10/28)
     gateway: str | None
     created_at: datetime

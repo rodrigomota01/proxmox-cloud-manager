@@ -2,15 +2,18 @@
 
 import logging
 from dataclasses import replace
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import func, select
 
 from app.compute.models import Instance
 from app.db.session import set_tenant_scope
+from app.inventory.guest_disk import poll_guest_disks
 from app.inventory.models import ProviderCluster, ProviderCredential
 from app.jobs import handlers  # noqa: F401 - registers job handlers
 from app.jobs.queue import run_one
+from app.providers.base import FilesystemUsage, PowerState
 from app.providers.registry import ProviderRegistry
 from app.worker.main import reconcile_all
 from tests.integration.factories import (
@@ -344,3 +347,60 @@ async def test_nodes_show_allocation_and_metrics(client, ctx, fake):
     assert set(r.json()["points"][0]) == {"t", "cpu", "memory_used_mb", "memory_total_mb",
                                           "net_in_bps", "net_out_bps", "load", "iowait"}
     assert (await client.get(url, headers=ctx["alice"])).status_code == 403
+
+
+async def test_network_rate_from_counter_deltas(client, ctx, fake, owner_db):
+    root = ctx["root"]
+    cid = await _cluster_with_creds(client, root)
+    fake.instances["10001"] = replace(
+        fake.instances["10001"], power_state=PowerState.RUNNING, net_in_bytes=1_000, net_out_bytes=0
+    )
+    await _sync(client, root, cid)
+    vm = await owner_db.scalar(
+        select(Instance).where(Instance.provider_ref["vmid"].as_integer() == 10001)
+    )
+    first_seen = vm.last_seen_at
+    # pretend the previous snapshot was 10 s ago, then the counters grow
+    await owner_db.execute(
+        Instance.__table__.update().where(Instance.id == vm.id)
+        .values(last_seen_at=first_seen - timedelta(seconds=10))
+    )
+    await owner_db.commit()
+    fake.instances["10001"] = replace(
+        fake.instances["10001"], net_in_bytes=11_000, net_out_bytes=500
+    )
+    await _sync(client, root, cid)
+    await owner_db.refresh(vm)
+    assert 900 < vm.net_in_bps <= 1_000 and 40 < vm.net_out_bps <= 50
+
+    # counter went down: the guest rebooted, no rate this round
+    fake.instances["10001"] = replace(fake.instances["10001"], net_in_bytes=10)
+    await _sync(client, root, cid)
+    await owner_db.refresh(vm)
+    assert vm.net_in_bps == 0
+
+
+async def test_disk_usage_containers_and_guest_agent(client, ctx, app, registry, fake, owner_db):
+    root = ctx["root"]
+    await _cluster_with_creds(client, root)
+    gib = 1024**3
+    fake.instances["10001"] = replace(fake.instances["10001"], power_state=PowerState.RUNNING)
+    fake.instances["10002"] = replace(fake.instances["10002"], disk_used_bytes=5 * gib)  # ct, 20G
+    fake.add_instance(10003, "no-agent", node="tagima", power=PowerState.RUNNING)
+    fake.filesystems["10001"] = [
+        FilesystemUsage("/", "ext4", 18 * gib, 20 * gib),
+        FilesystemUsage("/data", "xfs", 10 * gib, 100 * gib),
+    ]
+    await reconcile_all(app.state.sessionmaker, registry)
+    await poll_guest_disks(app.state.sessionmaker, registry)
+
+    rows = {
+        i.provider_ref["vmid"]: i
+        for i in (await owner_db.execute(select(Instance))).scalars()
+    }
+    vm, ct, bare = rows[10001], rows[10002], rows[10003]
+    assert vm.guest_agent == "ok" and vm.disk_usage == 0.9  # the fullest filesystem wins
+    assert vm.disk_used_bytes == 28 * gib and vm.disk_total_bytes == 120 * gib
+    assert [f["mountpoint"] for f in vm.filesystems] == ["/", "/data"]
+    assert ct.disk_usage == 0.25 and ct.guest_agent is None  # from the host, no agent needed
+    assert bare.guest_agent == "unavailable" and bare.disk_usage is None

@@ -1316,6 +1316,112 @@
         "title": "DashboardSummary",
         "type": "object"
       },
+      "DiskUsageOut": {
+        "description": "Space used inside the guest. VMs need the QEMU guest agent; containers do not.",
+        "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "filesystems": {
+            "items": {
+              "$ref": "#/components/schemas/FilesystemOut"
+            },
+            "title": "Filesystems",
+            "type": "array"
+          },
+          "total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Bytes"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usage"
+          },
+          "used_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Bytes"
+          }
+        },
+        "required": [
+          "usage",
+          "used_bytes",
+          "total_bytes",
+          "filesystems",
+          "agent",
+          "checked_at"
+        ],
+        "title": "DiskUsageOut",
+        "type": "object"
+      },
+      "FilesystemOut": {
+        "properties": {
+          "mountpoint": {
+            "title": "Mountpoint",
+            "type": "string"
+          },
+          "total_bytes": {
+            "title": "Total Bytes",
+            "type": "integer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "used_bytes": {
+            "title": "Used Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "mountpoint",
+          "type",
+          "used_bytes",
+          "total_bytes"
+        ],
+        "title": "FilesystemOut",
+        "type": "object"
+      },
       "ForgotPasswordRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1675,6 +1781,9 @@
             "title": "Created At",
             "type": "string"
           },
+          "disk": {
+            "$ref": "#/components/schemas/DiskUsageOut"
+          },
           "gateway": {
             "anyOf": [
               {
@@ -1741,6 +1850,14 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "net_in_bps": {
+            "title": "Net In Bps",
+            "type": "number"
+          },
+          "net_out_bps": {
+            "title": "Net Out Bps",
+            "type": "number"
           },
           "power_state": {
             "title": "Power State",
@@ -1832,6 +1949,9 @@
           "cpu_usage",
           "memory_used_mb",
           "uptime_seconds",
+          "net_in_bps",
+          "net_out_bps",
+          "disk",
           "ipv4",
           "gateway",
           "created_at",
@@ -2631,6 +2751,14 @@
             "title": "Cpu Usage",
             "type": "number"
           },
+          "guests_net_in_bps": {
+            "title": "Guests Net In Bps",
+            "type": "number"
+          },
+          "guests_net_out_bps": {
+            "title": "Guests Net Out Bps",
+            "type": "number"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -2724,7 +2852,9 @@
           "instances_total",
           "instances_running",
           "vcpus_allocated",
-          "memory_allocated_mb"
+          "memory_allocated_mb",
+          "guests_net_in_bps",
+          "guests_net_out_bps"
         ],
         "title": "NodeOut",
         "type": "object"

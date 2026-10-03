@@ -158,6 +158,9 @@ class NodeOut(NodeBase):
     instances_running: int
     vcpus_allocated: int
     memory_allocated_mb: int
+    # traffic of the guests on this node (sum of their rates), not the host NICs
+    guests_net_in_bps: float
+    guests_net_out_bps: float
 
 
 class NodeMetricPointOut(BaseModel):

@@ -77,6 +77,19 @@ class Instance(UUIDPk, Timestamps, Base):
     cpu_usage: Mapped[float] = mapped_column(Float, server_default="0")  # 0..1 of vcpus
     memory_used_mb: Mapped[int] = mapped_column(Integer, server_default="0")
     uptime_seconds: Mapped[int] = mapped_column(BigInteger, server_default="0")
+    # network: last raw counters (bytes since guest boot) and the rate between two syncs
+    net_in_bytes: Mapped[int] = mapped_column(BigInteger, server_default="0")
+    net_out_bytes: Mapped[int] = mapped_column(BigInteger, server_default="0")
+    net_in_bps: Mapped[float] = mapped_column(Float, server_default="0")
+    net_out_bps: Mapped[float] = mapped_column(Float, server_default="0")
+    # disk *inside* the guest: containers via the host, VMs via the guest agent (slower
+    # poll). disk_usage is the fullest filesystem (0..1), which is what runs out first.
+    disk_used_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    disk_total_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    disk_usage: Mapped[float | None] = mapped_column(Float)
+    filesystems: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    disk_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    guest_agent: Mapped[str | None] = mapped_column(Text)  # ok|unavailable|forbidden
     missing_count: Mapped[int] = mapped_column(Integer, server_default="0")
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

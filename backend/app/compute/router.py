@@ -13,6 +13,8 @@ from app.compute.models import Instance, operable
 from app.compute.schemas import (
     Accepted,
     DashboardSummary,
+    DiskUsageOut,
+    FilesystemOut,
     InstanceAccepted,
     InstanceCreate,
     InstanceDelete,
@@ -55,6 +57,14 @@ async def places(db: AsyncSession) -> Places:
     return {cid: (zid, zname, rname, cfg) for cid, zid, zname, rname, cfg in rows}
 
 
+def disk_out(i: Instance) -> DiskUsageOut:
+    return DiskUsageOut(
+        usage=i.disk_usage, used_bytes=i.disk_used_bytes, total_bytes=i.disk_total_bytes,
+        filesystems=[FilesystemOut(**f) for f in i.filesystems or []],
+        agent=i.guest_agent, checked_at=i.disk_checked_at,
+    )
+
+
 def instance_out(i: Instance, where: Places) -> InstanceOut:
     zone_id, zone_name, region_name, settings = where.get(i.cluster_id, (None, None, None, {}))
     if i.project_id is None:  # DB constraint: managed instances always have a project
@@ -67,6 +77,7 @@ def instance_out(i: Instance, where: Places) -> InstanceOut:
         read_only=not operable(i, settings),
         cpu_usage=i.cpu_usage, memory_used_mb=i.memory_used_mb,
         uptime_seconds=i.uptime_seconds,
+        net_in_bps=i.net_in_bps, net_out_bps=i.net_out_bps, disk=disk_out(i),
         ipv4=i.network.get("address"), gateway=i.network.get("gateway"),
         created_at=i.created_at, last_seen_at=i.last_seen_at,
     )

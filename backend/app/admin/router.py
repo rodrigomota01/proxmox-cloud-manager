@@ -219,6 +219,8 @@ async def nodes_out(db: DbSession, nodes: list[Node]) -> list[NodeOut]:
             func.count().filter(Instance.power_state == "running"),
             func.coalesce(func.sum(Instance.vcpus), 0),
             func.coalesce(func.sum(Instance.memory_mb), 0),
+            func.coalesce(func.sum(Instance.net_in_bps), 0.0),
+            func.coalesce(func.sum(Instance.net_out_bps), 0.0),
         )
         .where(Instance.node_id.in_([n.id for n in nodes]), Instance.deleted_at.is_(None))
         .group_by(Instance.node_id)
@@ -234,7 +236,7 @@ async def nodes_out(db: DbSession, nodes: list[Node]) -> list[NodeOut]:
     }
     out = []
     for n in nodes:
-        total, running, vcpus, memory = alloc.get(n.id, (0, 0, 0, 0))
+        total, running, vcpus, memory, net_in, net_out = alloc.get(n.id, (0, 0, 0, 0, 0.0, 0.0))
         out.append(NodeOut(
             **NodeBase.model_validate(n, from_attributes=True).model_dump(),
             cluster_name=clusters.get(n.cluster_id, ("", None, None))[0],
@@ -242,6 +244,7 @@ async def nodes_out(db: DbSession, nodes: list[Node]) -> list[NodeOut]:
             region_name=clusters.get(n.cluster_id, ("", None, None))[2],
             instances_total=total, instances_running=running,
             vcpus_allocated=vcpus, memory_allocated_mb=memory,
+            guests_net_in_bps=net_in, guests_net_out_bps=net_out,
         ))
     return out
 

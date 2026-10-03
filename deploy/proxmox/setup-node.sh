@@ -9,7 +9,11 @@
 #   BRIDGE     bridge the templates' NICs use (SDN.Use there only)
 #   TEMPLATES  template VMIDs the platform may clone (read + clone only, never change)
 #   AUDIT_ALL  1 = read-only view of EVERY guest (VM.Audit on /vms): full inventory, tags
-#              and metrics in the platform; still no power/config/delete outside POOL
+#              and metrics in the platform; still no power/config/delete outside POOL.
+#              On PVE 9 it also grants VM.GuestAgent.Audit (disk usage inside the VMs).
+#              On PVE 8 the only way to read the agent is VM.Monitor, which also allows
+#              running commands inside the guest: it is NOT granted outside POOL, so
+#              those VMs show "agente sem permissão" for disk usage.
 #
 # It never touches existing guests. The token secret is printed ONCE (on creation).
 set -euo pipefail
@@ -79,7 +83,7 @@ role CMNode "$(privs Sys.Audit)"
 role CMTemplate "$(privs VM.Audit VM.Clone)"
 role CMStorage "$(privs Datastore.Audit Datastore.AllocateSpace)"
 role CMNetwork "$(privs SDN.Use)"
-role CMAudit "$(privs VM.Audit)"
+role CMAudit "$(privs VM.Audit VM.GuestAgent.Audit)"
 
 say "token"
 if out=$(pveum user token add "$PVE_USER" "$TOKEN_ID" --privsep 1 --comment "cloud-manager" \
@@ -120,10 +124,11 @@ say "permissões efetivas do token"
 pveum user token permissions "$PVE_USER" "$TOKEN_ID"
 cat <<EOF
 
-Pronto. Na plataforma: Clusters -> Novo cluster
+Pronto. Na plataforma: Hypervisors -> Adicionar hypervisor
   URL: a mesma que você usa no navegador para este Proxmox (https://<host>:8006),
        com o nome que consta no certificado TLS
   Pool de destino: $POOL    Token ID: $TOKEN
   Secret: o exibido acima. Cole direto na plataforma; não o compartilhe em chats/tickets.
-Depois: Testar conexão, Sincronizar e registrar os templates em Imagens.
+Depois: registrar os templates em Imagens. Para ver o disco usado dentro das VMs,
+instale e ative o qemu-guest-agent nelas (Options -> QEMU Guest Agent).
 EOF

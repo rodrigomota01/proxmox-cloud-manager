@@ -30,6 +30,10 @@ class ProviderOperationError(ProviderError):
     """An asynchronous operation finished with an error."""
 
 
+class GuestAgentUnavailable(ProviderError):
+    """The guest has no agent, or it is not running (the guest itself is fine)."""
+
+
 class InstanceKind(enum.StrEnum):
     VM = "vm"
     CONTAINER = "container"
@@ -96,6 +100,10 @@ class InstanceObservation:
     uptime_seconds: int = 0
     cpu_usage: float = 0.0  # 0..1 of the allocated vCPUs
     memory_used_mb: int = 0
+    # cumulative counters since the guest started; rates come from two snapshots
+    net_in_bytes: int = 0
+    net_out_bytes: int = 0
+    disk_used_bytes: int | None = None  # containers only: a VM's disk is opaque to the host
 
 
 @dataclass(frozen=True)
@@ -122,6 +130,16 @@ class NodeMetricPoint:
     net_out_bps: float
     load: float  # 1-minute load average
     iowait: float  # 0..1
+
+
+@dataclass(frozen=True)
+class FilesystemUsage:
+    """One mounted filesystem inside a guest, as its agent reports it."""
+
+    mountpoint: str
+    type: str
+    used_bytes: int
+    total_bytes: int
 
 
 @dataclass(frozen=True)
@@ -218,6 +236,9 @@ class CloudProvider(Protocol):
         """History for timeframe in hour|day|week (provider-side retention)."""
         ...
     async def node_metrics(self, node: str, timeframe: str) -> list[NodeMetricPoint]: ...
+    async def guest_filesystems(self, ref: ProviderRef) -> list[FilesystemUsage]:
+        """Filesystems inside a running VM. GuestAgentUnavailable without an agent."""
+        ...
     async def describe_template(self, ref: ProviderRef) -> TemplateDetails: ...
     async def slot_available(self, ref: ProviderRef) -> bool:
         """Whether the target id is free in the whole provider (also where we cannot see)."""

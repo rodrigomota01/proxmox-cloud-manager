@@ -5,6 +5,8 @@ from typing import ClassVar
 from urllib.parse import quote
 
 from app.providers.base import (
+    FilesystemUsage,
+    GuestAgentUnavailable,
     InstanceObservation,
     InstanceSpec,
     Inventory,
@@ -14,6 +16,7 @@ from app.providers.base import (
     OperationResult,
     PowerAction,
     ProgressCb,
+    ProviderAuthError,
     ProviderError,
     ProviderHealth,
     ProviderRef,
@@ -72,6 +75,18 @@ class ProxmoxProvider:
         ) or []
         points = (mapper.metric_point(r) for r in rows)
         return sorted((p for p in points if p is not None), key=lambda p: p.time)
+
+    async def guest_filesystems(self, ref: ProviderRef) -> list[FilesystemUsage]:
+        try:
+            data = await self.client.get(f"{self._path(ref)}/agent/get-fsinfo")
+        except ProviderAuthError:
+            raise
+        except ProviderError as exc:
+            # 500 "QEMU guest agent is not running" / "No QEMU guest agent configured"
+            if "agent" in str(exc).lower():
+                raise GuestAgentUnavailable(str(exc)) from exc
+            raise
+        return mapper.filesystems((data or {}).get("result") or [])
 
     async def node_metrics(self, node: str, timeframe: str) -> list[NodeMetricPoint]:
         rows = await self.client.get(

@@ -184,6 +184,12 @@ def _observe(
     instance.cpu_usage = 0.0 if stale else obs.cpu_usage
     instance.memory_used_mb = 0 if stale else obs.memory_used_mb
     instance.uptime_seconds = 0 if stale else obs.uptime_seconds
+    _observe_network(instance, obs, stale, now)
+    if obs.disk_used_bytes is not None:  # containers: the host sees their filesystem
+        total = obs.disk_gb * 1024**3
+        instance.disk_used_bytes, instance.disk_total_bytes = obs.disk_used_bytes, total or None
+        instance.disk_usage = obs.disk_used_bytes / total if total else None
+        instance.disk_checked_at = now
     instance.vcpus, instance.memory_mb, instance.root_disk_gb = (
         obs.vcpus, obs.memory_mb, obs.disk_gb,
     )
@@ -191,3 +197,20 @@ def _observe(
     instance.tags = sorted({t.strip().lower() for t in obs.tags if t.strip()})
     instance.missing_count = 0
     instance.last_seen_at = now
+
+
+def _observe_network(
+    instance: Instance, obs: InstanceObservation, stale: bool, now: datetime
+) -> None:
+    """Rate = counter delta / time between two snapshots. A counter that went down means
+    the guest restarted: no rate this round, the next one is right again."""
+    previous = instance.last_seen_at
+    rates = (0.0, 0.0)
+    if not stale and obs.power_state is PowerState.RUNNING and previous is not None:
+        elapsed = (now - previous).total_seconds()
+        d_in = obs.net_in_bytes - instance.net_in_bytes
+        d_out = obs.net_out_bytes - instance.net_out_bytes
+        if elapsed > 0 and d_in >= 0 and d_out >= 0:
+            rates = (d_in / elapsed, d_out / elapsed)
+    instance.net_in_bps, instance.net_out_bps = rates
+    instance.net_in_bytes, instance.net_out_bytes = obs.net_in_bytes, obs.net_out_bytes
