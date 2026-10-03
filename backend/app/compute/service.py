@@ -292,7 +292,7 @@ class ComputeService:
 
     # --- jobs ----------------------------------------------------------------------------
 
-    async def _viewable_projects(self) -> set[uuid.UUID] | None:
+    async def viewable_projects(self) -> set[uuid.UUID] | None:
         """Projects where the actor may view any instance kind; None = all."""
         projects: set[uuid.UUID] = set()
         for kind in KINDS:
@@ -304,7 +304,7 @@ class ComputeService:
 
     async def _jobs_visible(self) -> ColumnElement[bool]:
         """Own jobs, plus jobs of projects where the actor can view instances."""
-        projects = await self._viewable_projects()
+        projects = await self.viewable_projects()
         if projects is None:
             return Job.tenant_id == self.ctx.tenant_id
         return or_(Job.requested_by == self.actor, Job.project_id.in_(projects))
@@ -355,7 +355,7 @@ class ComputeService:
         projects_stmt = select(func.count()).select_from(Project).where(
             Project.tenant_id == self.ctx.tenant_id, Project.deleted_at.is_(None)
         )
-        viewable = await self._viewable_projects()
+        viewable = await self.viewable_projects()
         if viewable is not None:
             projects_stmt = projects_stmt.where(Project.id.in_(viewable))
         projects = await self.db.scalar(projects_stmt) or 0

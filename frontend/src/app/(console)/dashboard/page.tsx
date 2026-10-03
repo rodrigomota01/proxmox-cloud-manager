@@ -7,6 +7,7 @@ import { useState } from "react";
 import { NoTenant } from "@/components/no-tenant";
 import { ActivityRow } from "@/components/activity";
 import { Card, Empty, ErrorBox, Select, formatBytes } from "@/components/ui";
+import { AlertList } from "@/components/alerts";
 import { Stat, UsagePanel } from "@/components/usage-panel";
 import { pct } from "@/components/viz";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
@@ -37,6 +38,7 @@ function PlatformOverview() {
         </Select>
       </div>
       <ErrorBox message={overview.isError ? errorMessage(overview.error) : null} />
+      <ActiveAlerts scope={{ admin: true, tenantId: scope }} />
       {infra && (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Stat label="Hypervisors online" value={`${infra.nodes_online} de ${infra.nodes_total}`} />
@@ -65,6 +67,46 @@ function PlatformOverview() {
         </>
       )}
     </section>
+  );
+}
+
+/** Firing alerts in view, most recent first; hidden when there are none. */
+/** scope.tenantId "" (admin only) = every alert on the platform. */
+function ActiveAlerts({ scope }: { scope: { admin: boolean; tenantId: string } }) {
+  const alerts = useQuery({
+    queryKey: ["dashboard", "alerts", scope.admin, scope.tenantId],
+    queryFn: async () =>
+      scope.admin
+        ? unwrap(
+            await api.GET("/api/v1/admin/alerts", {
+              params: { query: { limit: 8, ...(scope.tenantId ? { tenant_id: scope.tenantId } : {}) } },
+            }),
+          )
+        : unwrap(await api.GET("/api/v1/alerts", { params: { query: { limit: 8 } } })),
+    refetchInterval: 15_000,
+  });
+  if (!alerts.data?.length) return null;
+  return (
+    <Card
+      title="Alertas ativos"
+      actions={
+        <Link href="/alerts" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+          Ver todos
+        </Link>
+      }
+    >
+      <AlertList
+        alerts={alerts.data}
+        showTenant={scope.admin && !scope.tenantId}
+        href={(a) =>
+          scope.admin
+            ? a.resource_type === "node"
+              ? `/admin/nodes/${a.resource_id}`
+              : null
+            : `/instances/${a.resource_id}`
+        }
+      />
+    </Card>
   );
 }
 
@@ -112,6 +154,7 @@ function TenantDashboard({ tenantId }: { tenantId: string }) {
         <Stat label="Operações em andamento" value={data?.active_jobs ?? "—"} />
       </div>
 
+      <ActiveAlerts scope={{ admin: false, tenantId }} />
       <TenantUsage tenantId={tenantId} />
 
       <Card

@@ -11,6 +11,7 @@ from fastapi import APIRouter, FastAPI
 from redis.asyncio import Redis
 
 from app.admin import router as admin
+from app.alerts import router as alerts
 from app.api import health
 from app.auth import router as auth
 from app.compute import router as compute
@@ -90,6 +91,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     v1.include_router(sshkeys.router)
     v1.include_router(users.router)
     v1.include_router(admin.router)
+    v1.include_router(alerts.router)
+    v1.include_router(alerts.admin_router)
     app.include_router(v1)
 
     return app

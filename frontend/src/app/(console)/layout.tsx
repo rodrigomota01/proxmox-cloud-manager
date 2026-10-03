@@ -1,16 +1,19 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { Logo } from "@/components/logo";
 import { Button, Select } from "@/components/ui";
+import { api, unwrap } from "@/lib/api/client";
 import { logout } from "@/lib/auth/session";
 import { SessionProvider, usePermissions, useSession } from "@/lib/session";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/instances", label: "Instâncias" },
+  { href: "/alerts", label: "Alertas" },
   { href: "/history", label: "Histórico" },
   { href: "/ssh-keys", label: "Chaves SSH" },
 ];
@@ -18,9 +21,37 @@ const ADMIN_NAV = [
   { href: "/admin/nodes", label: "Hypervisors" },
   { href: "/admin/regions", label: "Regiões e zonas" },
   { href: "/admin/images", label: "Imagens" },
+  { href: "/admin/alerts", label: "Regras de alerta" },
   { href: "/admin/tenants", label: "Clientes e quotas" },
   { href: "/admin/users", label: "Usuários" },
 ];
+
+/** Firing alerts in view: the tenant's (as its members see them) or, for platform
+ * admins, everything. */
+function AlertCount() {
+  const { tenantId, isPlatformAdmin } = useSession();
+  const summary = useQuery({
+    queryKey: ["alerts-summary", isPlatformAdmin, tenantId],
+    queryFn: async () =>
+      isPlatformAdmin
+        ? unwrap(await api.GET("/api/v1/admin/alerts/summary"))
+        : unwrap(await api.GET("/api/v1/alerts/summary")),
+    enabled: isPlatformAdmin || tenantId !== null,
+    refetchInterval: 30_000,
+  });
+  const s = summary.data;
+  if (!s?.firing) return null;
+  return (
+    <span
+      className={`ml-auto rounded-full px-1.5 text-xs font-semibold tabular-nums ${
+        s.critical ? "bg-rose-600 text-white" : "bg-amber-400 text-slate-900"
+      }`}
+      aria-label={`${s.firing} alertas ativos${s.critical ? `, ${s.critical} críticos` : ""}`}
+    >
+      {s.firing}
+    </span>
+  );
+}
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
@@ -28,13 +59,14 @@ function NavLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className={`block rounded-md px-3 py-1.5 text-sm ${
+      className={`flex items-center rounded-md px-3 py-1.5 text-sm ${
         active
           ? "bg-indigo-50 font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
           : "text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
       }`}
     >
       {label}
+      {href === "/alerts" && <AlertCount />}
     </Link>
   );
 }

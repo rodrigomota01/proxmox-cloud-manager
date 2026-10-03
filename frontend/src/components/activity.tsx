@@ -20,6 +20,7 @@ const TYPE: Record<string, string> = {
   "instance.create": "Criou",
   "instance.delete": "Excluiu",
   "cluster.sync": "Sincronizou o cluster",
+  "alert.notify": "Testou o canal de notificação",
 };
 
 export function actionLabel(job: Job): string {

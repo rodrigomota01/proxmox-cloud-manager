@@ -40,6 +40,7 @@ PERMISSIONS: dict[str, str] = {
     "cluster:manage": "Manage provider clusters and credentials",
     "cluster:sync": "Trigger inventory sync",
     "node:view": "View hypervisor nodes",
+    "alert:manage": "Manage alert rules and notification channels",
     "user:manage": "Manage user accounts (profile, status, password reset)",
     "platform:admin": "Manage platform administrators",
 }
@@ -64,6 +65,7 @@ ROLES: dict[str, tuple[str, list[str], set[str]]] = {
         _compute(_LIFECYCLE) | _SNAPSHOTS | _COMMON_VIEW | {
             "template:clone", "template:create", "network:manage", "project:create",
             "project:delete", "member:manage", "billing:view", "audit:view", "tenant:manage",
+            "alert:manage",
         },
     ),
     "PROJECT_ADMIN": (

@@ -21,6 +21,8 @@ import asyncpg
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.alerts import notify
+from app.alerts.evaluator import run_alerts
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.db.session import create_engine, create_sessionmaker, set_platform_scope
@@ -194,6 +196,9 @@ async def reconcile_loop(
             if loop.time() >= next_disk_poll:
                 next_disk_poll = loop.time() + settings.guest_disk_interval_seconds
                 await poll_guest_disks(sessionmaker, registry)
+            changes = await run_alerts(sessionmaker)
+            if changes:
+                logger.info("alerts changed", extra={"changes": len(changes)})
         except Exception:  # keep the loop alive; the next tick retries
             logger.exception("reconcile loop error")
         try:
@@ -208,6 +213,7 @@ async def run(settings: Settings | None = None) -> None:
     engine = create_engine(settings)
     sessionmaker = create_sessionmaker(engine)
     registry = ProviderRegistry(settings, build_secrets_backend(settings))
+    notify.configure(notify.Notifier.build(settings, registry.secrets))
 
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()

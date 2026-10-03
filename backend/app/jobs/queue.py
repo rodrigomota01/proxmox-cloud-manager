@@ -31,6 +31,11 @@ CHANNEL = "cm_jobs"
 LEASE = timedelta(minutes=10)
 
 
+class RetryLater(Exception):
+    """Raised by handlers for a transient failure outside the provider (e.g. SMTP or a
+    webhook receiver down): retried with the same backoff as provider outages."""
+
+
 class JobFailed(Exception):
     """Raised by handlers for a final, user-visible failure."""
 
@@ -209,13 +214,14 @@ async def run_one(
             raise JobFailed("UNKNOWN_JOB_TYPE", f"no handler for {job.type}")
         await ctx.event("started", attempt=job.attempts)
         result = await fn(ctx)
-    except ProviderUnavailable as exc:
+    except (ProviderUnavailable, RetryLater) as exc:
         if job.attempts < job.max_attempts:
             delay = timedelta(seconds=min(5 * 2 ** (job.attempts - 1), 120))
             await ctx.event("retry", str(exc), delay_seconds=delay.total_seconds())
             await _finish(sessionmaker, job.id, status="pending", run_after=now + delay)
         else:
-            await _fail(ctx, sessionmaker, "PROVIDER_UNAVAILABLE", str(exc))
+            code = "PROVIDER_UNAVAILABLE" if isinstance(exc, ProviderUnavailable) else "UNAVAILABLE"
+            await _fail(ctx, sessionmaker, code, str(exc))
     except JobFailed as exc:
         await _fail(ctx, sessionmaker, exc.code, exc.message)
     except ProviderError as exc:

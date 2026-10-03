@@ -1,5 +1,6 @@
 """Imports every ORM model so Base.metadata is complete (Alembic, schema tests)."""
 
+from app.alerts.models import Alert, AlertRule, NotificationChannel
 from app.audit.models import AuditLog
 from app.auth.models import PasswordResetToken, RefreshToken, Session
 from app.compute.models import Instance
@@ -13,6 +14,8 @@ from app.sshkeys.models import SshPublicKey
 from app.tenancy.models import Project, Tenant, TenantMembership, TenantQuota
 
 __all__ = [
+    "Alert",
+    "AlertRule",
     "AuditLog",
     "Base",
     "Image",
@@ -21,6 +24,7 @@ __all__ = [
     "Job",
     "JobEvent",
     "Node",
+    "NotificationChannel",
     "PasswordResetToken",
     "Permission",
     "Project",
