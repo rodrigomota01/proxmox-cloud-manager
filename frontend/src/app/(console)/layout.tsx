@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
+import { Logo } from "@/components/logo";
 import { Button, Select } from "@/components/ui";
 import { logout } from "@/lib/auth/session";
 import { SessionProvider, usePermissions, useSession } from "@/lib/session";
@@ -51,7 +52,9 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white px-3 py-4 dark:border-slate-800 dark:bg-slate-900">
-        <div className="px-3 pb-4 text-base font-semibold">Cloud Manager</div>
+        <div className="px-3 pb-5">
+          <Logo />
+        </div>
         <nav className="space-y-1">
           {NAV.map((item) => (
             <NavLink key={item.href} {...item} />
