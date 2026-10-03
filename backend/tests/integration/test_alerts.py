@@ -263,7 +263,9 @@ async def test_webhook_is_signed_and_secret_shown_once(client, env, app, owner_d
     job = (await client.get(f"/api/v1/jobs/{r.json()['job']['id']}", headers=alice)).json()
     assert job["status"] == "succeeded", job
     [(url, body, headers)] = env.webhook.calls
-    assert url == "https://hooks.example.com/cm" and json.loads(body)["event"] == "test"
+    payload = json.loads(body)
+    assert url == "https://hooks.example.com/cm" and payload["event"] == "test"
+    assert payload["text"].startswith("Cloud Manager — TESTE: VM vm-exemplo")
     expected = hmac.new(secret.encode(), headers["X-CM-Timestamp"].encode() + b"." + body,
                         hashlib.sha256).hexdigest()
     assert headers["X-CM-Signature"] == f"sha256={expected}"

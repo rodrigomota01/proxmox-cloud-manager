@@ -129,7 +129,12 @@ class Notifier:
         return cls(settings, build_mailer(settings), HttpWebhookSender(settings), secrets)
 
     def payload(self, alert: Alert, event: str) -> dict[str, Any]:
+        summary = self.mail("", alert, event).subject.removeprefix("[Cloud Manager] ")
         return {
+            # chat services render these as the message (Slack/Mattermost: text,
+            # Discord: content); everything else is for programmatic receivers
+            "text": f"Cloud Manager — {summary}",
+            "content": f"Cloud Manager — {summary}",
             "event": event,  # firing|resolved|test
             "alert_id": str(alert.id),
             "severity": alert.severity,
