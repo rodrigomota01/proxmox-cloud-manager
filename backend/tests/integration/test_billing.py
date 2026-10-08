@@ -1,6 +1,6 @@
 """Prices -> accrual by the worker -> cost reports, and who sees which costs."""
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -10,6 +10,7 @@ from app.billing.accrual import accrue_once
 from app.billing.models import PriceItem, UsageRecord
 from app.billing.service import month_of
 from app.db.session import set_platform_scope
+from app.k8s.models import K8sCluster, K8sSnapshot
 from tests.integration.factories import add_member, make_user
 from tests.integration.test_alerts import Env, env  # noqa: F401 - fixture
 
@@ -228,3 +229,90 @@ async def test_month_validation_and_past_months(client, benv):
     r = await client.post("/api/v1/admin/price-tables", headers=await benv.h("root"),
                           json={"name": "Padrão", "prices": PRICES})
     assert r.status_code == 409
+
+
+async def test_cost_visibility_per_client(client, benv, app, owner_db):
+    base = await _base(owner_db)
+    await _accrue(app, base)
+    await _accrue(app, base + timedelta(hours=2))
+    root, alice = await benv.h("root"), await benv.h("alice", benv.acme)
+    cluster = K8sCluster(name="acme-prod", source="manual", tenant_id=benv.acme.id,
+                         synced_at=datetime.now(UTC))
+    owner_db.add(cluster)
+    await owner_db.flush()
+    owner_db.add(K8sSnapshot(
+        cluster_id=cluster.id, health="healthy", collected_at=datetime.now(UTC),
+        summary={"nodes": 3, "nodes_ready": 3, "pods": 40, "namespaces": 6,
+                 "cpu_capacity": 12, "cpu_allocatable": 11.4, "cpu_requests": 5.5,
+                 "cpu_usage": 2.25, "mem_capacity": 48 * 2**30, "mem_allocatable": 46 * 2**30,
+                 "mem_requests": 20 * 2**30, "mem_usage": None},
+    ))
+    await owner_db.commit()
+
+    async def access(headers):
+        r = await client.get("/api/v1/billing/access", headers=headers)
+        assert r.status_code == 200, r.text
+        return r.json()["cost_visibility"]
+
+    async def set_visibility(value, headers=root):
+        return await client.put(f"/api/v1/admin/tenants/{benv.acme.id}/cost-visibility",
+                                json={"cost_visibility": value}, headers=headers)
+
+    # default: costs and usage
+    assert await access(alice) == "full"
+    assert (await client.get("/api/v1/billing/usage", headers=alice)).status_code == 200
+
+    # only platform billing admins choose; the tenant admin cannot widen it back
+    assert (await set_visibility("usage", alice)).status_code == 403
+    r = await set_visibility("usage")
+    assert r.status_code == 200 and r.json() == {"cost_visibility": "usage"}
+    assert (await set_visibility("bogus")).status_code == 422
+
+    # usage only: no costs, no prices, but consumed/allocated resources and the cluster
+    assert await access(alice) == "usage"
+    for path in ("/api/v1/billing/summary", "/api/v1/billing/prices"):
+        assert (await client.get(path, headers=alice)).status_code == 403
+    r = await client.get("/api/v1/billing/usage", headers=alice)
+    assert r.status_code == 200, r.text
+    u = r.json()
+    assert "accrued" not in u and "prices" not in u
+    assert [i["name"] for i in u["instances"]] == ["cm-test-2", "cm-test-1"]
+    ct = u["instances"][0]  # running, 2 vCPU / 2 GiB / 20 GiB for 2 hours
+    assert Decimal(ct["vcpu_hours"]) == 4 and Decimal(ct["memory_gib_hours"]) == 4
+    assert Decimal(ct["disk_gib_hours"]) == 40 and Decimal(ct["running_hours"]) == 2
+    vm = u["instances"][1]  # stopped: only its disk counts
+    assert Decimal(vm["vcpu_hours"]) == 0 and Decimal(vm["disk_gib_hours"]) == 40
+    assert Decimal(u["consumed"]["disk_gib_hours"]) == 80
+    assert u["allocated"]["instances"] == 2 and u["allocated"]["running"] == 1
+    assert {p["name"] for p in u["projects"]} == {"db", "web"}
+    assert sum(Decimal(d["vcpu_hours"]) for d in u["days"]) == 4
+    [c] = u["clusters"]
+    assert c["name"] == "acme-prod" and c["nodes"] == 3 and c["cpu_usage"] == 2.25
+    assert c["mem_usage"] is None and c["mem_capacity"] == 48 * 2**30
+
+    # project roles: only their projects' VMs; the client's cluster with k8s:view
+    r = await client.get("/api/v1/billing/usage", headers=await benv.h("paula", benv.acme))
+    assert [i["name"] for i in r.json()["instances"]] == ["cm-test-1"]
+    assert [c["name"] for c in r.json()["clusters"]] == ["acme-prod"]
+    # another client sees neither
+    r = await client.get("/api/v1/billing/usage", headers=await benv.h("eve", benv.globex))
+    assert r.json()["instances"] == [] and r.json()["clusters"] == []
+
+    # platform billing viewers are not bound by the setting
+    as_root = await benv.h("root", benv.acme)
+    assert await access(as_root) == "full"
+    assert (await client.get("/api/v1/billing/summary", headers=as_root)).status_code == 200
+
+    # hidden: nothing at all for the client's members
+    assert (await set_visibility("none")).status_code == 200
+    assert await access(alice) == "none"
+    for path in ("/api/v1/billing/summary", "/api/v1/billing/usage", "/api/v1/billing/prices"):
+        assert (await client.get(path, headers=alice)).status_code == 403
+    p = (await client.get("/api/v1/admin/billing/summary", headers=root)).json()
+    vis = {t["slug"]: t["cost_visibility"] for t in p["tenants"]}
+    assert vis == {"acme": "none", "globex": "full"}
+    actions = (await owner_db.execute(text(
+        "SELECT details->>'to' FROM audit_logs WHERE action = 'TENANT_COST_VISIBILITY_SET'"
+        " ORDER BY occurred_at"
+    ))).scalars().all()
+    assert actions == ["usage", "none"]

@@ -9,6 +9,7 @@ import { Icon, type IconName } from "@/components/icons";
 import { LogoMark } from "@/components/logo";
 import { api, unwrap } from "@/lib/api/client";
 import { logout } from "@/lib/auth/session";
+import { useCostVisibility } from "@/lib/queries";
 import { SessionProvider, usePermissions, useSession } from "@/lib/session";
 
 type NavItem = { href: string; label: string; also?: string[] };
@@ -27,6 +28,8 @@ function useNav(): { top: NavItem & { icon: IconName }; groups: NavGroup[] } {
     staleTime: 60_000,
   });
   const k8sLinked = (linked.data?.length ?? 0) > 0;
+  // per client: costs, resource usage only (no prices), or hidden
+  const costs = useCostVisibility();
   const groups: NavGroup[] = [
     {
       key: "compute",
@@ -59,11 +62,14 @@ function useNav(): { top: NavItem & { icon: IconName }; groups: NavGroup[] } {
     },
     {
       key: "billing",
-      label: "Custos",
+      label: admin || costs !== "usage" ? "Custos" : "Consumo",
       icon: "coins",
       items: [
-        // every tenant role sees the costs of its own projects (the page scopes them)
-        ...(tenantId ? [{ href: "/costs", label: "Custos" }] : []),
+        // every tenant role sees the costs of its own projects (the page scopes them),
+        // unless the client's costs are limited to usage or hidden
+        ...(tenantId && costs && costs !== "none"
+          ? [{ href: "/costs", label: costs === "usage" ? "Uso de recursos" : "Custos e uso" }]
+          : []),
         ...(admin ? [{ href: "/admin/pricing", label: "Tabelas de preço" }] : []),
       ],
     },

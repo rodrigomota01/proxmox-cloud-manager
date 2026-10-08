@@ -829,6 +829,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/tenants/{tenant_id}/cost-visibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Tenant Cost Visibility
+         * @description What the client's members see in Costs: full, usage (no prices) or none.
+         */
+        put: operations["set_tenant_cost_visibility_api_v1_admin_tenants__tenant_id__cost_visibility_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/tenants/{tenant_id}/price-table": {
         parameters: {
             query?: never;
@@ -1177,6 +1197,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tenant Billing Access
+         * @description What the console offers this user: costs, resource usage only, or nothing. The
+         *     permission checks (billing:view) still apply on each report.
+         */
+        get: operations["tenant_billing_access_api_v1_billing_access_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/prices": {
         parameters: {
             query?: never;
@@ -1186,7 +1227,8 @@ export interface paths {
         };
         /**
          * Tenant Prices
-         * @description Today's prices for the tenant: any member (the creation form shows an estimate).
+         * @description Today's prices for the tenant: any member (the creation form shows an estimate),
+         *     unless the client's costs are hidden from it.
          */
         get: operations["tenant_prices_api_v1_billing_prices_get"];
         put?: never;
@@ -1206,6 +1248,27 @@ export interface paths {
         };
         /** Tenant Summary */
         get: operations["tenant_summary_api_v1_billing_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tenant Usage
+         * @description Consumed and allocated resources of the tenant's VMs (same project rules as the
+         *     cost summary) and the Kubernetes clusters linked to it; no prices.
+         */
+        get: operations["tenant_usage_api_v1_billing_usage_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2335,6 +2398,33 @@ export interface components {
             /** Firing */
             firing: number;
         };
+        /**
+         * AllocatedOut
+         * @description What the live instances hold right now.
+         */
+        AllocatedOut: {
+            /** Disk Gb */
+            disk_gb: number;
+            /** Instances */
+            instances: number;
+            /** Memory Mb */
+            memory_mb: number;
+            /** Running */
+            running: number;
+            /** Vcpus */
+            vcpus: number;
+        };
+        /**
+         * BillingAccessOut
+         * @description What this user sees of the tenant's billing (platform billing viewers: always full).
+         */
+        BillingAccessOut: {
+            /**
+             * Cost Visibility
+             * @enum {string}
+             */
+            cost_visibility: "full" | "usage" | "none";
+        };
         /** BindingCreate */
         BindingCreate: {
             /** Project Id */
@@ -2577,6 +2667,48 @@ export interface components {
             /** Zone Id */
             zone_id?: string | null;
         };
+        /**
+         * ClusterUsageOut
+         * @description Last collection of a Kubernetes cluster linked to the tenant (not month-bound).
+         *     CPU in cores, memory in bytes; usage is None without metrics-server.
+         */
+        ClusterUsageOut: {
+            /**
+             * Cluster Id
+             * Format: uuid
+             */
+            cluster_id: string;
+            /** Collected At */
+            collected_at: string | null;
+            /** Cpu Allocatable */
+            cpu_allocatable: number;
+            /** Cpu Capacity */
+            cpu_capacity: number;
+            /** Cpu Requests */
+            cpu_requests: number;
+            /** Cpu Usage */
+            cpu_usage: number | null;
+            /** Health */
+            health: ("healthy" | "warning" | "critical" | "unreachable") | null;
+            /** Mem Allocatable */
+            mem_allocatable: number;
+            /** Mem Capacity */
+            mem_capacity: number;
+            /** Mem Requests */
+            mem_requests: number;
+            /** Mem Usage */
+            mem_usage: number | null;
+            /** Name */
+            name: string;
+            /** Namespaces */
+            namespaces: number;
+            /** Nodes */
+            nodes: number;
+            /** Nodes Ready */
+            nodes_ready: number;
+            /** Pods */
+            pods: number;
+        };
         /** Confirm */
         Confirm: {
             /** Confirm */
@@ -2678,6 +2810,18 @@ export interface components {
              * Format: date
              */
             date: string;
+        };
+        /** DayUsageOut */
+        DayUsageOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Memory Gib Hours */
+            memory_gib_hours: string;
+            /** Vcpu Hours */
+            vcpu_hours: string;
         };
         /**
          * DiskUsageOut
@@ -2999,6 +3143,40 @@ export interface components {
             zone_id: string | null;
             /** Zone Name */
             zone_name: string | null;
+        };
+        /** InstanceUsageOut */
+        InstanceUsageOut: {
+            /** Deleted */
+            deleted: boolean;
+            /** Disk Gb */
+            disk_gb: number;
+            /** Disk Gib Hours */
+            disk_gib_hours: string;
+            /** Hours */
+            hours: string;
+            /**
+             * Instance Id
+             * Format: uuid
+             */
+            instance_id: string;
+            /** Kind */
+            kind: string;
+            /** Memory Gib Hours */
+            memory_gib_hours: string;
+            /** Memory Mb */
+            memory_mb: number;
+            /** Name */
+            name: string;
+            /** Power State */
+            power_state: string;
+            /** Project Id */
+            project_id: string | null;
+            /** Running Hours */
+            running_hours: string;
+            /** Vcpu Hours */
+            vcpu_hours: string;
+            /** Vcpus */
+            vcpus: number;
         };
         /** IpamReportOut */
         IpamReportOut: {
@@ -4000,6 +4178,21 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /** ProjectUsageOut */
+        ProjectUsageOut: {
+            /** Disk Gib Hours */
+            disk_gib_hours: string;
+            /** Instances */
+            instances: number;
+            /** Memory Gib Hours */
+            memory_gib_hours: string;
+            /** Name */
+            name: string | null;
+            /** Project Id */
+            project_id: string | null;
+            /** Vcpu Hours */
+            vcpu_hours: string;
+        };
         /** QuotaLineOut */
         QuotaLineOut: {
             /** Available */
@@ -4074,6 +4267,18 @@ export interface components {
             new_password: string;
             /** Token */
             token: string;
+        };
+        /**
+         * ResourceHoursOut
+         * @description Consumption in the month: vCPU and RAM count while running; disk while it exists.
+         */
+        ResourceHoursOut: {
+            /** Disk Gib Hours */
+            disk_gib_hours: string;
+            /** Memory Gib Hours */
+            memory_gib_hours: string;
+            /** Vcpu Hours */
+            vcpu_hours: string;
         };
         /** RoleOut */
         RoleOut: {
@@ -4222,6 +4427,11 @@ export interface components {
         TenantCostOut: {
             /** Accrued */
             accrued: string;
+            /**
+             * Cost Visibility
+             * @enum {string}
+             */
+            cost_visibility: "full" | "usage" | "none";
             /** Custom Price Table */
             custom_price_table: boolean;
             /** Forecast */
@@ -4243,6 +4453,14 @@ export interface components {
              * Format: uuid
              */
             tenant_id: string;
+        };
+        /** TenantCostVisibility */
+        TenantCostVisibility: {
+            /**
+             * Cost Visibility
+             * @enum {string}
+             */
+            cost_visibility: "full" | "usage" | "none";
         };
         /** TenantCreate */
         TenantCreate: {
@@ -4388,6 +4606,25 @@ export interface components {
             top: components["schemas"]["TopInstancesOut"];
             /** Vcpus */
             vcpus: number;
+        };
+        /** UsageReportOut */
+        UsageReportOut: {
+            allocated: components["schemas"]["AllocatedOut"];
+            /** Clusters */
+            clusters: components["schemas"]["ClusterUsageOut"][];
+            consumed: components["schemas"]["ResourceHoursOut"];
+            /** Current */
+            current: boolean;
+            /** Days */
+            days: components["schemas"]["DayUsageOut"][];
+            /** Instances */
+            instances: components["schemas"]["InstanceUsageOut"][];
+            /** Month */
+            month: string;
+            /** Projects */
+            projects: components["schemas"]["ProjectUsageOut"][];
+            /** Timezone */
+            timezone: string;
         };
         /** UserCreate */
         UserCreate: {
@@ -6268,6 +6505,41 @@ export interface operations {
             };
         };
     };
+    set_tenant_cost_visibility_api_v1_admin_tenants__tenant_id__cost_visibility_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantCostVisibility"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantCostVisibility"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     set_tenant_price_table_api_v1_admin_tenants__tenant_id__price_table_put: {
         parameters: {
             query?: never;
@@ -7054,6 +7326,35 @@ export interface operations {
             };
         };
     };
+    tenant_billing_access_api_v1_billing_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingAccessOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     tenant_prices_api_v1_billing_prices_get: {
         parameters: {
             query?: never;
@@ -7102,6 +7403,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CostSummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tenant_usage_api_v1_billing_usage_get: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM */
+                month?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageReportOut"];
                 };
             };
             /** @description Validation Error */

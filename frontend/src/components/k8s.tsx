@@ -73,7 +73,7 @@ const HEALTH: Record<K8sSummary["health"], { tone: StatusTone; label: string; ic
   unreachable: { tone: "off", label: "Sem conexão", icon: "ban" },
 };
 
-export function HealthBadge({ s }: { s: K8sSummary | null | undefined }) {
+export function HealthBadge({ s }: { s: Pick<K8sSummary, "health"> | null | undefined }) {
   if (!s) return <Status tone="unknown">Não coletado</Status>;
   const h = HEALTH[s.health];
   return (

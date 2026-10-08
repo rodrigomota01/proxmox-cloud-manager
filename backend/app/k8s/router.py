@@ -286,14 +286,18 @@ tenant_clusters = table("k8s_tenant_clusters", *(column(c) for c in _CLUSTER_COL
 tenant_snapshots = table("k8s_tenant_snapshots", *(column(c) for c in _SNAPSHOT_COLS))
 
 
-async def _require_k8s_view(db: AsyncSession, ctx) -> None:
+async def can_view_k8s(db: AsyncSession, ctx) -> bool:
     """k8s:view at the tenant, or from any project-level binding in it (a cluster serves
     the whole client, so a role in one of its projects is enough)."""
     user = ctx.principal.user_id
     if "k8s:view" in await effective_permissions(db, user, Scope(ctx.tenant_id)):
-        return
-    if not await projects_with_permission(db, user, ctx.tenant_id, "k8s:view"):
-        await authorize(db, user, "k8s:view", Scope(ctx.tenant_id))  # raises + audits
+        return True
+    return bool(await projects_with_permission(db, user, ctx.tenant_id, "k8s:view"))
+
+
+async def _require_k8s_view(db: AsyncSession, ctx) -> None:
+    if not await can_view_k8s(db, ctx):
+        await authorize(db, ctx.principal.user_id, "k8s:view", Scope(ctx.tenant_id))  # raises
 
 
 def _transient(row) -> K8sCluster:
@@ -307,6 +311,19 @@ async def _tenant_snapshots(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid
         return {}
     rows = await db.execute(select(tenant_snapshots).where(tenant_snapshots.c.cluster_id.in_(ids)))
     return {r.cluster_id: K8sSnapshot(**r._mapping) for r in rows}
+
+
+async def linked_clusters(
+    db: AsyncSession, tenant_id: uuid.UUID
+) -> list[tuple[uuid.UUID, str, K8sSnapshot | None]]:
+    """(id, name, last snapshot) of the clusters linked to the tenant, read through the
+    views (the session must be scoped to the tenant)."""
+    rows = (await db.execute(
+        select(tenant_clusters.c.id, tenant_clusters.c.name)
+        .where(tenant_clusters.c.tenant_id == tenant_id).order_by(tenant_clusters.c.name)
+    )).all()
+    snaps = await _tenant_snapshots(db, [r.id for r in rows])
+    return [(r.id, r.name, snaps.get(r.id)) for r in rows]
 
 
 @tenant_router.get("/clusters")

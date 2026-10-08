@@ -45,6 +45,14 @@ externo ainda; a arquitetura precisa deixar a integração possível depois.
   do próprio cliente (`/billing/prices`), para a estimativa no formulário de criação.
   Admin da plataforma vê o custo por cliente (`/admin/billing/summary`) e o detalhe de
   um cliente entrando no tenant, como nas outras telas.
+- **Visibilidade por cliente** (desde 2026-10-08, `tenants.cost_visibility`, migração
+  0015): o admin da plataforma (`billing:manage`) escolhe o que os usuários do cliente
+  veem. `full` (padrão): custos e uso. `usage`: só o consumo e o alocado, sem nenhum
+  valor (`/billing/summary` e `/billing/prices` respondem 403; `/billing/usage` traz
+  vCPU·h, GiB·h de RAM e de disco das VMs e a capacidade/consumo dos clusters Kubernetes
+  vinculados ao cliente). `none`: nada (403 nas três rotas, menu oculto). É um limite a
+  mais sobre `billing:view`, não um substituto: as regras por projeto continuam valendo.
+  Quem tem `billing:view` na plataforma não é afetado.
 
 ## Alternativas
 - **Calcular sob demanda a partir da auditoria/jobs** (ligou às X, desligou às Y):

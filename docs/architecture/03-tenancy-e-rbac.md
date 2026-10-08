@@ -122,7 +122,7 @@ Legenda: ✅ concede · — não concede
 | `member:manage` | ✅ | ✅ | ✅ | ✅² | — | — | — |
 | `quota:view` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `quota:manage` | ✅ | ✅ | — | — | — | — | — |
-| `billing:view` (no projeto: só os custos dele) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `billing:view` (no projeto: só os custos dele; limitado pela visibilidade do cliente) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `k8s:view` (clusters vinculados ao tenant, sem kubeconfig) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `billing:manage` (preços) | ✅ | ✅ | — | — | — | — | — |
 | `audit:view` | ✅ | ✅ | ✅³ | — | — | — | — |

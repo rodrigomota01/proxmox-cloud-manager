@@ -33,3 +33,18 @@ export function useAdminZones() {
     r.zones.map((z) => ({ id: z.id, label: `${r.name} · ${z.name}`, active: r.active && z.active })),
   );
 }
+
+export type CostVisibility = "full" | "usage" | "none";
+
+/** What this user sees of the client's billing: costs, resource usage only, or nothing.
+ * Set per client by a platform admin; platform admins always get "full". */
+export function useCostVisibility(): CostVisibility | undefined {
+  const { tenantId } = useSession();
+  const q = useQuery({
+    queryKey: ["billing", "access", tenantId],
+    queryFn: async () => unwrap(await api.GET("/api/v1/billing/access")).cost_visibility,
+    enabled: tenantId !== null,
+    staleTime: 60_000,
+  });
+  return q.data;
+}
