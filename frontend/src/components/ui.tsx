@@ -3,14 +3,17 @@
 /** Small UI primitives (Tailwind). Kept local instead of a component library. */
 import { useEffect, useRef } from "react";
 
-type Variant = "primary" | "secondary" | "danger" | "ghost";
+import { Icon, type IconName } from "@/components/icons";
+
+type Variant = "primary" | "secondary" | "danger" | "ghost" | "link";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-indigo-600 text-white hover:bg-indigo-500 disabled:bg-indigo-400",
+  primary: "bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 disabled:bg-indigo-400",
   secondary:
-    "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800",
+    "border border-slate-300 bg-white text-slate-800 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800",
   danger: "bg-rose-600 text-white hover:bg-rose-500 disabled:bg-rose-400",
   ghost: "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
+  link: "!px-0 text-indigo-600 hover:underline dark:text-indigo-400",
 };
 
 export function Button({
@@ -29,7 +32,7 @@ export function Button({
 export function Input({ className = "", ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 ${className}`}
+      className={`w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 ${className}`}
       {...props}
     />
   );
@@ -50,7 +53,7 @@ export function Textarea({
 export function Select({ className = "", ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900 ${className}`}
+      className={`rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 ${className}`}
       {...props}
     />
   );
@@ -76,26 +79,34 @@ export function Field({
 
 export function Card({
   title,
+  description,
   actions,
   children,
   className = "",
+  flush = false,
 }: {
   title?: React.ReactNode;
+  description?: React.ReactNode;
   actions?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  /** no body padding: for tables and toolbars that run edge to edge */
+  flush?: boolean;
 }) {
   return (
     <section
-      className={`rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 ${className}`}
+      className={`rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${className}`}
     >
       {(title || actions) && (
-        <header className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-          <h2 className="text-sm font-semibold">{title}</h2>
-          {actions && <div className="flex items-center gap-2">{actions}</div>}
+        <header className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 pb-1">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold">{title}</h2>
+            {description && <p className="text-xs text-slate-500">{description}</p>}
+          </div>
+          {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </header>
       )}
-      <div className="p-4">{children}</div>
+      <div className={flush ? "pt-2" : "px-5 pt-3 pb-5"}>{children}</div>
     </section>
   );
 }
@@ -106,84 +117,174 @@ const tones = {
   amber: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
   red: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
   blue: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
+  indigo: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
 };
 
 export function Badge({ tone = "gray", children }: { tone?: keyof typeof tones; children: React.ReactNode }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${tones[tone]}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${tones[tone]}`}>
       {children}
     </span>
   );
 }
 
-const powerTone: Record<string, keyof typeof tones> = {
-  running: "green",
-  stopped: "gray",
-  paused: "amber",
-  unknown: "amber",
+export type StatusTone = "ok" | "off" | "warn" | "error" | "progress" | "unknown" | "info";
+
+const statusStyle: Record<StatusTone, { icon: IconName; color: string }> = {
+  ok: { icon: "checkCircle", color: "text-emerald-600 dark:text-emerald-400" },
+  off: { icon: "minusCircle", color: "text-slate-400 dark:text-slate-500" },
+  warn: { icon: "warning", color: "text-amber-500 dark:text-amber-400" },
+  error: { icon: "xCircle", color: "text-rose-600 dark:text-rose-400" },
+  progress: { icon: "loader", color: "text-sky-600 dark:text-sky-400" },
+  unknown: { icon: "helpCircle", color: "text-slate-400 dark:text-slate-500" },
+  info: { icon: "info", color: "text-sky-600 dark:text-sky-400" },
 };
-const powerLabel: Record<string, string> = {
-  running: "Ligada",
-  stopped: "Desligada",
-  paused: "Pausada",
-  unknown: "Desconhecido",
+
+/** Console-style status: colored icon + plain text (color is never the only signal). */
+export function Status({
+  tone,
+  children,
+  icon,
+  title,
+}: {
+  tone: StatusTone;
+  children: React.ReactNode;
+  icon?: IconName;
+  title?: string;
+}) {
+  const st = statusStyle[tone];
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm" title={title}>
+      <span className={st.color}>
+        <Icon name={icon ?? st.icon} className={`h-4 w-4 ${tone === "progress" ? "animate-spin" : ""}`} />
+      </span>
+      {children}
+    </span>
+  );
+}
+
+const power: Record<string, [StatusTone, string, IconName?]> = {
+  running: ["ok", "Ligada"],
+  stopped: ["off", "Desligada"],
+  paused: ["warn", "Pausada", "pauseCircle"],
+  unknown: ["unknown", "Desconhecido"],
 };
 
 export function PowerBadge({ state }: { state: string }) {
-  return <Badge tone={powerTone[state] ?? "gray"}>{powerLabel[state] ?? state}</Badge>;
+  const [tone, label, icon] = power[state] ?? ["unknown", state];
+  return (
+    <Status tone={tone} icon={icon}>
+      {label}
+    </Status>
+  );
 }
 
-const stateTone: Record<string, keyof typeof tones> = {
-  provisioning: "blue",
-  deleting: "amber",
-  error: "red",
-  active: "green",
-};
-const stateLabel: Record<string, string> = {
-  provisioning: "Criando…",
-  deleting: "Excluindo…",
-  error: "Erro",
-  active: "Ativa",
+const lifecycle: Record<string, [StatusTone, string]> = {
+  provisioning: ["progress", "Criando…"],
+  deleting: ["progress", "Excluindo…"],
+  error: ["error", "Erro"],
+  active: ["ok", "Ativa"],
 };
 
 export function StateBadge({ state }: { state: string }) {
-  return <Badge tone={stateTone[state] ?? "gray"}>{stateLabel[state] ?? state}</Badge>;
+  const [tone, label] = lifecycle[state] ?? ["unknown", state];
+  return <Status tone={tone}>{label}</Status>;
 }
 
-const jobTone: Record<string, keyof typeof tones> = {
-  pending: "blue",
-  running: "blue",
-  succeeded: "green",
-  failed: "red",
-  cancelled: "gray",
-};
-const jobLabel: Record<string, string> = {
-  pending: "Na fila",
-  running: "Executando",
-  succeeded: "Concluído",
-  failed: "Falhou",
-  cancelled: "Cancelado",
+const job: Record<string, [StatusTone, string, IconName?]> = {
+  pending: ["info", "Na fila", "history"],
+  running: ["progress", "Executando"],
+  succeeded: ["ok", "Concluído"],
+  failed: ["error", "Falhou"],
+  cancelled: ["off", "Cancelado"],
 };
 
 export function JobBadge({ status }: { status: string }) {
-  return <Badge tone={jobTone[status] ?? "gray"}>{jobLabel[status] ?? status}</Badge>;
+  const [tone, label, icon] = job[status] ?? ["unknown", status];
+  return (
+    <Status tone={tone} icon={icon}>
+      {label}
+    </Status>
+  );
 }
 
-export function ErrorBox({ message }: { message: string | null | undefined }) {
-  if (!message) return null;
+const alertStyle = {
+  info: { icon: "info", box: "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-950/60 dark:text-sky-100", ic: "text-sky-600 dark:text-sky-400" },
+  success: { icon: "checkCircle", box: "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-100", ic: "text-emerald-600 dark:text-emerald-400" },
+  warning: { icon: "warning", box: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-100", ic: "text-amber-500 dark:text-amber-400" },
+  danger: { icon: "xCircle", box: "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-100", ic: "text-rose-600 dark:text-rose-400" },
+} as const;
+
+/** Inline alert with a colored top border and icon. */
+export function Alert({
+  variant = "info",
+  title,
+  children,
+  actions,
+}: {
+  variant?: keyof typeof alertStyle;
+  title?: React.ReactNode;
+  children?: React.ReactNode;
+  actions?: React.ReactNode;
+}) {
+  const st = alertStyle[variant];
   return (
     <div
-      role="alert"
-      className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200"
+      role={variant === "danger" ? "alert" : "status"}
+      className={`flex gap-3 rounded-md border border-t-[3px] px-4 py-3 text-sm ${st.box}`}
     >
-      {message}
+      <span className={`mt-0.5 ${st.ic}`}>
+        <Icon name={st.icon} />
+      </span>
+      <div className="min-w-0 flex-1 space-y-1">
+        {title && <div className="font-semibold">{title}</div>}
+        {children && <div>{children}</div>}
+      </div>
+      {actions && <div className="flex shrink-0 items-start gap-2">{actions}</div>}
     </div>
   );
 }
 
-export function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="py-6 text-center text-sm text-slate-500">{children}</p>;
+export function ErrorBox({ message }: { message: string | null | undefined }) {
+  if (!message) return null;
+  return <Alert variant="danger">{message}</Alert>;
 }
+
+/** Empty state: icon, a sentence, and optionally what to do next. */
+export function Empty({
+  children,
+  title,
+  icon = "search",
+  action,
+}: {
+  children?: React.ReactNode;
+  title?: React.ReactNode;
+  icon?: IconName;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+      <span className="text-slate-300 dark:text-slate-600">
+        <Icon name={icon} className="h-10 w-10" />
+      </span>
+      {title && <div className="text-base font-semibold">{title}</div>}
+      {children && <p className="max-w-md text-sm text-slate-500">{children}</p>}
+      {action && <div className="pt-2">{action}</div>}
+    </div>
+  );
+}
+
+/** Class names for console tables (use inside a flush Card). */
+export const tbl = {
+  wrap: "overflow-x-auto",
+  table: "w-full text-left text-sm",
+  thead: "border-b border-slate-200 text-xs font-semibold text-slate-600 dark:border-slate-800 dark:text-slate-300",
+  th: "whitespace-nowrap px-4 py-3 font-semibold first:pl-5 last:pr-5",
+  tbody: "divide-y divide-slate-100 dark:divide-slate-800",
+  tr: "align-middle hover:bg-slate-50 dark:hover:bg-slate-800/40",
+  td: "px-4 py-3 first:pl-5 last:pr-5",
+  link: "font-medium text-indigo-600 hover:underline dark:text-indigo-400",
+};
 
 export function Spinner() {
   return (
@@ -217,12 +318,20 @@ export function Dialog({
     <dialog
       ref={ref}
       onClose={onClose}
-      className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+      className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
     >
-      <div className="border-b border-slate-200 px-4 py-3 text-sm font-semibold dark:border-slate-800">
-        {title}
+      <div className="flex items-center justify-between gap-3 px-5 pt-5 pb-2">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar"
+          className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+        >
+          <Icon name="x" />
+        </button>
       </div>
-      <div className="p-4">{children}</div>
+      <div className="px-5 pb-5">{children}</div>
     </dialog>
   );
 }

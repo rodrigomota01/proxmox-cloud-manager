@@ -3,7 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Select } from "@/components/ui";
+import { Menu, PageHeader, Toolbar } from "@/components/page";
+import { Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Select, Status, tbl } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 
 type Template = Schemas["TemplateOut"];
@@ -191,60 +192,113 @@ export default function AdminImagesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold">Imagens</h1>
+      <PageHeader
+        title="Imagens"
+        breadcrumbs={[{ label: "Computação" }, { label: "Imagens" }]}
+        description="Catálogo oferecido em “Nova instância”. Cada imagem aponta para um template em um ou mais servidores (uma zona por servidor)."
+      />
 
-      <Card title="Catálogo">
-        {images.data?.length === 0 && <Empty>Nenhuma imagem registrada.</Empty>}
-        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-          {images.data?.map((i) => (
-            <li key={i.id} className={`py-3 ${i.active ? "" : "opacity-50"}`}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{i.name}</span>
-                  <Badge tone={i.visibility === "public" ? "blue" : "gray"}>
-                    {i.visibility === "public" ? "Pública" : "Tenant"}
-                  </Badge>
-                  <span className="text-xs text-slate-500">
-                    usuário {i.default_user} · disco mín. {i.min_disk_gb} GiB
-                  </span>
-                </div>
-                <Button variant="ghost" disabled={toggle.isPending} onClick={() => toggle.mutate({ id: i.id, active: !i.active })}>
-                  {i.active ? "Desativar" : "Reativar"}
-                </Button>
-              </div>
-              <ul className="mt-2 flex flex-wrap gap-2">
-                {i.templates.length === 0 && (
-                  <li className="text-xs text-amber-700 dark:text-amber-300">Sem template em nenhum servidor: indisponível.</li>
-                )}
-                {i.templates.map((t) => (
-                  <li
-                    key={t.id}
-                    className="flex items-center gap-2 rounded-md border border-slate-200 px-2 py-1 text-xs dark:border-slate-700"
-                  >
-                    <span>
-                      {t.zone_name ?? <span className="text-amber-700 dark:text-amber-300">sem zona</span>} ·{" "}
-                      {t.cluster_name} · template {t.template_vmid}
-                    </span>
-                    <button
-                      aria-label={`Remover template de ${t.cluster_name}`}
-                      className="text-slate-400 hover:text-rose-600"
-                      disabled={detach.isPending}
-                      onClick={() => detach.mutate({ image: i.id, template: t.id })}
-                    >
-                      ✕
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
-        <ErrorBox message={toggle.isError ? errorMessage(toggle.error) : detach.isError ? errorMessage(detach.error) : null} />
+      <ErrorBox message={toggle.isError ? errorMessage(toggle.error) : detach.isError ? errorMessage(detach.error) : null} />
+      <Card title="Catálogo" description={images.data ? `${images.data.length} imagem(ns)` : undefined} flush>
+        {images.data?.length === 0 ? (
+          <Empty icon="layers" title="Nenhuma imagem registrada">
+            Escolha um servidor em “Templates nos servidores” abaixo e registre um template.
+          </Empty>
+        ) : (
+          !!images.data?.length && (
+            <div className={tbl.wrap}>
+              <table className={tbl.table}>
+                <thead className={tbl.thead}>
+                  <tr>
+                    <th className={tbl.th}>Imagem</th>
+                    <th className={tbl.th}>Visibilidade</th>
+                    <th className={tbl.th}>Status</th>
+                    <th className={tbl.th}>Templates (zona · servidor · VMID)</th>
+                    <th className={tbl.th} />
+                  </tr>
+                </thead>
+                <tbody className={tbl.tbody}>
+                  {images.data.map((i) => (
+                    <tr key={i.id} className={`${tbl.tr} align-top`}>
+                      <td className={tbl.td}>
+                        <div className="font-medium">{i.name}</div>
+                        <div className="text-xs text-slate-500">
+                          usuário {i.default_user} · disco mín. {i.min_disk_gb} GiB
+                        </div>
+                      </td>
+                      <td className={tbl.td}>
+                        <Badge tone={i.visibility === "public" ? "blue" : "gray"}>
+                          {i.visibility === "public" ? "Pública" : "Tenant"}
+                        </Badge>
+                      </td>
+                      <td className={tbl.td}>
+                        {!i.active ? (
+                          <Status tone="off">Desativada</Status>
+                        ) : i.templates.length === 0 ? (
+                          <Status tone="warn" title="Sem template em nenhum servidor">
+                            Indisponível
+                          </Status>
+                        ) : (
+                          <Status tone="ok">Disponível</Status>
+                        )}
+                      </td>
+                      <td className={tbl.td}>
+                        {i.templates.length === 0 ? (
+                          <span className="text-xs text-amber-700 dark:text-amber-300">Sem template em nenhum servidor.</span>
+                        ) : (
+                          <ul className="flex flex-wrap gap-1.5">
+                            {i.templates.map((t) => (
+                              <li
+                                key={t.id}
+                                className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs dark:border-slate-700 dark:bg-slate-800/50"
+                              >
+                                <span>
+                                  {t.zone_name ?? <span className="text-amber-700 dark:text-amber-300">sem zona</span>} ·{" "}
+                                  {t.cluster_name} · {t.template_vmid}
+                                </span>
+                                <button
+                                  aria-label={`Remover template de ${t.cluster_name}`}
+                                  title="Remover este template da imagem"
+                                  className="text-slate-400 hover:text-rose-600"
+                                  disabled={detach.isPending}
+                                  onClick={() => detach.mutate({ image: i.id, template: t.id })}
+                                >
+                                  ✕
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </td>
+                      <td className={`${tbl.td} text-right`}>
+                        <Menu
+                          ariaLabel={`Ações de ${i.name}`}
+                          items={[
+                            {
+                              label: i.active ? "Desativar" : "Reativar",
+                              danger: i.active,
+                              disabled: toggle.isPending,
+                              onClick: () => toggle.mutate({ id: i.id, active: !i.active }),
+                            },
+                          ]}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
       </Card>
 
+      <ErrorBox message={templates.isError ? errorMessage(templates.error) : null} />
       <Card
         title="Templates nos servidores"
-        actions={
+        description="Templates que o token de cada servidor enxerga; registre-os no catálogo."
+        flush
+      >
+        <Toolbar count={templates.data ? `${templates.data.length} template(s)` : undefined}>
           <Select aria-label="Servidor" value={clusterId} onChange={(e) => setClusterId(e.target.value)}>
             <option value="">Escolha um servidor…</option>
             {clusters.data?.map((c) => (
@@ -254,30 +308,43 @@ export default function AdminImagesPage() {
               </option>
             ))}
           </Select>
-        }
-      >
-        {!clusterId && <Empty>Escolha um servidor para ver os templates que o token enxerga.</Empty>}
-        <ErrorBox message={templates.isError ? errorMessage(templates.error) : null} />
+        </Toolbar>
+        {!clusterId && <Empty icon="server">Escolha um servidor para ver os templates que o token enxerga.</Empty>}
         {templates.data?.length === 0 && <Empty>Nenhum template visível. Dê ao token acesso de leitura/clone no template.</Empty>}
-        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-          {templates.data?.map((t) => (
-            <li key={t.vmid} className="flex items-center justify-between gap-4 py-2 text-sm">
-              <span>
-                <span className="font-medium">{t.name}</span>{" "}
-                <span className="text-slate-500">
-                  · {t.vmid} · {t.node} · {t.disk_gb} GiB
-                </span>
-              </span>
-              {t.image_id ? (
-                <Badge tone="green">em “{imageName.get(t.image_id) ?? "imagem"}”</Badge>
-              ) : (
-                <Button variant="secondary" onClick={() => setRegistering(t)}>
-                  Registrar
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
+        {!!templates.data?.length && (
+          <div className={tbl.wrap}>
+            <table className={tbl.table}>
+              <thead className={tbl.thead}>
+                <tr>
+                  <th className={tbl.th}>Template</th>
+                  <th className={tbl.th}>VMID</th>
+                  <th className={tbl.th}>Node</th>
+                  <th className={`${tbl.th} text-right`}>Disco</th>
+                  <th className={tbl.th}>No catálogo</th>
+                </tr>
+              </thead>
+              <tbody className={tbl.tbody}>
+                {templates.data.map((t) => (
+                  <tr key={t.vmid} className={tbl.tr}>
+                    <td className={`${tbl.td} font-medium`}>{t.name}</td>
+                    <td className={`${tbl.td} tabular-nums`}>{t.vmid}</td>
+                    <td className={tbl.td}>{t.node}</td>
+                    <td className={`${tbl.td} text-right tabular-nums`}>{t.disk_gb} GiB</td>
+                    <td className={tbl.td}>
+                      {t.image_id ? (
+                        <Status tone="ok">em “{imageName.get(t.image_id) ?? "imagem"}”</Status>
+                      ) : (
+                        <Button variant="secondary" onClick={() => setRegistering(t)}>
+                          Registrar
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       <RegisterDialog

@@ -1,13 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { ConnectionInstances, ConnectionSettings } from "@/components/admin/connection";
 import { IpamPanel } from "@/components/admin/ipam-panel";
 import { NodeMetrics } from "@/components/metrics-panel";
-import { Card, ErrorBox, formatBytes } from "@/components/ui";
+import { DescriptionList, PageHeader } from "@/components/page";
+import { Card, ErrorBox, Status, formatBytes } from "@/components/ui";
 import { Allocation, Meter, mib, uptime } from "@/components/viz";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
 
@@ -53,7 +53,7 @@ export default function NodeDetailPage() {
   const rows: [string, React.ReactNode][] = [
     ...(multi ? ([["Cluster", n.cluster_name]] as [string, React.ReactNode][]) : []),
     ["Zona", n.region_name ? `${n.region_name} · ${n.zone_name}` : "sem zona"],
-    ["Status", online ? "Online" : n.status],
+    ["Nome no Proxmox", n.name],
     ["Ligado há", online ? uptime(n.uptime_seconds) : "—"],
     ["CPU em uso", online ? <Meter value={n.cpu_usage} title="CPU" /> : "—"],
     [
@@ -90,47 +90,41 @@ export default function NodeDetailPage() {
     ["VMs ligadas", `${n.instances_running} de ${n.instances_total}`],
   ];
 
+  const title = multi ? n.name : n.cluster_name;
+  const status =
+    n.status === "online" ? (
+      <Status tone="ok">Online</Status>
+    ) : n.status === "offline" ? (
+      <Status tone="error">Offline</Status>
+    ) : (
+      <Status tone="unknown">Desconhecido</Status>
+    );
+
   return (
     <div className="space-y-4">
-      <Link href="/admin/nodes" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
-        ← Hypervisors
-      </Link>
-      <div>
-        <h1 className="text-lg font-semibold">{multi ? n.name : n.cluster_name}</h1>
-        {!multi && n.name !== n.cluster_name && (
-          <p className="text-sm text-slate-500">Nome no Proxmox: {n.name}</p>
-        )}
-      </div>
-      <nav className="flex gap-1 border-b border-slate-200 dark:border-slate-800" aria-label="Seções">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => router.replace(t.key === "overview" ? `/admin/nodes/${id}` : `/admin/nodes/${id}?tab=${t.key}`)}
-            aria-current={tab === t.key ? "page" : undefined}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm ${
-              tab === t.key
-                ? "border-indigo-600 font-medium text-indigo-700 dark:text-indigo-300"
-                : "border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <PageHeader
+        title={title}
+        kind="hypervisor"
+        status={status}
+        breadcrumbs={[{ label: "Infraestrutura" }, { label: "Hypervisors", href: "/admin/nodes" }, { label: title }]}
+        tabs={TABS}
+        activeTab={tab}
+        onTab={(t) => router.replace(t === "overview" ? `/admin/nodes/${id}` : `/admin/nodes/${id}?tab=${t}`)}
+      >
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          {n.region_name ? `${n.region_name} · ${n.zone_name}` : "sem zona"}
+          {multi && ` · cluster ${n.cluster_name}`}
+          {!multi && n.name !== n.cluster_name && ` · nome no Proxmox: ${n.name}`}
+          {cluster.data?.version && ` · Proxmox ${cluster.data.version}`}
+        </p>
+      </PageHeader>
       {tab === "vms" && <ConnectionInstances clusterId={n.cluster_id} nodeName={n.name} />}
       {tab === "ips" && <IpamPanel clusterId={n.cluster_id} />}
       {tab === "config" && cluster.data && <ConnectionSettings cluster={cluster.data} nodeCount={siblings} />}
       {tab === "overview" && (
         <>
-          <Card title="Agora">
-            <dl className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
-              {rows.map(([label, value]) => (
-                <div key={label} className="grid grid-cols-3 items-center gap-4 text-sm">
-                  <dt className="text-slate-500">{label}</dt>
-                  <dd className="col-span-2">{value}</dd>
-                </div>
-              ))}
-            </dl>
+          <Card title="Detalhes">
+            <DescriptionList columns={3} items={rows} />
           </Card>
           {online && <NodeMetrics nodeId={n.id} />}
         </>

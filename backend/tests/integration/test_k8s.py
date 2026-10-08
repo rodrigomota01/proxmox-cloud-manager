@@ -14,6 +14,7 @@ from tests.integration.factories import (
     PASSWORD,
     add_member,
     grant_platform,
+    make_project,
     make_tenant,
     make_user,
 )
@@ -46,7 +47,13 @@ async def env(app, client, owner_db, registry):
     root, alice = (await make_user(owner_db, "root@example.com"),
                    await make_user(owner_db, "alice@example.com"))
     await grant_platform(owner_db, root, "PLATFORM_ADMIN")
-    await add_member(owner_db, await make_tenant(owner_db, "acme"), alice, "TENANT_ADMIN")
+    acme, globex = await make_tenant(owner_db, "acme"), await make_tenant(owner_db, "globex")
+    await add_member(owner_db, acme, alice, "TENANT_ADMIN")
+    # a USER in one acme project only; bob belongs to another client
+    carol, bob = (await make_user(owner_db, "carol@example.com"),
+                  await make_user(owner_db, "bob@example.com"))
+    await add_member(owner_db, acme, carol, "USER", await make_project(owner_db, acme, "web"))
+    await add_member(owner_db, globex, bob, "TENANT_ADMIN")
     today = datetime.now(UTC).date()
     soon = datetime.combine(today + timedelta(days=5), datetime.min.time(), UTC)
     source = FakeK8sSource([
@@ -62,6 +69,9 @@ async def env(app, client, owner_db, registry):
     ])
     return {"root": await _login(client, "root@example.com"),
             "alice": await _login(client, "alice@example.com"),
+            "carol": await _login(client, "carol@example.com"),
+            "bob": await _login(client, "bob@example.com"),
+            "acme": acme, "globex": globex,
             "source": source, "registry": registry}
 
 
@@ -282,3 +292,67 @@ async def test_snapshot_from_before_httproutes_still_renders(client, app, env, o
     d = r.json()
     assert d["httproutes"] == [] and d["namespaces"][0]["httproutes"] == 0
     assert d["snapshot"]["httproutes"] == 0 and d["snapshot"]["gateway_api"] is False
+
+
+async def test_cluster_linked_to_a_tenant_without_its_kubeconfig(client, app, env, owner_db):
+    await _sync(app, env)
+    ids = {c["name"]: c["id"] for c in (await client.get(
+        "/api/v1/admin/kubernetes/clusters", headers=env["root"])).json()}
+    acme, globex = str(env["acme"].id), str(env["globex"].id)
+    as_acme = lambda who: {**env[who], "X-Tenant-Id": acme}  # noqa: E731
+    as_globex = {**env["bob"], "X-Tenant-Id": globex}
+
+    # nothing linked yet: an empty list for the client
+    r = await client.get("/api/v1/kubernetes/clusters", headers=as_acme("alice"))
+    assert r.status_code == 200 and r.json() == []
+
+    # only platform admins link, and only to an existing tenant
+    path = f"/api/v1/admin/kubernetes/clusters/{ids['prod']}/tenant"
+    r = await client.put(path, json={"tenant_id": acme}, headers=env["alice"])
+    assert r.status_code == 403
+    bad = await client.put(path, json={"tenant_id": str(ids["drift"])}, headers=env["root"])
+    assert bad.status_code == 422
+    r = await client.put(path, json={"tenant_id": acme}, headers=env["root"])
+    assert r.status_code == 200 and r.json()["tenant_name"] == "Acme"
+    listed = (await client.get("/api/v1/admin/kubernetes/clusters", headers=env["root"])).json()
+    assert {c["name"]: c["tenant_id"] for c in listed}["prod"] == acme
+
+    # every role of the client sees it — a project-level USER too — with no credential
+    for who in ("alice", "carol"):
+        r = await client.get("/api/v1/kubernetes/clusters", headers=as_acme(who))
+        assert r.status_code == 200, r.text
+        [c] = r.json()
+        assert c["name"] == "prod" and c["has_kubeconfig"] is False and c["nodes"] == []
+        assert c["kubeconfig_error"] is None and c["expires_on"] is not None
+    r = await client.get(f"/api/v1/kubernetes/clusters/{ids['prod']}", headers=as_acme("carol"))
+    assert r.status_code == 200 and r.json()["has_kubeconfig"] is False
+    assert "client-key-data" not in r.text and "certificate" not in r.text
+    # ...but never the download, nor clusters that are not theirs
+    assert (await client.get(f"{path.removesuffix('/tenant')}/kubeconfig",
+                             headers=env["alice"])).status_code == 403
+    r = await client.get(f"/api/v1/kubernetes/clusters/{ids['drift']}", headers=as_acme("alice"))
+    assert r.status_code == 404
+
+    # another client sees nothing of it
+    assert (await client.get("/api/v1/kubernetes/clusters", headers=as_globex)).json() == []
+    r = await client.get(f"/api/v1/kubernetes/clusters/{ids['prod']}", headers=as_globex)
+    assert r.status_code == 404
+
+    # the views are read-only and the table stays platform-only for cm_app
+    async with app.state.sessionmaker() as db, db.begin():
+        await db.execute(text("SELECT set_config('app.tenant_ids', :t, true)"), {"t": acme})
+        assert await db.scalar(text("SELECT count(*) FROM k8s_tenant_clusters")) == 1
+        assert await db.scalar(select(func.count()).select_from(K8sCluster)) == 0
+        cols = (await db.execute(text("SELECT * FROM k8s_tenant_clusters"))).keys()
+        assert not any("kubeconfig" in c or "dek" in c for c in cols)
+    async with app.state.sessionmaker() as db:
+        with pytest.raises(Exception, match="permission denied"):
+            await db.execute(text("UPDATE k8s_tenant_clusters SET name = 'x'"))
+
+    # unlinking takes it away, audited
+    r = await client.put(path, json={"tenant_id": None}, headers=env["root"])
+    assert r.status_code == 200 and r.json()["tenant_id"] is None
+    assert (await client.get("/api/v1/kubernetes/clusters", headers=as_acme("alice"))).json() == []
+    actions = (await owner_db.execute(
+        select(AuditLog.action).where(AuditLog.action == "K8S_CLUSTER_TENANT"))).scalars().all()
+    assert len(actions) == 2

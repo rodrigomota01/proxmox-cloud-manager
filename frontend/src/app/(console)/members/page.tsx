@@ -3,8 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { Icon } from "@/components/icons";
 import { NoTenant } from "@/components/no-tenant";
-import { Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Select } from "@/components/ui";
+import { Menu, PageHeader, SearchInput, Toolbar } from "@/components/page";
+import { Alert, Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Select, tbl } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { useProjectNames, useProjects } from "@/lib/queries";
 import { ROLE_INFO, roleLabel } from "@/lib/roles";
@@ -171,6 +173,7 @@ export default function MembersPage() {
   const [inviting, setInviting] = useState(false);
   const [adding, setAdding] = useState<Member | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<Member | null>(null);
+  const [search, setSearch] = useState("");
 
   const members = useQuery({
     queryKey: ["members", tenantId],
@@ -200,80 +203,113 @@ export default function MembersPage() {
   if (!tenantId) return <NoTenant />;
   if (perms.size > 0 && !perms.has("member:manage")) {
     return (
-      <Card title="Membros">
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+      <div className="space-y-4">
+        <PageHeader title="Membros" />
+        <Alert variant="info" title="Sem acesso">
           Só o admin do cliente gerencia membros de {tenant?.name}.
-        </p>
-      </Card>
+        </Alert>
+      </div>
     );
   }
   const scopeLabel = (b: Schemas["BindingOut"]) =>
     b.scope_type === "tenant" ? "cliente inteiro" : `projeto ${projectNames.get(b.scope_id) ?? "?"}`;
   const error = unbind.error ?? remove.error;
 
+  const q = search.trim().toLowerCase();
+  const visible = (members.data ?? []).filter(
+    (m) => !q || m.display_name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q),
+  );
+
   return (
-    <div className="max-w-5xl space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold">Membros de {tenant?.name}</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Cada pessoa vê apenas o que o acesso dela permite: o cliente inteiro ou só os projetos indicados.
-          </p>
-        </div>
-        <Button onClick={() => setInviting(true)}>Convidar membro</Button>
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        title={`Membros de ${tenant?.name ?? ""}`}
+        description="Cada pessoa vê apenas o que o acesso dela permite: o cliente inteiro ou só os projetos indicados."
+        actions={<Button onClick={() => setInviting(true)}>Convidar membro</Button>}
+      />
       <ErrorBox message={members.isError ? errorMessage(members.error) : error ? errorMessage(error) : null} />
-      <Card>
-        {members.data?.length === 0 && <Empty>Nenhum membro.</Empty>}
-        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-          {members.data?.map((m) => {
-            const self = m.user_id === me.id;
-            return (
-              <li key={m.user_id} className="flex flex-wrap items-start justify-between gap-4 py-3 text-sm">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{m.display_name}</span>
-                    {self && <Badge tone="blue">você</Badge>}
-                    {m.invited && <Badge tone="amber">convite pendente</Badge>}
-                  </div>
-                  <div className="text-xs text-slate-500">{m.email}</div>
-                  <ul className="mt-2 flex flex-wrap gap-2">
-                    {m.bindings.map((b) => (
-                      <li
-                        key={b.id}
-                        className="flex items-center gap-2 rounded-md border border-slate-200 px-2 py-1 text-xs dark:border-slate-700"
-                      >
-                        <span>
-                          <strong>{roleLabel(b.role)}</strong> · {scopeLabel(b)}
-                        </span>
+      <Card flush>
+        <Toolbar count={members.data ? `${visible.length} de ${members.data.length} membros` : undefined}>
+          <SearchInput value={search} onChange={setSearch} placeholder="Filtrar por nome ou e-mail…" />
+        </Toolbar>
+        {members.data?.length === 0 ? (
+          <Empty
+            title="Nenhum membro"
+            icon="users"
+            action={<Button onClick={() => setInviting(true)}>Convidar membro</Button>}
+          >
+            Convide a equipe do cliente para gerenciar as VMs.
+          </Empty>
+        ) : members.data && visible.length === 0 ? (
+          <Empty title="Nenhum resultado">Nenhum membro corresponde ao filtro.</Empty>
+        ) : (
+          <div className={tbl.wrap}>
+            <table className={tbl.table}>
+              <thead className={tbl.thead}>
+                <tr>
+                  <th className={tbl.th}>Membro</th>
+                  <th className={tbl.th}>Acessos</th>
+                  <th className={tbl.th}>
+                    <span className="sr-only">Ações</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className={tbl.tbody}>
+                {visible.map((m) => {
+                  const self = m.user_id === me.id;
+                  return (
+                    <tr key={m.user_id} className={`${tbl.tr} align-top`}>
+                      <td className={tbl.td}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium">{m.display_name}</span>
+                          {self && <Badge tone="indigo">você</Badge>}
+                          {m.invited && <Badge tone="amber">convite pendente</Badge>}
+                        </div>
+                        <div className="text-xs text-slate-500">{m.email}</div>
+                      </td>
+                      <td className={tbl.td}>
+                        <ul className="flex flex-wrap gap-1.5">
+                          {m.bindings.map((b) => (
+                            <li
+                              key={b.id}
+                              className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 py-0.5 pr-1.5 pl-2.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+                            >
+                              <span>
+                                <strong>{roleLabel(b.role)}</strong> · {scopeLabel(b)}
+                              </span>
+                              {!self && (
+                                <button
+                                  aria-label={`Remover ${roleLabel(b.role)} de ${m.display_name}`}
+                                  title="Remover este acesso"
+                                  className="rounded-full p-0.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950"
+                                  disabled={unbind.isPending}
+                                  onClick={() => unbind.mutate(b.id)}
+                                >
+                                  <Icon name="x" className="h-3 w-3" />
+                                </button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </td>
+                      <td className={`${tbl.td} text-right`}>
                         {!self && (
-                          <button
-                            aria-label={`Remover ${roleLabel(b.role)} de ${m.display_name}`}
-                            className="text-slate-400 hover:text-rose-600"
-                            disabled={unbind.isPending}
-                            onClick={() => unbind.mutate(b.id)}
-                          >
-                            ✕
-                          </button>
+                          <Menu
+                            ariaLabel={`Ações de ${m.display_name}`}
+                            items={[
+                              { label: "Adicionar acesso", onClick: () => setAdding(m) },
+                              { label: "Remover do cliente", danger: true, onClick: () => setConfirmRemove(m) },
+                            ]}
+                          />
                         )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                {!self && (
-                  <div className="flex gap-2">
-                    <Button variant="secondary" onClick={() => setAdding(m)}>
-                      Adicionar acesso
-                    </Button>
-                    <Button variant="ghost" onClick={() => setConfirmRemove(m)}>
-                      Remover
-                    </Button>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       <InviteDialog tenantId={tenantId} open={inviting} onClose={() => setInviting(false)} />

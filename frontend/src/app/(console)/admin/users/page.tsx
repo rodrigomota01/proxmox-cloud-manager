@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { Button, Card, Dialog, Empty, ErrorBox, Field, Input, formatDate } from "@/components/ui";
+import { Menu, PageHeader, SearchInput, Toolbar } from "@/components/page";
+import { Button, Card, Dialog, Empty, ErrorBox, Field, Input, formatDate, tbl } from "@/components/ui";
 import { UserStatus } from "@/components/user-status";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
 
@@ -53,7 +54,27 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function Avatar({ name }: { name: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300"
+    >
+      {initials(name)}
+    </span>
+  );
+}
+
 export default function AdminUsersPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const users = useInfiniteQuery({
@@ -71,55 +92,68 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold">Usuários</h1>
-        <div className="flex gap-2">
-          <Input
-            aria-label="Buscar"
-            placeholder="Buscar por nome ou e-mail"
-            className="w-64"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <Button onClick={() => setCreating(true)}>Novo usuário</Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Usuários"
+        description="Contas de todos os clientes e administradores da plataforma."
+        actions={<Button onClick={() => setCreating(true)}>Novo usuário</Button>}
+      />
       <ErrorBox message={users.isError ? errorMessage(users.error) : null} />
-      <Card>
-        {users.isSuccess && items.length === 0 && <Empty>Nenhum usuário encontrado.</Empty>}
+      <Card flush>
+        <Toolbar count={users.isSuccess ? `${items.length}${users.hasNextPage ? "+" : ""} usuários` : undefined}>
+          <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nome ou e-mail…" className="w-72" />
+        </Toolbar>
+        {users.isSuccess && items.length === 0 && (
+          <Empty title="Nenhum usuário encontrado" icon="users">
+            {search ? "Nenhuma conta corresponde à busca." : "Convide o primeiro usuário."}
+          </Empty>
+        )}
         {items.length > 0 && (
-          <table className="w-full text-left text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="py-2 pr-4 font-medium">Nome</th>
-                <th className="py-2 pr-4 font-medium">E-mail</th>
-                <th className="py-2 pr-4 font-medium">Situação</th>
-                <th className="py-2 font-medium">Último acesso</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {items.map((u) => (
-                <tr key={u.id}>
-                  <td className="py-2 pr-4">
-                    <Link
-                      href={`/admin/users/${u.id}`}
-                      className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-                    >
-                      {u.display_name}
-                    </Link>
-                  </td>
-                  <td className="py-2 pr-4">{u.email}</td>
-                  <td className="py-2 pr-4">
-                    <UserStatus user={u} />
-                  </td>
-                  <td className="py-2">{formatDate(u.last_login_at)}</td>
+          <div className={tbl.wrap}>
+            <table className={tbl.table}>
+              <thead className={tbl.thead}>
+                <tr>
+                  <th className={tbl.th}>Nome</th>
+                  <th className={tbl.th}>Situação</th>
+                  <th className={tbl.th}>Último acesso</th>
+                  <th className={tbl.th}>
+                    <span className="sr-only">Ações</span>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className={tbl.tbody}>
+                {items.map((u) => (
+                  <tr key={u.id} className={tbl.tr}>
+                    <td className={tbl.td}>
+                      <div className="flex items-center gap-3">
+                        <Avatar name={u.display_name} />
+                        <div className="min-w-0">
+                          <Link href={`/admin/users/${u.id}`} className={tbl.link}>
+                            {u.display_name}
+                          </Link>
+                          <div className="truncate text-xs text-slate-500">{u.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className={tbl.td}>
+                      <UserStatus user={u} />
+                    </td>
+                    <td className={`${tbl.td} whitespace-nowrap text-slate-600 dark:text-slate-400`}>
+                      {formatDate(u.last_login_at)}
+                    </td>
+                    <td className={`${tbl.td} text-right`}>
+                      <Menu
+                        ariaLabel={`Ações de ${u.display_name}`}
+                        items={[{ label: "Ver detalhes", onClick: () => router.push(`/admin/users/${u.id}`) }]}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         {users.hasNextPage && (
-          <div className="pt-4 text-center">
+          <div className="border-t border-slate-200 py-3 text-center dark:border-slate-800">
             <Button variant="secondary" onClick={() => users.fetchNextPage()}>
               Carregar mais
             </Button>

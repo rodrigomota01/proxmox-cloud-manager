@@ -1,13 +1,17 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
-import { Badge, Button, Card, formatBytes } from "@/components/ui";
+import { Icon } from "@/components/icons";
+import { Button, Card, Dialog, ErrorBox, Field, Select, Status, type StatusTone, formatBytes } from "@/components/ui";
 import { Meter } from "@/components/viz";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useSession } from "@/lib/session";
 
 export type K8sCluster = Schemas["K8sClusterOut"];
+/** admin: /admin/kubernetes (every cluster); tenant: /kubernetes (the client's, read-only) */
+export type K8sMode = "admin" | "tenant";
 export type K8sSummary = Schemas["K8sSummaryOut"];
 
 /** "2026-10-13" -> "13/10/2026" (a calendar date: no timezone shift). */
@@ -49,43 +53,33 @@ export function UsageMeter({
   );
 }
 
-const EXPIRY: Record<K8sCluster["status"], { tone: "red" | "amber" | "green" | "gray"; icon: string; label: string }> = {
-  expired: { tone: "red", icon: "✕", label: "Vencido" },
-  critical: { tone: "red", icon: "!", label: "Vence em breve" },
-  warning: { tone: "amber", icon: "!", label: "Vence em até 30 dias" },
-  ok: { tone: "green", icon: "✓", label: "Em dia" },
-  unknown: { tone: "gray", icon: "?", label: "Sem data" },
+const EXPIRY: Record<K8sCluster["status"], { tone: StatusTone; label: string }> = {
+  expired: { tone: "error", label: "Vencido" },
+  critical: { tone: "error", label: "Vence em breve" },
+  warning: { tone: "warn", label: "Vence em até 30 dias" },
+  ok: { tone: "ok", label: "Em dia" },
+  unknown: { tone: "unknown", label: "Sem data" },
 };
 
 export function ExpiryBadge({ c }: { c: K8sCluster }) {
   const s = EXPIRY[c.status];
-  return (
-    <Badge tone={s.tone}>
-      <span aria-hidden className="mr-1">
-        {s.icon}
-      </span>
-      {s.label}
-    </Badge>
-  );
+  return <Status tone={s.tone}>{s.label}</Status>;
 }
 
-const HEALTH: Record<K8sSummary["health"], { tone: "red" | "amber" | "green" | "gray"; icon: string; label: string }> = {
-  healthy: { tone: "green", icon: "✓", label: "Saudável" },
-  warning: { tone: "amber", icon: "!", label: "Atenção" },
-  critical: { tone: "red", icon: "✕", label: "Crítico" },
-  unreachable: { tone: "gray", icon: "⊘", label: "Sem conexão" },
+const HEALTH: Record<K8sSummary["health"], { tone: StatusTone; label: string; icon?: "ban" }> = {
+  healthy: { tone: "ok", label: "Saudável" },
+  warning: { tone: "warn", label: "Atenção" },
+  critical: { tone: "error", label: "Crítico" },
+  unreachable: { tone: "off", label: "Sem conexão", icon: "ban" },
 };
 
 export function HealthBadge({ s }: { s: K8sSummary | null | undefined }) {
-  if (!s) return <Badge tone="gray">Não coletado</Badge>;
+  if (!s) return <Status tone="unknown">Não coletado</Status>;
   const h = HEALTH[s.health];
   return (
-    <Badge tone={h.tone}>
-      <span aria-hidden className="mr-1">
-        {h.icon}
-      </span>
+    <Status tone={h.tone} icon={h.icon}>
       {h.label}
-    </Badge>
+    </Status>
   );
 }
 
@@ -180,9 +174,10 @@ export function DownloadKubeconfig({ c }: { c: K8sCluster }) {
     );
   }
   return (
-    <span>
+    <span className="inline-flex items-center">
       <Button
-        variant="ghost"
+        variant="secondary"
+        title="Baixar kubeconfig"
         disabled={download.isPending}
         onClick={() => {
           if (confirm(`Baixar o kubeconfig de "${c.name}"? Ele dá acesso de administrador ao cluster e o download fica registrado na auditoria.`)) {
@@ -190,9 +185,73 @@ export function DownloadKubeconfig({ c }: { c: K8sCluster }) {
           }
         }}
       >
-        Baixar kubeconfig
+        <Icon name="download" /> Kubeconfig
       </Button>
       {download.isError && <span className="ml-1 text-xs text-rose-600">{errorMessage(download.error)}</span>}
     </span>
+  );
+}
+
+/** Platform admins: which client sees this cluster (read-only, never the kubeconfig). */
+export function LinkTenantDialog({ cluster, onClose }: { cluster: K8sCluster | null; onClose: () => void }) {
+  const { tenants } = useSession();
+  const queryClient = useQueryClient();
+  const link = useMutation({
+    mutationFn: async ({ id, tenantId }: { id: string; tenantId: string | null }) =>
+      unwrap(
+        await api.PUT("/api/v1/admin/kubernetes/clusters/{cluster_id}/tenant", {
+          params: { path: { cluster_id: id } },
+          body: { tenant_id: tenantId },
+        }),
+      ),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "k8s-clusters"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "k8s-cluster", id] });
+      queryClient.invalidateQueries({ queryKey: ["k8s-clusters"] });
+      close();
+    },
+  });
+  const close = () => {
+    link.reset();
+    onClose();
+  };
+  return (
+    <Dialog open={cluster !== null} onClose={close} title={`Vincular ${cluster?.name ?? ""} a um cliente`}>
+      {cluster && (
+        <form
+          key={cluster.id}
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const value = String(new FormData(e.currentTarget).get("tenant_id") ?? "");
+            link.mutate({ id: cluster.id, tenantId: value || null });
+          }}
+        >
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Os usuários do cliente passam a ver este cluster em <strong>Kubernetes</strong>: saúde, nós, namespaces,
+            workloads, pods e rotas. Só leitura, e o kubeconfig nunca aparece para eles.
+          </p>
+          <Field label="Cliente">
+            <Select name="tenant_id" defaultValue={cluster.tenant_id ?? ""} className="w-full">
+              <option value="">Nenhum (só a plataforma vê)</option>
+              {tenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <ErrorBox message={link.isError ? errorMessage(link.error) : null} />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={close}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={link.isPending}>
+              Salvar
+            </Button>
+          </div>
+        </form>
+      )}
+    </Dialog>
   );
 }

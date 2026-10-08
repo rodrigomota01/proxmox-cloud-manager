@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { StatTile } from "@/components/page";
 import { Card, Empty, formatBytes } from "@/components/ui";
 import { Meter, mib, pct, rate } from "@/components/viz";
 import type { Schemas } from "@/lib/api/client";
@@ -7,14 +8,9 @@ import type { Schemas } from "@/lib/api/client";
 type Usage = Schemas["UsageOut"] | Schemas["AdminUsageOut"];
 type Entry = Schemas["TopInstanceOut"] & Partial<Pick<Schemas["AdminTopInstanceOut"], "tenant_name" | "node_id" | "managed">>;
 
+/** Plain number tile; StatTile adds icon, link and tone. */
 export function Stat({ label, value, hint }: { label: string; value: React.ReactNode; hint?: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
-      {hint && <div className="mt-0.5 text-xs text-slate-500">{hint}</div>}
-    </div>
-  );
+  return <StatTile label={label} value={value} hint={hint} />;
 }
 
 const RANKINGS = [
@@ -79,7 +75,7 @@ export function UsagePanel({ usage, href }: { usage: Usage; href: (e: Entry) => 
           return (
             <Card key={r.key} title={r.title}>
               {rows.length === 0 ? (
-                <Empty>{r.empty}</Empty>
+                <Empty icon="dashboard">{r.empty}</Empty>
               ) : (
                 <ol className="divide-y divide-slate-100 dark:divide-slate-800">
                   {rows.map((e) => {

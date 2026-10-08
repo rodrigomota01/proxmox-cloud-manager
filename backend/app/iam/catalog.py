@@ -32,6 +32,7 @@ PERMISSIONS: dict[str, str] = {
     "quota:view": "View quotas",
     "quota:manage": "Manage quotas",
     "billing:view": "View usage and cost",
+    "k8s:view": "View the Kubernetes clusters linked to the tenant (never the kubeconfig)",
     "billing:manage": "Manage price tables",
     "audit:view": "View audit logs",
     "tenant:create": "Create tenants",
@@ -50,7 +51,8 @@ def _compute(actions: tuple[str, ...]) -> set[str]:
     return {f"{kind}:{a}" for kind in ("vm", "container") for a in actions}
 
 
-_COMMON_VIEW = {"storage:view", "network:view", "quota:view"}
+# every tenant role sees the costs of what it can see, and the tenant's clusters
+_COMMON_VIEW = {"storage:view", "network:view", "quota:view", "billing:view", "k8s:view"}
 _SNAPSHOTS = {"snapshot:create", "snapshot:rollback"}
 
 ROLES: dict[str, tuple[str, list[str], set[str]]] = {

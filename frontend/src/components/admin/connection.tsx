@@ -8,7 +8,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { ClusterStatus } from "@/components/cluster-status";
+import { DescriptionList, ResourceIcon, Toolbar } from "@/components/page";
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -23,6 +25,7 @@ import {
   Spinner,
   Textarea,
   formatDate,
+  tbl,
 } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { useJob } from "@/lib/jobs";
@@ -55,12 +58,14 @@ function CredentialsCard({ cluster }: { cluster: Schemas["ClusterOut"] }) {
   }
 
   return (
-    <Card title="Credencial (API token)">
-      <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
-        {cluster.has_credentials
+    <Card
+      title="Credencial (API token)"
+      description={
+        cluster.has_credentials
           ? `Token ${cluster.token_id}, atualizado em ${formatDate(cluster.credentials_rotated_at)}. O secret nunca é exibido; envie um novo para trocar.`
-          : "Nenhuma credencial cadastrada."}
-      </p>
+          : "Nenhuma credencial cadastrada."
+      }
+    >
       <form onSubmit={submit} className="space-y-3">
         <Field label="Token ID" hint="usuario@realm!token">
           <Input name="token_id" required defaultValue={cluster.token_id ?? "cloudmgr@pve!cm"} />
@@ -73,7 +78,7 @@ function CredentialsCard({ cluster }: { cluster: Schemas["ClusterOut"] }) {
           <Button type="submit" disabled={save.isPending}>
             Salvar credencial
           </Button>
-          {saved && <span className="text-sm text-emerald-600">Salva (cifrada).</span>}
+          {saved && <span className="text-sm text-emerald-600 dark:text-emerald-400">Salva (cifrada).</span>}
         </div>
       </form>
     </Card>
@@ -279,21 +284,21 @@ export function ConnectionSettings({ cluster: c, nodeCount }: { cluster: Schemas
   return (
     <div className="space-y-4">
       {nodeCount > 1 && (
-        <div className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-200">
+        <Alert variant="info">
           Este servidor faz parte do cluster <strong>{c.name}</strong>: estas configurações valem para os{" "}
           {nodeCount} servidores dele.
-        </div>
+        </Alert>
       )}
       {(!c.settings.pool || !c.zone_id) && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          ⚠ Este servidor <strong>não recebe VMs novas</strong>: falta{" "}
-          {!c.zone_id && !c.settings.pool ? "zona e pool de destino" : !c.zone_id ? "zona" : "pool de destino"}. Ele
-          continua sincronizado e monitorado, mas a zona não aparece em “Nova instância” até isso ser preenchido
-          abaixo (e haver templates dele em Imagens).
-        </div>
+        <Alert variant="warning" title="Este servidor não recebe VMs novas">
+          Falta {!c.zone_id && !c.settings.pool ? "zona e pool de destino" : !c.zone_id ? "zona" : "pool de destino"}.
+          Ele continua sincronizado e monitorado, mas a zona não aparece em “Nova instância” até isso ser
+          preenchido abaixo (e haver templates dele em Imagens).
+        </Alert>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-5 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold">Conexão</span>
           <ClusterStatus status={c.status} />
           {c.version && <span className="text-sm text-slate-500">Proxmox {c.version}</span>}
         </div>
@@ -309,10 +314,10 @@ export function ConnectionSettings({ cluster: c, nodeCount }: { cluster: Schemas
 
       {test.data &&
         (test.data.ok ? (
-          <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
-            Conectado: Proxmox {test.data.version}, {test.data.nodes_online}/{test.data.nodes_total} servidor(es)
-            online, {test.data.guests_visible} guest(s) visíveis ao token.
-          </div>
+          <Alert variant="success" title="Conectado">
+            Proxmox {test.data.version}, {test.data.nodes_online}/{test.data.nodes_total} servidor(es) online,{" "}
+            {test.data.guests_visible} guest(s) visíveis ao token.
+          </Alert>
         ) : (
           <ErrorBox message={`Falha na conexão: ${test.data.error}`} />
         ))}
@@ -322,68 +327,58 @@ export function ConnectionSettings({ cluster: c, nodeCount }: { cluster: Schemas
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Configuração">
-          <dl className="space-y-2 text-sm">
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-slate-500">Nome</dt>
-              <dd>
-                <NameEditor clusterId={c.id} name={c.name} />
-              </dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-slate-500">URL da API</dt>
-              <dd>{c.api_url}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-slate-500">TLS</dt>
-              <dd>{c.insecure_skip_verify ? "sem verificação (dev)" : c.has_custom_ca ? "CA própria" : "CAs do sistema"}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-slate-500">Zona</dt>
-              <dd>
-                <ZoneEditor clusterId={c.id} zoneId={c.zone_id ?? ""} />
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-slate-500">Pool de destino</dt>
-              <dd>
-                <PoolEditor clusterId={c.id} pool={(c.settings.pool as string | undefined) ?? ""} />
-              </dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-slate-500">Último sync</dt>
-              <dd>{formatDate(c.last_synced_at)}</dd>
-            </div>
-            {c.last_error && (
-              <div className="flex justify-between gap-4">
-                <dt className="text-slate-500">Último erro</dt>
-                <dd className="text-rose-600 dark:text-rose-400">{c.last_error}</dd>
-              </div>
-            )}
-          </dl>
+          <DescriptionList
+            columns={1}
+            items={[
+              ["Nome", <NameEditor key="n" clusterId={c.id} name={c.name} />],
+              ["URL da API", <span key="u" className="font-mono text-xs">{c.api_url}</span>],
+              ["TLS", c.insecure_skip_verify ? "sem verificação (dev)" : c.has_custom_ca ? "CA própria" : "CAs do sistema"],
+              ["Zona", <ZoneEditor key="z" clusterId={c.id} zoneId={c.zone_id ?? ""} />],
+              ["Pool de destino", <PoolEditor key="p" clusterId={c.id} pool={(c.settings.pool as string | undefined) ?? ""} />],
+              ["Último sync", formatDate(c.last_synced_at)],
+              !!c.last_error && ["Último erro", <span key="e" className="text-rose-600 dark:text-rose-400">{c.last_error}</span>],
+            ]}
+          />
         </Card>
         <CredentialsCard cluster={c} />
       </div>
 
-      <Card title="Sincronizações recentes">
-        {runs.data?.length === 0 && <Empty>Nenhuma sincronização ainda.</Empty>}
-        <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
-          {runs.data?.map((r) => (
-            <li key={r.id} className="flex items-center justify-between gap-4 py-2">
-              <span>
-                {formatDate(r.started_at)} · {r.trigger === "manual" ? "manual" : "automática"}
-                {r.error && <span className="ml-2 text-rose-600 dark:text-rose-400">{r.error}</span>}
-              </span>
-              <span className="flex items-center gap-2">
-                {r.status === "succeeded" && (
-                  <span className="text-xs text-slate-500">
-                    {String(r.stats.instances_seen ?? 0)} guests · {String(r.stats.discovered ?? 0)} novos
-                  </span>
-                )}
-                <JobBadge status={r.status} />
-              </span>
-            </li>
-          ))}
-        </ul>
+      <Card title="Sincronizações recentes" flush>
+        {runs.data?.length === 0 ? (
+          <Empty icon="history">Nenhuma sincronização ainda.</Empty>
+        ) : (
+          <div className={tbl.wrap}>
+            <table className={tbl.table}>
+              <thead className={tbl.thead}>
+                <tr>
+                  <th className={tbl.th}>Início</th>
+                  <th className={tbl.th}>Origem</th>
+                  <th className={tbl.th}>Resultado</th>
+                  <th className={tbl.th}>Status</th>
+                </tr>
+              </thead>
+              <tbody className={tbl.tbody}>
+                {runs.data?.map((r) => (
+                  <tr key={r.id} className={tbl.tr}>
+                    <td className={`${tbl.td} tabular-nums`}>{formatDate(r.started_at)}</td>
+                    <td className={tbl.td}>{r.trigger === "manual" ? "manual" : "automática"}</td>
+                    <td className={`${tbl.td} text-xs`}>
+                      {r.status === "succeeded" && (
+                        <span className="text-slate-500">
+                          {String(r.stats.instances_seen ?? 0)} guests · {String(r.stats.discovered ?? 0)} novos
+                        </span>
+                      )}
+                      {r.error && <span className="text-rose-600 dark:text-rose-400">{r.error}</span>}
+                    </td>
+                    <td className={tbl.td}>
+                      <JobBadge status={r.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );
@@ -415,43 +410,42 @@ export function ConnectionInstances({ clusterId, nodeName }: { clusterId: string
     <div className="space-y-4">
       <ErrorBox message={instances.isError ? errorMessage(instances.error) : null} />
       <Card
+        flush
         title={`Descobertas (${discovered.length})`}
+        description="Guests que existem no Proxmox mas ainda não pertencem a nenhum cliente. Só administradores as veem. As que estão fora do pool gerenciado ficam somente leitura depois de adotadas: o cliente vê estado e métricas, sem ligar/desligar/excluir."
         actions={
           selected.size > 0 && (
             <Button onClick={() => setBulkAdopting(true)}>Adotar selecionadas ({selected.size})</Button>
           )
         }
       >
-        <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
-          Guests que existem no Proxmox mas ainda não pertencem a nenhum cliente. Só administradores as veem.
-          As que estão fora do pool gerenciado ficam <strong>somente leitura</strong> depois de adotadas: o
-          cliente vê estado e métricas, sem ligar/desligar/excluir.
-        </p>
         {tagCounts.length > 0 && (
-          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-slate-500">Filtrar por tag:</span>
-            {tagCounts.map(([tag, n]) => (
-              <button
-                key={tag}
-                onClick={() => setTagFilter(tagFilter === tag ? "" : tag)}
-                className={`rounded-full border px-2 py-0.5 ${
-                  tagFilter === tag
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
-                    : "border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                }`}
-              >
-                {tag} ({n})
-              </button>
-            ))}
-            {tagFilter && (
-              <button className="text-indigo-600 hover:underline dark:text-indigo-400" onClick={() => setTagFilter("")}>
-                limpar
-              </button>
-            )}
-          </div>
+          <Toolbar count={`${shown.length} de ${discovered.length}`}>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-slate-500">Filtrar por tag:</span>
+              {tagCounts.map(([tag, n]) => (
+                <button
+                  key={tag}
+                  onClick={() => setTagFilter(tagFilter === tag ? "" : tag)}
+                  className={`rounded-full border px-2 py-0.5 ${
+                    tagFilter === tag
+                      ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                      : "border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  {tag} ({n})
+                </button>
+              ))}
+              {tagFilter && (
+                <button className="text-indigo-600 hover:underline dark:text-indigo-400" onClick={() => setTagFilter("")}>
+                  limpar
+                </button>
+              )}
+            </div>
+          </Toolbar>
         )}
         {shown.length === 0 ? (
-          <Empty>Nada a adotar.</Empty>
+          <Empty icon="checkCircle">Nada a adotar.</Empty>
         ) : (
           <InstanceTable
             rows={shown}
@@ -472,8 +466,8 @@ export function ConnectionInstances({ clusterId, nodeName }: { clusterId: string
         )}
       </Card>
 
-      <Card title={`Gerenciadas (${managed.length})`}>
-        {managed.length === 0 ? <Empty>Nenhuma instância adotada.</Empty> : <InstanceTable rows={managed} />}
+      <Card flush title={`Gerenciadas (${managed.length})`}>
+        {managed.length === 0 ? <Empty icon="monitor">Nenhuma instância adotada.</Empty> : <InstanceTable rows={managed} />}
       </Card>
 
       <AdoptDialog instance={adopting} onClose={() => setAdopting(null)} />
@@ -613,12 +607,12 @@ function InstanceTable({
   const selectable = selected !== undefined && onToggle !== undefined;
   const allOn = selectable && rows.length > 0 && rows.every((r) => selected.has(r.id));
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="text-xs uppercase tracking-wide text-slate-500">
+    <div className={tbl.wrap}>
+      <table className={tbl.table}>
+        <thead className={tbl.thead}>
           <tr>
             {selectable && (
-              <th className="py-2 pr-2">
+              <th className={`${tbl.th} w-8`}>
                 <input
                   type="checkbox"
                   aria-label="Selecionar todas"
@@ -627,20 +621,20 @@ function InstanceTable({
                 />
               </th>
             )}
-            <th className="py-2 pr-4 font-medium">VMID</th>
-            <th className="py-2 pr-4 font-medium">Nome</th>
-            <th className="py-2 pr-4 font-medium">Tags</th>
-            <th className="py-2 pr-4 font-medium">Pool</th>
-            <th className="py-2 pr-4 font-medium">Estado</th>
-            <th className="py-2 pr-4 font-medium">Recursos</th>
-            {action && <th className="py-2 font-medium" />}
+            <th className={tbl.th}>VMID</th>
+            <th className={tbl.th}>Nome</th>
+            <th className={tbl.th}>Tags</th>
+            <th className={tbl.th}>Pool</th>
+            <th className={tbl.th}>Estado</th>
+            <th className={tbl.th}>Recursos</th>
+            {action && <th className={tbl.th} />}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+        <tbody className={tbl.tbody}>
           {rows.map((i) => (
-            <tr key={i.id}>
+            <tr key={i.id} className={tbl.tr}>
               {selectable && (
-                <td className="py-2 pr-2">
+                <td className={`${tbl.td} w-8`}>
                   <input
                     type="checkbox"
                     aria-label={`Selecionar ${i.provider_name}`}
@@ -649,20 +643,23 @@ function InstanceTable({
                   />
                 </td>
               )}
-              <td className="py-2 pr-4 tabular-nums">{i.vmid}</td>
-              <td className="py-2 pr-4">
-                {i.name}
+              <td className={`${tbl.td} tabular-nums`}>{i.vmid}</td>
+              <td className={tbl.td}>
+                <span className="inline-flex items-center gap-2 font-medium">
+                  <ResourceIcon kind={i.kind === "vm" ? "vm" : "container"} />
+                  {i.name}
+                </span>
                 {i.name !== i.provider_name && <span className="ml-1 text-xs text-slate-500">({i.provider_name})</span>}
                 <div className="text-xs text-slate-500">
                   {i.kind === "vm" ? "VM" : "Container"} · {i.node}
                 </div>
               </td>
-              <td className="py-2 pr-4">
+              <td className={tbl.td}>
                 <span className="flex flex-wrap gap-1">
                   {i.tags.length ? i.tags.map((t) => <Badge key={t}>{t}</Badge>) : <span className="text-slate-400">—</span>}
                 </span>
               </td>
-              <td className="py-2 pr-4">
+              <td className={tbl.td}>
                 {i.pool ?? <span className="text-slate-400">—</span>}
                 {i.read_only && (
                   <div>
@@ -670,13 +667,13 @@ function InstanceTable({
                   </div>
                 )}
               </td>
-              <td className="py-2 pr-4">
+              <td className={tbl.td}>
                 <PowerBadge state={i.power_state} />
               </td>
-              <td className="py-2 pr-4 tabular-nums text-slate-600 dark:text-slate-400">
+              <td className={`${tbl.td} whitespace-nowrap tabular-nums text-slate-600 dark:text-slate-400`}>
                 {i.vcpus} vCPU · {(i.memory_mb / 1024).toFixed(1)} GiB · {i.root_disk_gb} GiB
               </td>
-              {action && <td className="py-2 text-right">{action(i)}</td>}
+              {action && <td className={`${tbl.td} text-right`}>{action(i)}</td>}
             </tr>
           ))}
         </tbody>
@@ -746,10 +743,10 @@ export function AddHypervisorDialog({
   return (
     <Dialog open={open} onClose={close} title="Adicionar hypervisor">
       <form onSubmit={submit} className="space-y-4">
-        <p className="text-sm text-slate-600 dark:text-slate-400">
+        <Alert variant="info">
           Rode antes o <code>deploy/proxmox/setup-node.sh</code> no servidor: ele cria o usuário, o pool e o
           token com o mínimo de permissões.
-        </p>
+        </Alert>
         <Field label="Nome" hint="Rótulo para os admins, ex.: hv08. Os clientes não veem.">
           <Input name="name" required maxLength={64} placeholder="hv08" disabled={created !== null} />
         </Field>
@@ -784,9 +781,7 @@ export function AddHypervisorDialog({
           <Textarea name="ca_pem" rows={3} placeholder="-----BEGIN CERTIFICATE-----" disabled={created !== null} />
         </Field>
         {created && !add.isPending && (
-          <p className="text-sm text-amber-700 dark:text-amber-300">
-            O servidor já foi cadastrado; corrija o token e tente de novo.
-          </p>
+          <Alert variant="warning">O servidor já foi cadastrado; corrija o token e tente de novo.</Alert>
         )}
         <ErrorBox message={add.isError ? errorMessage(add.error) : null} />
         <div className="flex justify-end gap-2">

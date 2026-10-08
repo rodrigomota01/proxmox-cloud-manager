@@ -29,6 +29,13 @@ control-plane. O kubeconfig traz certificado e chave de cliente (acesso de admin
   RLS na tabela que só libera escopo de plataforma (nem uma rota de tenant com bug
   enxerga). Download do kubeconfig com confirmação, `Cache-Control: no-store` e
   auditoria (`K8S_KUBECONFIG_DOWNLOAD`).
+- **Vínculo com um tenant** (adendo, 2026-10-08): o admin vincula um cluster a um
+  cliente (`k8s_clusters.tenant_id`, auditado como `K8S_CLUSTER_TENANT`). Os membros
+  do cliente (`k8s:view`, que todo papel de tenant/projeto tem) veem o cluster em
+  `/kubernetes/*`, só leitura. As tabelas continuam só-plataforma: o tenant lê pelas
+  views `k8s_tenant_clusters` e `k8s_tenant_snapshots` (dono `cm_owner`, filtradas por
+  `app.tenant_ids`, sem nenhuma coluna de credencial, `cm_app` só com `SELECT`). Não há
+  rota de kubeconfig para o tenant.
 
 ## Consequências
 - `host` é um id de outra tabela legada sem permissão de leitura: os nós aparecem por

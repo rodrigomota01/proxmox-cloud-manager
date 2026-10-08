@@ -100,6 +100,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     v1.include_router(billing.router)
     v1.include_router(billing.admin_router)
     v1.include_router(k8s.router)
+    v1.include_router(k8s.tenant_router)
     app.include_router(v1)
 
     return app

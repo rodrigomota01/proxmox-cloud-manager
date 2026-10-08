@@ -4,8 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
-import { Card } from "@/components/ui";
-import { Stat } from "@/components/usage-panel";
+import { StatTile } from "@/components/page";
+import { Card, tbl } from "@/components/ui";
 import { api, ApiError, unwrap, type Schemas } from "@/lib/api/client";
 import { money, monthLabel, num } from "@/lib/money";
 
@@ -86,17 +86,20 @@ export function CostTiles({
 }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <Stat
+      <StatTile
+        icon="coins"
         label={current ? "Custo no mês até agora" : `Custo em ${monthLabel(month)}`}
         value={money(accrued, currency)}
         hint={current ? monthLabel(month) : "mês encerrado"}
       />
-      <Stat
+      <StatTile
+        icon="power"
         label="Custo atual"
         value={current ? `${money(runRate, currency)}/mês` : "—"}
         hint={current ? `${money(runRateHourly, currency, true)}/hora com as instâncias de agora` : undefined}
       />
-      <Stat
+      <StatTile
+        icon="history"
         label="Previsão para o mês"
         value={forecast !== null ? money(forecast, currency) : "—"}
         hint={current ? "acumulado + custo atual até o fim do mês" : undefined}
@@ -167,24 +170,26 @@ export function PlatformCostPreview() {
           month={s.month}
         />
         {top.length > 0 && (
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="py-1 font-medium">Cliente</th>
-                <th className="py-1 text-right font-medium">No mês</th>
-                <th className="py-1 text-right font-medium">Custo atual/mês</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {top.map((t) => (
-                <tr key={t.tenant_id}>
-                  <td className="py-1.5">{t.name}</td>
-                  <td className="py-1.5 text-right tabular-nums">{money(t.accrued, s.currency)}</td>
-                  <td className="py-1.5 text-right tabular-nums">{money(t.run_rate_monthly, s.currency)}</td>
+          <div className={`${tbl.wrap} -mx-5`}>
+            <table className={tbl.table}>
+              <thead className={tbl.thead}>
+                <tr>
+                  <th className={tbl.th}>Cliente</th>
+                  <th className={`${tbl.th} text-right`}>No mês</th>
+                  <th className={`${tbl.th} text-right`}>Custo atual/mês</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className={tbl.tbody}>
+                {top.map((t) => (
+                  <tr key={t.tenant_id} className={tbl.tr}>
+                    <td className={`${tbl.td} font-medium`}>{t.name}</td>
+                    <td className={`${tbl.td} text-right tabular-nums`}>{money(t.accrued, s.currency)}</td>
+                    <td className={`${tbl.td} text-right tabular-nums`}>{money(t.run_rate_monthly, s.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </Card>

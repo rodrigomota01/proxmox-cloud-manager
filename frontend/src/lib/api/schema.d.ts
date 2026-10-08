@@ -559,6 +559,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/kubernetes/clusters/{cluster_id}/tenant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link Tenant
+         * @description Links the cluster to a client (or unlinks it with null): its members then see
+         *     health, load and workloads, never the kubeconfig.
+         */
+        put: operations["link_tenant_api_v1_admin_kubernetes_clusters__cluster_id__tenant_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/nodes": {
         parameters: {
             query?: never;
@@ -1340,6 +1361,40 @@ export interface paths {
         };
         /** Get Job */
         get: operations["get_job_api_v1_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kubernetes/clusters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tenant List Clusters */
+        get: operations["tenant_list_clusters_api_v1_kubernetes_clusters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kubernetes/clusters/{cluster_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tenant Get Cluster */
+        get: operations["tenant_get_cluster_api_v1_kubernetes_clusters__cluster_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3145,6 +3200,10 @@ export interface components {
              * Format: date-time
              */
             synced_at: string;
+            /** Tenant Id */
+            tenant_id?: string | null;
+            /** Tenant Name */
+            tenant_name?: string | null;
             /** Workloads */
             workloads: components["schemas"]["K8sWorkloadOut"][];
         };
@@ -3195,6 +3254,15 @@ export interface components {
              * Format: date-time
              */
             synced_at: string;
+            /** Tenant Id */
+            tenant_id?: string | null;
+            /** Tenant Name */
+            tenant_name?: string | null;
+        };
+        /** K8sClusterTenantPut */
+        K8sClusterTenantPut: {
+            /** Tenant Id */
+            tenant_id: string | null;
         };
         /**
          * K8sHttpRouteOut
@@ -5622,6 +5690,41 @@ export interface operations {
             };
         };
     };
+    link_tenant_api_v1_admin_kubernetes_clusters__cluster_id__tenant_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["K8sClusterTenantPut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["K8sClusterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_nodes_api_v1_admin_nodes_get: {
         parameters: {
             query?: never;
@@ -7359,6 +7462,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tenant_list_clusters_api_v1_kubernetes_clusters_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["K8sClusterOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tenant_get_cluster_api_v1_kubernetes_clusters__cluster_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["K8sClusterDetail"];
                 };
             };
             /** @description Validation Error */

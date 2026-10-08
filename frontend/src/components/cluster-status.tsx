@@ -1,18 +1,14 @@
-import { Badge } from "@/components/ui";
+import { Status, type StatusTone } from "@/components/ui";
 
-const STATUS_TONE = { online: "green", offline: "red", auth_error: "red", error: "red", unknown: "gray" } as const;
-const STATUS_LABEL: Record<string, string> = {
-  online: "Online",
-  offline: "Offline",
-  auth_error: "Erro de autenticação",
-  error: "Erro",
-  unknown: "Não verificado",
+const STATUS: Record<string, [StatusTone, string]> = {
+  online: ["ok", "Online"],
+  offline: ["error", "Offline"],
+  auth_error: ["error", "Erro de autenticação"],
+  error: ["error", "Erro"],
+  unknown: ["unknown", "Não verificado"],
 };
 
 export function ClusterStatus({ status }: { status: string }) {
-  return (
-    <Badge tone={STATUS_TONE[status as keyof typeof STATUS_TONE] ?? "gray"}>
-      {STATUS_LABEL[status] ?? status}
-    </Badge>
-  );
+  const [tone, label] = STATUS[status] ?? ["unknown", status];
+  return <Status tone={tone}>{label}</Status>;
 }

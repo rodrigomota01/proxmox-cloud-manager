@@ -180,10 +180,11 @@ async def test_who_sees_which_costs(client, benv, app, owner_db):
     assert [i["name"] for i in s["instances"]] == ["cm-test-1"]
     assert money(s["accrued"]["total"]) == Decimal("0.03")
 
-    # USER and READ_ONLY: no cost reports, but prices for the creation estimate
-    for who in ("carol", "dave"):
-        headers = await benv.h(who, benv.acme)
-        assert (await client.get("/api/v1/billing/summary", headers=headers)).status_code == 403
+    # every role sees the costs of its own projects (USER in web, READ_ONLY in db)
+    for who, seen in (("carol", ["cm-test-1"]), ("dave", ["cm-test-2"])):
+        r = await client.get("/api/v1/billing/summary", headers=await benv.h(who, benv.acme))
+        assert r.status_code == 200, r.text
+        assert [i["name"] for i in r.json()["instances"]] == seen
     r = await client.get("/api/v1/billing/prices", headers=await benv.h("carol", benv.acme))
     assert r.status_code == 200 and r.json()["prices"]["vcpu"].startswith("73")
 
