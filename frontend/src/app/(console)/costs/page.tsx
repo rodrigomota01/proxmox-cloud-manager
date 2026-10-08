@@ -5,14 +5,16 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { CostTiles, DailyCostBars } from "@/components/cost";
+import { Icon } from "@/components/icons";
 import { NoTenant } from "@/components/no-tenant";
+import { Menu, PageHeader, ResourceIcon, SearchInput, Toolbar } from "@/components/page";
 import { ScopeToggle } from "@/components/scope-toggle";
-import { Badge, Button, Card, Empty, ErrorBox, PowerBadge, Select } from "@/components/ui";
+import { Alert, Badge, Button, Card, Empty, ErrorBox, PowerBadge, Select, tbl } from "@/components/ui";
 import { mib } from "@/components/viz";
 import { api, ApiError, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { money, monthLabel, num, recentMonths, RESOURCE_LABEL } from "@/lib/money";
 import { useProjectNames } from "@/lib/queries";
-import { useSession } from "@/lib/session";
+import { usePermissions, useSession } from "@/lib/session";
 
 function MonthPicker({ value, onChange }: { value: string; onChange: (m: string) => void }) {
   return (
@@ -46,9 +48,13 @@ const BREAKDOWN = [
 ] as const;
 
 function TenantCosts({ tenantId }: { tenantId: string }) {
-  const { tenant } = useSession();
+  const { tenant, isPlatformAdmin } = useSession();
+  // without billing:view on the whole client, the API reports only the user's projects
+  const tenantPerms = usePermissions(`tenant:${tenantId}`);
+  const projectScoped = !isPlatformAdmin && tenantPerms.size > 0 && !tenantPerms.has("billing:view");
   const projectNames = useProjectNames();
   const [month, setMonth] = useState(recentMonths(1)[0]);
+  const [filter, setFilter] = useState("");
   const summary = useQuery({
     queryKey: ["billing", "summary", tenantId, month],
     queryFn: async () => unwrap(await api.GET("/api/v1/billing/summary", { params: { query: { month } } })),
@@ -71,23 +77,36 @@ function TenantCosts({ tenantId }: { tenantId: string }) {
     ]);
   }
 
+  const q = filter.trim().toLowerCase();
+  const instances = (s?.instances ?? []).filter((i) => !q || i.name.toLowerCase().includes(q));
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold">Custos · {tenant?.name}</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <MonthPicker value={month} onChange={setMonth} />
-          <ScopeToggle />
-        </div>
-      </div>
+      <PageHeader
+        title="Custos"
+        breadcrumbs={[{ label: "Custos" }, { label: tenant?.name ?? "Cliente" }]}
+        description={
+          <>
+            Cliente <strong className="font-medium text-slate-900 dark:text-slate-100">{tenant?.name}</strong> ·{" "}
+            {monthLabel(month)}
+          </>
+        }
+        actions={
+          <>
+            <MonthPicker value={month} onChange={setMonth} />
+            <ScopeToggle />
+          </>
+        }
+      />
       {denied ? (
-        <Card title="Sem acesso">
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Os custos ficam visíveis para administradores do cliente e dos projetos.
-          </p>
-        </Card>
+        <Alert variant="warning" title="Sem acesso">
+          Os custos ficam visíveis para quem tem algum papel no cliente ou em um dos seus projetos.
+        </Alert>
       ) : (
         <ErrorBox message={summary.isError ? errorMessage(summary.error) : null} />
+      )}
+      {s && (projectScoped || (tenantPerms.size === 0 && !isPlatformAdmin)) && (
+        <Alert variant="info">Mostrando os custos dos projetos em que você tem acesso.</Alert>
       )}
       {s && (
         <>
@@ -105,101 +124,52 @@ function TenantCosts({ tenantId }: { tenantId: string }) {
             <Card title="Custo por dia" className="lg:col-span-2">
               <DailyCostBars month={s.month} days={s.days} currency={cur} />
             </Card>
-            <Card title="Por recurso">
-              <table className="w-full text-sm">
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <Card title="Por recurso" flush>
+              <table className={tbl.table}>
+                <tbody className={tbl.tbody}>
                   {BREAKDOWN.map((b) => (
-                    <tr key={b.key}>
-                      <td className="py-1.5">{b.label}</td>
-                      <td className="py-1.5 text-right tabular-nums">{money(s.accrued[b.key], cur)}</td>
+                    <tr key={b.key} className={tbl.tr}>
+                      <td className={tbl.td}>{b.label}</td>
+                      <td className={`${tbl.td} text-right tabular-nums`}>{money(s.accrued[b.key], cur)}</td>
                     </tr>
                   ))}
-                  <tr className="font-semibold">
-                    <td className="py-1.5">Total</td>
-                    <td className="py-1.5 text-right tabular-nums">{money(s.accrued.total, cur)}</td>
+                  <tr className="border-t border-slate-200 font-semibold dark:border-slate-700">
+                    <td className={tbl.td}>Total</td>
+                    <td className={`${tbl.td} text-right tabular-nums`}>{money(s.accrued.total, cur)}</td>
                   </tr>
                 </tbody>
               </table>
             </Card>
           </div>
 
-          <Card title="Por projeto">
+          <Card title="Por projeto" flush>
             {s.projects.length === 0 ? (
-              <Empty>Nenhum custo neste mês.</Empty>
+              <Empty icon="folder">Nenhum custo neste mês.</Empty>
             ) : (
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="py-1 font-medium">Projeto</th>
-                    <th className="py-1 text-right font-medium">No mês</th>
-                    {s.current && <th className="py-1 text-right font-medium">Custo atual/mês</th>}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {s.projects.map((p) => (
-                    <tr key={p.project_id ?? "none"}>
-                      <td className="py-1.5">{p.name ?? <span className="text-slate-500">sem projeto</span>}</td>
-                      <td className="py-1.5 text-right tabular-nums">{money(p.accrued, cur)}</td>
-                      {s.current && <td className="py-1.5 text-right tabular-nums">{money(p.run_rate_monthly, cur)}</td>}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Card>
-
-          <Card
-            title="Por instância"
-            actions={
-              s.instances.length > 0 && (
-                <Button variant="secondary" onClick={() => exportCsv(s)}>
-                  Exportar CSV
-                </Button>
-              )
-            }
-          >
-            {s.instances.length === 0 ? (
-              <Empty>Nenhuma instância com custo neste mês.</Empty>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[44rem] text-sm">
-                  <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
+              <div className={tbl.wrap}>
+                <table className={tbl.table}>
+                  <thead className={tbl.thead}>
                     <tr>
-                      <th className="py-1 font-medium">Instância</th>
-                      <th className="py-1 font-medium">Recursos</th>
-                      <th className="py-1 text-right font-medium">Horas (ligada)</th>
-                      <th className="py-1 text-right font-medium">No mês</th>
-                      {s.current && <th className="py-1 text-right font-medium">Custo atual/mês</th>}
+                      <th className={tbl.th}>Projeto</th>
+                      <th className={`${tbl.th} text-right`}>No mês</th>
+                      {s.current && <th className={`${tbl.th} text-right`}>Custo atual/mês</th>}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {s.instances.map((i) => (
-                      <tr key={i.instance_id}>
-                        <td className="py-1.5">
-                          {i.deleted ? (
-                            <span className="text-slate-500">{i.name}</span>
+                  <tbody className={tbl.tbody}>
+                    {s.projects.map((p) => (
+                      <tr key={p.project_id ?? "none"} className={tbl.tr}>
+                        <td className={tbl.td}>
+                          {p.name ? (
+                            <span className="flex items-center gap-2 font-medium">
+                              <ResourceIcon kind="project" />
+                              {p.name}
+                            </span>
                           ) : (
-                            <Link href={`/instances/${i.instance_id}`} className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
-                              {i.name}
-                            </Link>
+                            <span className="text-slate-500">sem projeto</span>
                           )}
-                          <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                            {projectNames.get(i.project_id ?? "") ?? ""}
-                            {i.deleted ? <Badge>excluída</Badge> : <PowerBadge state={i.power_state} />}
-                          </div>
                         </td>
-                        <td className="py-1.5 text-xs tabular-nums text-slate-600 dark:text-slate-400">
-                          {i.vcpus} vCPU · {mib(i.memory_mb)} · {i.disk_gb} GiB
-                        </td>
-                        <td className="py-1.5 text-right tabular-nums">
-                          {num(i.hours).toFixed(1)} ({num(i.running_hours).toFixed(1)})
-                        </td>
-                        <td className="py-1.5 text-right tabular-nums">{money(i.accrued.total, cur)}</td>
-                        {s.current && (
-                          <td className="py-1.5 text-right tabular-nums">
-                            {i.deleted ? "—" : money(i.run_rate_monthly, cur)}
-                          </td>
-                        )}
+                        <td className={`${tbl.td} text-right tabular-nums`}>{money(p.accrued, cur)}</td>
+                        {s.current && <td className={`${tbl.td} text-right tabular-nums`}>{money(p.run_rate_monthly, cur)}</td>}
                       </tr>
                     ))}
                   </tbody>
@@ -208,16 +178,87 @@ function TenantCosts({ tenantId }: { tenantId: string }) {
             )}
           </Card>
 
-          <Card title={`Tabela de preços${s.prices.price_table ? `: ${s.prices.price_table}` : ""}`}>
-            <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
-              Preço mensal ({s.prices.hours_per_month} h) por unidade alocada, cobrado por segundo de uso. vCPU e
-              memória só contam com a instância ligada; disco e taxa por instância enquanto ela existir.
-            </p>
+          <Card
+            title="Por instância"
+            flush
+            actions={
+              s.instances.length > 0 && (
+                <Button variant="secondary" onClick={() => exportCsv(s)}>
+                  <Icon name="download" /> Exportar CSV
+                </Button>
+              )
+            }
+          >
+            {s.instances.length === 0 ? (
+              <Empty icon="monitor">Nenhuma instância com custo neste mês.</Empty>
+            ) : (
+              <>
+                <Toolbar count={`${instances.length} de ${s.instances.length} instâncias`}>
+                  <SearchInput value={filter} onChange={setFilter} />
+                </Toolbar>
+                <div className={tbl.wrap}>
+                  <table className={`${tbl.table} min-w-[44rem]`}>
+                    <thead className={tbl.thead}>
+                      <tr>
+                        <th className={tbl.th}>Instância</th>
+                        <th className={tbl.th}>Recursos</th>
+                        <th className={`${tbl.th} text-right`}>Horas (ligada)</th>
+                        <th className={`${tbl.th} text-right`}>No mês</th>
+                        {s.current && <th className={`${tbl.th} text-right`}>Custo atual/mês</th>}
+                      </tr>
+                    </thead>
+                    <tbody className={tbl.tbody}>
+                      {instances.map((i) => (
+                        <tr key={i.instance_id} className={tbl.tr}>
+                          <td className={tbl.td}>
+                            <div className="flex items-start gap-2">
+                              <ResourceIcon kind={i.kind === "container" ? "container" : "vm"} className="mt-0.5" />
+                              <div>
+                                {i.deleted ? (
+                                  <span className="text-slate-500">{i.name}</span>
+                                ) : (
+                                  <Link href={`/instances/${i.instance_id}`} className={tbl.link}>
+                                    {i.name}
+                                  </Link>
+                                )}
+                                <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
+                                  {projectNames.get(i.project_id ?? "") ?? ""}
+                                  {i.deleted ? <Badge>excluída</Badge> : <PowerBadge state={i.power_state} />}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className={`${tbl.td} text-xs tabular-nums text-slate-600 dark:text-slate-400`}>
+                            {i.vcpus} vCPU · {mib(i.memory_mb)} · {i.disk_gb} GiB
+                          </td>
+                          <td className={`${tbl.td} text-right tabular-nums`}>
+                            {num(i.hours).toFixed(1)} ({num(i.running_hours).toFixed(1)})
+                          </td>
+                          <td className={`${tbl.td} text-right font-medium tabular-nums`}>{money(i.accrued.total, cur)}</td>
+                          {s.current && (
+                            <td className={`${tbl.td} text-right tabular-nums`}>
+                              {i.deleted ? "—" : money(i.run_rate_monthly, cur)}
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {instances.length === 0 && <Empty>Nenhuma instância com esse nome.</Empty>}
+              </>
+            )}
+          </Card>
+
+          <Card
+            title={`Tabela de preços${s.prices.price_table ? `: ${s.prices.price_table}` : ""}`}
+            description={`Preço mensal (${s.prices.hours_per_month} h) por unidade alocada, cobrado por segundo de uso. vCPU e memória só contam com a instância ligada; disco e taxa por instância enquanto ela existir.`}
+          >
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {Object.entries(s.prices.prices).map(([r, p]) => (
-                <div key={r} className="rounded-md border border-slate-200 px-3 py-2 dark:border-slate-700">
+                <div key={r} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
                   <div className="text-xs text-slate-500">{RESOURCE_LABEL[r] ?? r}</div>
-                  <div className="font-medium tabular-nums">{money(p, cur, true)}/mês</div>
+                  <div className="font-semibold tabular-nums">{money(p, cur, true)}/mês</div>
                 </div>
               ))}
             </div>
@@ -232,6 +273,7 @@ function TenantCosts({ tenantId }: { tenantId: string }) {
 function PlatformCosts() {
   const { selectTenant } = useSession();
   const [month, setMonth] = useState(recentMonths(1)[0]);
+  const [filter, setFilter] = useState("");
   const summary = useQuery({
     queryKey: ["admin", "billing", "summary", month],
     queryFn: async () => unwrap(await api.GET("/api/v1/admin/billing/summary", { params: { query: { month } } })),
@@ -239,15 +281,23 @@ function PlatformCosts() {
   });
   const s = summary.data;
   const cur = s?.currency ?? "BRL";
+  const q = filter.trim().toLowerCase();
+  const tenants = (s?.tenants ?? []).filter(
+    (t) => !q || t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q),
+  );
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold">Custos · toda a plataforma</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <MonthPicker value={month} onChange={setMonth} />
-          <ScopeToggle />
-        </div>
-      </div>
+      <PageHeader
+        title="Custos"
+        breadcrumbs={[{ label: "Custos" }, { label: "Toda a plataforma" }]}
+        description={<>Toda a plataforma · {monthLabel(month)}</>}
+        actions={
+          <>
+            <MonthPicker value={month} onChange={setMonth} />
+            <ScopeToggle />
+          </>
+        }
+      />
       <ErrorBox message={summary.isError ? errorMessage(summary.error) : null} />
       {s && (
         <>
@@ -265,6 +315,7 @@ function PlatformCosts() {
           </Card>
           <Card
             title="Custo por cliente"
+            flush
             actions={
               <Button
                 variant="secondary"
@@ -275,46 +326,65 @@ function PlatformCosts() {
                   ])
                 }
               >
-                Exportar CSV
+                <Icon name="download" /> Exportar CSV
               </Button>
             }
           >
             {s.tenants.length === 0 ? (
-              <Empty>Nenhum cliente.</Empty>
+              <Empty icon="building">Nenhum cliente.</Empty>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[40rem] text-sm">
-                  <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
-                    <tr>
-                      <th className="py-1 font-medium">Cliente</th>
-                      <th className="py-1 font-medium">Tabela de preços</th>
-                      <th className="py-1 text-right font-medium">No mês</th>
-                      {s.current && <th className="py-1 text-right font-medium">Custo atual/mês</th>}
-                      {s.current && <th className="py-1 text-right font-medium">Previsão</th>}
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {s.tenants.map((t) => (
-                      <tr key={t.tenant_id}>
-                        <td className="py-1.5 font-medium">{t.name}</td>
-                        <td className="py-1.5 text-slate-600 dark:text-slate-400">
-                          {t.price_table ?? "—"}
-                          {!t.custom_price_table && t.price_table && <span className="text-xs"> (padrão)</span>}
-                        </td>
-                        <td className="py-1.5 text-right tabular-nums">{money(t.accrued, cur)}</td>
-                        {s.current && <td className="py-1.5 text-right tabular-nums">{money(t.run_rate_monthly, cur)}</td>}
-                        {s.current && <td className="py-1.5 text-right tabular-nums">{money(t.forecast, cur)}</td>}
-                        <td className="py-1.5 text-right">
-                          <Button variant="ghost" onClick={() => selectTenant(t.tenant_id)}>
-                            Detalhar
-                          </Button>
-                        </td>
+              <>
+                <Toolbar count={`${tenants.length} de ${s.tenants.length} clientes`}>
+                  <SearchInput value={filter} onChange={setFilter} placeholder="Filtrar cliente…" />
+                </Toolbar>
+                <div className={tbl.wrap}>
+                  <table className={`${tbl.table} min-w-[40rem]`}>
+                    <thead className={tbl.thead}>
+                      <tr>
+                        <th className={tbl.th}>Cliente</th>
+                        <th className={tbl.th}>Tabela de preços</th>
+                        <th className={`${tbl.th} text-right`}>No mês</th>
+                        {s.current && <th className={`${tbl.th} text-right`}>Custo atual/mês</th>}
+                        {s.current && <th className={`${tbl.th} text-right`}>Previsão</th>}
+                        <th className={tbl.th}>
+                          <span className="sr-only">Ações</span>
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className={tbl.tbody}>
+                      {tenants.map((t) => (
+                        <tr key={t.tenant_id} className={tbl.tr}>
+                          <td className={tbl.td}>
+                            <div className="flex items-start gap-2">
+                              <ResourceIcon kind="tenant" className="mt-0.5" />
+                              <div>
+                                <button type="button" onClick={() => selectTenant(t.tenant_id)} className={tbl.link}>
+                                  {t.name}
+                                </button>
+                                <div className="text-xs text-slate-500">{t.slug}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className={`${tbl.td} text-slate-600 dark:text-slate-400`}>
+                            {t.price_table ?? "—"}
+                            {!t.custom_price_table && t.price_table && <span className="text-xs"> (padrão)</span>}
+                          </td>
+                          <td className={`${tbl.td} text-right font-medium tabular-nums`}>{money(t.accrued, cur)}</td>
+                          {s.current && <td className={`${tbl.td} text-right tabular-nums`}>{money(t.run_rate_monthly, cur)}</td>}
+                          {s.current && <td className={`${tbl.td} text-right tabular-nums`}>{money(t.forecast, cur)}</td>}
+                          <td className={`${tbl.td} w-12 text-right`}>
+                            <Menu
+                              ariaLabel={`Ações de ${t.name}`}
+                              items={[{ label: "Detalhar custos", onClick: () => selectTenant(t.tenant_id) }]}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {tenants.length === 0 && <Empty>Nenhum cliente com esse nome.</Empty>}
+              </>
             )}
           </Card>
         </>

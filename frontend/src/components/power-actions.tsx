@@ -3,6 +3,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { Menu } from "@/components/page";
 import { Badge, Button, Dialog, ErrorBox, JobBadge, Spinner } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { useJob } from "@/lib/jobs";
@@ -18,6 +19,7 @@ const ACTIONS: { action: Action; label: string; verb: string; when: string[] }[]
   { action: "stop", label: "Forçar desligamento", verb: "stop", when: ["running", "paused", "unknown"] },
 ];
 
+/** Power buttons; `compact` (table rows) folds them into a kebab menu. */
 export function PowerActions({ instance, compact = false }: { instance: Instance; compact?: boolean }) {
   const perms = usePermissions(`project:${instance.project_id}`);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -51,20 +53,28 @@ export function PowerActions({ instance, compact = false }: { instance: Instance
       </span>
     );
   }
+  const onPick = (a: Action) => (a === "stop" ? setConfirming(true) : trigger(a));
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      {available.map((a) =>
-        a.action === "stop" && compact ? null : (
+    <div className={`flex items-center gap-2 ${compact ? "justify-end" : "flex-wrap"}`}>
+      {compact ? (
+        busy ? null : (
+          <Menu
+            ariaLabel={`Ações de ${instance.name}`}
+            items={available.map((a) => ({ label: a.label, danger: a.action === "stop", onClick: () => onPick(a.action) }))}
+          />
+        )
+      ) : (
+        available.map((a) => (
           <Button
             key={a.action}
             variant={a.action === "stop" ? "danger" : "secondary"}
             disabled={busy}
-            onClick={() => (a.action === "stop" ? setConfirming(true) : trigger(a.action))}
+            onClick={() => onPick(a.action)}
           >
             {a.label}
           </Button>
-        ),
+        ))
       )}
       {busy && <Spinner />}
       {job && !busy && job.status === "failed" && <JobBadge status="failed" />}

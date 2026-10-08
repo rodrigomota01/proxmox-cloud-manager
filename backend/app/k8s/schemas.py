@@ -23,6 +23,10 @@ class K8sKubeconfigPut(Input):
     kubeconfig: Annotated[str, Field(min_length=20, max_length=262_144)]
 
 
+class K8sClusterTenantPut(Input):
+    tenant_id: uuid.UUID | None  # null unlinks
+
+
 class K8sTableNodeOut(BaseModel):
     id: int  # kubernetes_clusters.id
     host: int | None
@@ -78,6 +82,8 @@ class K8sClusterOut(BaseModel):
     kubeconfig_error: str | None
     source_modified_at: datetime | None
     synced_at: datetime
+    tenant_id: uuid.UUID | None = None
+    tenant_name: str | None = None
     snapshot: K8sSummaryOut | None  # None: not collected yet
 
 

@@ -3,7 +3,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Select, formatDate } from "@/components/ui";
+import { Icon } from "@/components/icons";
+import { Menu, PageHeader, ResourceIcon } from "@/components/page";
+import { Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Select, formatDate, tbl } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { money, RESOURCE_LABEL } from "@/lib/money";
 
@@ -72,27 +74,28 @@ function TableEditor({ table }: { table: Schemas["PriceTableOut"] }) {
     <Card
       title={
         <span className="flex items-center gap-2">
+          <Icon name="tag" className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
           {table.name}
-          {table.is_default && <Badge tone="blue">padrão</Badge>}
-          {table.tenants.length > 0 && <Badge>{table.tenants.length} cliente(s)</Badge>}
+          {table.is_default && <Badge tone="indigo">padrão</Badge>}
         </span>
       }
+      description={
+        table.tenants.length > 0 ? `Usada por ${table.tenants.length} cliente(s)` : table.is_default ? "Vale para clientes sem tabela própria" : "Nenhum cliente usa esta tabela"
+      }
       actions={
-        <>
-          {!table.is_default && (
-            <Button variant="ghost" onClick={() => save.mutate({ is_default: true })}>
-              Tornar padrão
-            </Button>
-          )}
-          {!table.is_default && table.tenants.length === 0 && (
-            <Button
-              variant="ghost"
-              onClick={() => confirm(`Excluir a tabela "${table.name}"?`) && remove.mutate()}
-            >
-              Excluir
-            </Button>
-          )}
-        </>
+        <Menu
+          ariaLabel={`Ações da tabela ${table.name}`}
+          items={[
+            !table.is_default && { label: "Tornar padrão", onClick: () => save.mutate({ is_default: true }) },
+            { label: history ? "Ocultar histórico" : "Histórico de preços", onClick: () => setHistory((h) => !h) },
+            !table.is_default &&
+              table.tenants.length === 0 && {
+                label: "Excluir",
+                danger: true,
+                onClick: () => confirm(`Excluir a tabela "${table.name}"?`) && remove.mutate(),
+              },
+          ]}
+        />
       }
     >
       <form
@@ -114,35 +117,33 @@ function TableEditor({ table }: { table: Schemas["PriceTableOut"] }) {
           <Button type="submit" variant="secondary" disabled={save.isPending}>
             Salvar
           </Button>
-          {saved && <span className="text-sm text-emerald-600">Salvo. Novos preços valem a partir de agora.</span>}
-          <button
-            type="button"
-            className="ml-auto text-sm text-indigo-600 hover:underline dark:text-indigo-400"
-            onClick={() => setHistory((h) => !h)}
-          >
+          {saved && <span className="text-sm text-emerald-600 dark:text-emerald-400">Salvo. Novos preços valem a partir de agora.</span>}
+          <Button type="button" variant="link" className="ml-auto" onClick={() => setHistory((h) => !h)}>
             {history ? "Ocultar histórico" : "Histórico de preços"}
-          </button>
+          </Button>
         </div>
       </form>
       {history && (
-        <table className="mt-3 w-full text-sm">
-          <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
-            <tr>
-              <th className="py-1 font-medium">Desde</th>
-              <th className="py-1 font-medium">Recurso</th>
-              <th className="py-1 text-right font-medium">Preço/mês</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {table.history.map((h) => (
-              <tr key={`${h.resource}-${h.effective_from}`}>
-                <td className="py-1">{formatDate(h.effective_from)}</td>
-                <td className="py-1">{RESOURCE_LABEL[h.resource] ?? h.resource}</td>
-                <td className="py-1 text-right tabular-nums">{money(h.monthly_price, "BRL", true)}</td>
+        <div className={`${tbl.wrap} -mx-5 mt-4 border-t border-slate-200 dark:border-slate-800`}>
+          <table className={tbl.table}>
+            <thead className={tbl.thead}>
+              <tr>
+                <th className={tbl.th}>Desde</th>
+                <th className={tbl.th}>Recurso</th>
+                <th className={`${tbl.th} text-right`}>Preço/mês</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className={tbl.tbody}>
+              {table.history.map((h) => (
+                <tr key={`${h.resource}-${h.effective_from}`} className={tbl.tr}>
+                  <td className={tbl.td}>{formatDate(h.effective_from)}</td>
+                  <td className={tbl.td}>{RESOURCE_LABEL[h.resource] ?? h.resource}</td>
+                  <td className={`${tbl.td} text-right tabular-nums`}>{money(h.monthly_price, "BRL", true)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </Card>
   );
@@ -227,37 +228,62 @@ function TenantAssignments({ tables }: { tables: Schemas["PriceTableOut"][] }) {
   });
   const def = tables.find((t) => t.is_default);
   return (
-    <Card title="Tabela por cliente">
-      <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
-        Clientes sem tabela própria usam a padrão. A troca vale a partir de agora; o que já foi acumulado
-        mantém o preço da época.
-      </p>
-      <ErrorBox message={assign.isError ? errorMessage(assign.error) : summary.isError ? errorMessage(summary.error) : null} />
-      {summary.data?.tenants.length === 0 && <Empty>Nenhum cliente.</Empty>}
-      <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-        {summary.data?.tenants.map((t) => (
-          <li key={t.tenant_id} className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm">
-            <span className="font-medium">
-              {t.name} <span className="font-normal text-slate-500">({t.slug})</span>
-            </span>
-            <Select
-              aria-label={`Tabela de preços de ${t.name}`}
-              value={t.custom_price_table ? (t.price_table_id ?? "") : ""}
-              disabled={assign.isPending}
-              onChange={(e) => assign.mutate({ tenantId: t.tenant_id, tableId: e.target.value || null })}
-            >
-              <option value="">Padrão{def ? ` (${def.name})` : ""}</option>
-              {tables
-                .filter((tb) => !tb.is_default)
-                .map((tb) => (
-                  <option key={tb.id} value={tb.id}>
-                    {tb.name}
-                  </option>
-                ))}
-            </Select>
-          </li>
-        ))}
-      </ul>
+    <Card
+      title="Tabela por cliente"
+      description="Clientes sem tabela própria usam a padrão. A troca vale a partir de agora; o que já foi acumulado mantém o preço da época."
+      flush
+    >
+      {(assign.isError || summary.isError) && (
+        <div className="px-5 pb-3">
+          <ErrorBox message={assign.isError ? errorMessage(assign.error) : summary.isError ? errorMessage(summary.error) : null} />
+        </div>
+      )}
+      {summary.data?.tenants.length === 0 ? (
+        <Empty icon="building">Nenhum cliente.</Empty>
+      ) : (
+        <div className={tbl.wrap}>
+          <table className={tbl.table}>
+            <thead className={tbl.thead}>
+              <tr>
+                <th className={tbl.th}>Cliente</th>
+                <th className={tbl.th}>Tabela de preços</th>
+              </tr>
+            </thead>
+            <tbody className={tbl.tbody}>
+              {summary.data?.tenants.map((t) => (
+                <tr key={t.tenant_id} className={tbl.tr}>
+                  <td className={tbl.td}>
+                    <div className="flex items-start gap-2">
+                      <ResourceIcon kind="tenant" className="mt-0.5" />
+                      <div>
+                        <div className="font-medium">{t.name}</div>
+                        <div className="text-xs text-slate-500">{t.slug}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className={tbl.td}>
+                    <Select
+                      aria-label={`Tabela de preços de ${t.name}`}
+                      value={t.custom_price_table ? (t.price_table_id ?? "") : ""}
+                      disabled={assign.isPending}
+                      onChange={(e) => assign.mutate({ tenantId: t.tenant_id, tableId: e.target.value || null })}
+                    >
+                      <option value="">Padrão{def ? ` (${def.name})` : ""}</option>
+                      {tables
+                        .filter((tb) => !tb.is_default)
+                        .map((tb) => (
+                          <option key={tb.id} value={tb.id}>
+                            {tb.name}
+                          </option>
+                        ))}
+                    </Select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Card>
   );
 }
@@ -270,19 +296,31 @@ export default function AdminPricingPage() {
   });
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold">Preços</h1>
-          <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-400">
-            As VMs são precificadas pelos recursos alocados, com preço mensal (730 h) cobrado por segundo:
-            vCPU e memória enquanto a instância está ligada; disco e taxa por instância enquanto ela existe.
-          </p>
-        </div>
-        <Button onClick={() => setCreating(true)}>Nova tabela</Button>
-      </div>
+      <PageHeader
+        title="Tabelas de preço"
+        breadcrumbs={[{ label: "Custos" }, { label: "Tabelas de preço" }]}
+        description="As VMs são precificadas pelos recursos alocados, com preço mensal (730 h) cobrado por segundo: vCPU e memória enquanto a instância está ligada; disco e taxa por instância enquanto ela existe."
+        actions={
+          <Button onClick={() => setCreating(true)}>
+            <Icon name="plus" /> Nova tabela
+          </Button>
+        }
+      />
       <ErrorBox message={tables.isError ? errorMessage(tables.error) : null} />
       {tables.data?.length === 0 && (
-        <Empty>Nenhuma tabela. Crie uma e torne-a padrão para começar a calcular custos.</Empty>
+        <Card>
+          <Empty
+            icon="tag"
+            title="Nenhuma tabela de preços"
+            action={
+              <Button onClick={() => setCreating(true)}>
+                <Icon name="plus" /> Nova tabela
+              </Button>
+            }
+          >
+            Crie uma e torne-a padrão para começar a calcular custos.
+          </Empty>
+        </Card>
       )}
       {tables.data?.map((t) => <TableEditor key={t.id} table={t} />)}
       {tables.data && tables.data.length > 0 && <TenantAssignments tables={tables.data} />}

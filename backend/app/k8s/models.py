@@ -7,7 +7,9 @@
 - k8s_snapshots: the last state read from each cluster's API by the worker (health,
   load, namespaces, workloads, services). Read-only collection; no secrets stored.
 
-No tenant: reached only through /admin/* (cluster:manage); RLS allows platform scope only.
+Platform data: the tables are reached through /admin/* (cluster:manage) and RLS allows
+platform scope only. A cluster may be linked to one tenant (tenant_id); its members read
+it through the k8s_tenant_* views (migration 0014), which carry no credential column.
 """
 
 import uuid
@@ -31,6 +33,10 @@ class K8sCluster(UUIDPk, Base):
     name: Mapped[str] = mapped_column(Text, unique=True)  # kubernetes_clusters.client
     # the table sync only touches (and removes) its own rows
     source: Mapped[str] = mapped_column(Text, server_default="table")
+    # the client the cluster belongs to (set by a platform admin, never by the sync)
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("tenants.id", ondelete="SET NULL"), index=True
+    )
     api_server: Mapped[str | None] = mapped_column(Text)  # api_server_dns
     server_url: Mapped[str | None] = mapped_column(Text)  # from the kubeconfig
     # what the table says vs. what the kubeconfig's client certificate says

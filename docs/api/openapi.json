@@ -4033,6 +4033,29 @@
             "title": "Synced At",
             "type": "string"
           },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "tenant_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Name"
+          },
           "workloads": {
             "items": {
               "$ref": "#/components/schemas/K8sWorkloadOut"
@@ -4222,6 +4245,29 @@
             "format": "date-time",
             "title": "Synced At",
             "type": "string"
+          },
+          "tenant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          },
+          "tenant_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Name"
           }
         },
         "required": [
@@ -4244,6 +4290,28 @@
           "snapshot"
         ],
         "title": "K8sClusterOut",
+        "type": "object"
+      },
+      "K8sClusterTenantPut": {
+        "additionalProperties": false,
+        "properties": {
+          "tenant_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Id"
+          }
+        },
+        "required": [
+          "tenant_id"
+        ],
+        "title": "K8sClusterTenantPut",
         "type": "object"
       },
       "K8sHttpRouteOut": {
@@ -9619,6 +9687,60 @@
         ]
       }
     },
+    "/api/v1/admin/kubernetes/clusters/{cluster_id}/tenant": {
+      "put": {
+        "description": "Links the cluster to a client (or unlinks it with null): its members then see\nhealth, load and workloads, never the kubeconfig.",
+        "operationId": "link_tenant_api_v1_admin_kubernetes_clusters__cluster_id__tenant_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/K8sClusterTenantPut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/K8sClusterOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link Tenant",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/nodes": {
       "get": {
         "operationId": "list_nodes_api_v1_admin_nodes_get",
@@ -12264,6 +12386,84 @@
         "summary": "Get Job",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/api/v1/kubernetes/clusters": {
+      "get": {
+        "operationId": "tenant_list_clusters_api_v1_kubernetes_clusters_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/K8sClusterOut"
+                  },
+                  "title": "Response Tenant List Clusters Api V1 Kubernetes Clusters Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tenant List Clusters",
+        "tags": [
+          "kubernetes"
+        ]
+      }
+    },
+    "/api/v1/kubernetes/clusters/{cluster_id}": {
+      "get": {
+        "operationId": "tenant_get_cluster_api_v1_kubernetes_clusters__cluster_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/K8sClusterDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tenant Get Cluster",
+        "tags": [
+          "kubernetes"
         ]
       }
     },

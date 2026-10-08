@@ -6,6 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { ConnectionInstances, ConnectionSettings } from "@/components/admin/connection";
+import { ClusterStatus } from "@/components/cluster-status";
+import { PageHeader } from "@/components/page";
 import { ErrorBox } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
 
@@ -39,11 +41,12 @@ export default function ConnectionPage() {
 
   return (
     <div className="space-y-4">
-      <Link href="/admin/nodes" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
-        ← Hypervisors
-      </Link>
-      <div>
-        <h1 className="text-lg font-semibold">{c.name}</h1>
+      <PageHeader
+        title={c.name}
+        kind="cluster"
+        status={<ClusterStatus status={c.status} />}
+        breadcrumbs={[{ label: "Infraestrutura" }, { label: "Hypervisors", href: "/admin/nodes" }, { label: c.name }]}
+      >
         <p className="text-sm text-slate-600 dark:text-slate-400">
           {mine.length === 0 ? (
             "Nenhum servidor sincronizado ainda. Confira o token e clique em Sincronizar."
@@ -62,7 +65,7 @@ export default function ConnectionPage() {
             </>
           )}
         </p>
-      </div>
+      </PageHeader>
       <ConnectionSettings cluster={c} nodeCount={mine.length} />
       <ConnectionInstances clusterId={c.id} />
     </div>

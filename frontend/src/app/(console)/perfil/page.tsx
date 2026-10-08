@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { PageHeader } from "@/components/page";
 import { Badge, Button, Card, ErrorBox, Field, Input, formatDate } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
 import { useSession } from "@/lib/session";
@@ -148,11 +149,13 @@ function SessionsCard() {
 
 export default function ProfilePage() {
   return (
-    <div className="max-w-3xl space-y-4">
-      <h1 className="text-lg font-semibold">Meu perfil</h1>
-      <ProfileCard />
-      <PasswordCard />
-      <SessionsCard />
-    </div>
+    <>
+      <PageHeader title="Meu perfil" description="Seus dados, senha e sessões abertas." />
+      <div className="max-w-3xl space-y-4">
+        <ProfileCard />
+        <PasswordCard />
+        <SessionsCard />
+      </div>
+    </>
   );
 }

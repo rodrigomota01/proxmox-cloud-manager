@@ -4,7 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
-import { Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input } from "@/components/ui";
+import { Icon } from "@/components/icons";
+import { PageHeader } from "@/components/page";
+import { Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Status, tbl } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 
 type Region = Schemas["AdminRegionOut"];
@@ -89,7 +91,7 @@ function NewZoneForm({ region }: { region: Region }) {
   if (!open) {
     return (
       <Button variant="secondary" onClick={() => setOpen(true)}>
-        Nova zona
+        <Icon name="plus" /> Nova zona
       </Button>
     );
   }
@@ -147,25 +149,39 @@ export default function RegionsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold">Regiões e zonas</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Os usuários escolhem região e zona ao criar instâncias; a plataforma escolhe o servidor
-            dentro da zona. Vincule servidores às zonas em{" "}
+      <PageHeader
+        title="Regiões e zonas"
+        breadcrumbs={[{ label: "Infraestrutura" }, { label: "Regiões e zonas" }]}
+        description={
+          <>
+            Os usuários escolhem região e zona ao criar instâncias; a plataforma escolhe o servidor dentro da
+            zona. Vincule servidores às zonas em{" "}
             <Link href="/admin/nodes" className="text-indigo-600 hover:underline dark:text-indigo-400">
               Hypervisors
             </Link>{" "}
-            (aba Configuração de cada servidor)
-            .
-          </p>
-        </div>
-        <Button onClick={() => setCreating(true)}>Nova região</Button>
-      </div>
+            (aba Configuração de cada servidor).
+          </>
+        }
+        actions={
+          <Button onClick={() => setCreating(true)}>
+            <Icon name="plus" /> Nova região
+          </Button>
+        }
+      />
       <ErrorBox message={regions.isError ? errorMessage(regions.error) : null} />
       {regions.data?.length === 0 && (
         <Card>
-          <Empty>Nenhuma região. Crie a primeira, por exemplo “br-sp”.</Empty>
+          <Empty
+            icon="globe"
+            title="Nenhuma região"
+            action={
+              <Button onClick={() => setCreating(true)}>
+                <Icon name="plus" /> Nova região
+              </Button>
+            }
+          >
+            Crie a primeira, por exemplo “br-sp”.
+          </Empty>
         </Card>
       )}
       {regions.data?.map((r) => (
@@ -179,44 +195,48 @@ export default function RegionsPage() {
               {!r.active && <Badge tone="red">inativa</Badge>}
             </span>
           }
+          description={`${r.zones.length} zona(s)`}
           actions={<NewZoneForm region={r} />}
+          flush
         >
           {r.zones.length === 0 ? (
-            <Empty>Nenhuma zona nesta região.</Empty>
+            <Empty icon="globe">Nenhuma zona nesta região.</Empty>
           ) : (
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="py-2 pr-4 font-medium">Zona</th>
-                  <th className="py-2 pr-4 font-medium">Servidores</th>
-                  <th className="py-2 pr-4 font-medium">Situação</th>
-                  <th className="py-2 font-medium" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {r.zones.map((z) => (
-                  <tr key={z.id}>
-                    <td className="py-2 pr-4">
-                      <span className="font-medium">{z.name}</span>{" "}
-                      <span className="font-mono text-xs text-slate-500">{z.slug}</span>
-                    </td>
-                    <td className="py-2 pr-4">{z.clusters.length ? z.clusters.join(", ") : "—"}</td>
-                    <td className="py-2 pr-4">
-                      {!z.active ? (
-                        <Badge tone="red">Inativa</Badge>
-                      ) : z.usable ? (
-                        <Badge tone="green">Recebe instâncias</Badge>
-                      ) : (
-                        <Badge tone="amber">Sem servidor pronto</Badge>
-                      )}
-                    </td>
-                    <td className="py-2 text-right">
-                      <ZoneToggle zone={z} />
-                    </td>
+            <div className={tbl.wrap}>
+              <table className={tbl.table}>
+                <thead className={tbl.thead}>
+                  <tr>
+                    <th className={tbl.th}>Zona</th>
+                    <th className={tbl.th}>Servidores</th>
+                    <th className={tbl.th}>Situação</th>
+                    <th className={tbl.th} />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className={tbl.tbody}>
+                  {r.zones.map((z) => (
+                    <tr key={z.id} className={tbl.tr}>
+                      <td className={tbl.td}>
+                        <span className="font-medium">{z.name}</span>{" "}
+                        <span className="font-mono text-xs text-slate-500">{z.slug}</span>
+                      </td>
+                      <td className={tbl.td}>{z.clusters.length ? z.clusters.join(", ") : "—"}</td>
+                      <td className={tbl.td}>
+                        {!z.active ? (
+                          <Status tone="off">Inativa</Status>
+                        ) : z.usable ? (
+                          <Status tone="ok">Recebe instâncias</Status>
+                        ) : (
+                          <Status tone="warn">Sem servidor pronto</Status>
+                        )}
+                      </td>
+                      <td className={`${tbl.td} text-right`}>
+                        <ZoneToggle zone={z} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
       ))}

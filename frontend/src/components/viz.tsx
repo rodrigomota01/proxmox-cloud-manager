@@ -7,6 +7,8 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { tbl } from "@/components/ui";
+
 // --- formatting ------------------------------------------------------------------------
 
 export const pct = (v: number) => `${(v * 100).toFixed(v < 0.1 ? 1 : 0)}%`;
@@ -337,12 +339,12 @@ export function SortHeader<K extends string>({
   const active = sort.key === k;
   return (
     <th
-      className={`py-2 pr-4 font-medium ${align === "right" ? "text-right" : ""}`}
+      className={`${tbl.th} ${align === "right" ? "text-right" : ""}`}
       aria-sort={active ? (sort.desc ? "descending" : "ascending") : "none"}
     >
       <button
         onClick={() => toggle(k)}
-        className={`inline-flex items-center gap-1 uppercase tracking-wide hover:text-slate-900 dark:hover:text-slate-100 ${active ? "text-slate-900 dark:text-slate-100" : ""}`}
+        className={`inline-flex items-center gap-1 font-semibold hover:text-slate-900 dark:hover:text-slate-100 ${active ? "text-slate-900 dark:text-slate-100" : ""}`}
       >
         {label}
         <span aria-hidden className="text-[10px]">{active ? (sort.desc ? "▼" : "▲") : "↕"}</span>

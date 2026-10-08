@@ -2,9 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { NoTenant } from "@/components/no-tenant";
+import { DescriptionList, PageHeader } from "@/components/page";
 import { PowerActions } from "@/components/power-actions";
 import { DeleteInstance } from "@/components/delete-instance";
 import { InstanceMetrics } from "@/components/metrics-panel";
@@ -18,17 +19,20 @@ import { useSession } from "@/lib/session";
 
 const BUSY = ["provisioning", "deleting"];
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-3 gap-4 py-2 text-sm">
-      <dt className="text-slate-500">{label}</dt>
-      <dd className="col-span-2">{children}</dd>
-    </div>
-  );
-}
+const TABS = [
+  { key: "overview", label: "Visão geral" },
+  { key: "metrics", label: "Métricas" },
+  { key: "history", label: "Histórico" },
+] as const;
+type Tab = (typeof TABS)[number]["key"];
+
+const CRUMBS = { label: "Máquinas virtuais", href: "/instances" };
 
 export default function InstanceDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const params = useSearchParams();
+  const tab: Tab = TABS.some((t) => t.key === params.get("tab")) ? (params.get("tab") as Tab) : "overview";
   const { tenantId } = useSession();
   const projectNames = useProjectNames();
 
@@ -52,110 +56,147 @@ export default function InstanceDetailPage() {
   if (instance.isError) {
     return (
       <div className="space-y-4">
-        <Link href="/instances" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
-          ← Instâncias
-        </Link>
+        <PageHeader title="Instância" breadcrumbs={[CRUMBS]} />
         <ErrorBox message={errorMessage(instance.error)} />
       </div>
     );
   }
   const i = instance.data;
   if (!i) return null;
+  const running = i.power_state === "running" && i.state === "active";
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link href="/instances" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
-          ← Instâncias
-        </Link>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-semibold">{i.name}</h1>
-            {i.state === "active" ? <PowerBadge state={i.power_state} /> : <StateBadge state={i.state} />}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-4">
+      <PageHeader
+        title={i.name}
+        kind={i.kind === "vm" ? "vm" : "container"}
+        breadcrumbs={[CRUMBS, { label: i.name }]}
+        status={i.state === "active" ? <PowerBadge state={i.power_state} /> : <StateBadge state={i.state} />}
+        actions={
+          <>
             <PowerActions instance={i} />
             <DeleteInstance instance={i} />
-          </div>
-        </div>
-      </div>
+          </>
+        }
+        tabs={TABS.map((t) => (t.key === "history" && jobs.data ? { ...t, count: jobs.data.length } : t))}
+        activeTab={tab}
+        onTab={(t) => router.replace(t === "overview" ? `/instances/${id}` : `/instances/${id}?tab=${t}`)}
+      />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Visão geral">
-          <dl className="divide-y divide-slate-100 dark:divide-slate-800">
-            <Row label="Tipo">{i.kind === "vm" ? "Máquina virtual" : "Container"}</Row>
-            <Row label="Projeto">{projectNames.get(i.project_id) ?? "—"}</Row>
-            <Row label="Região / zona">
-              {i.region_name ? `${i.region_name} · ${i.zone_name}` : "—"}
-            </Row>
-            <Row label="vCPUs">{i.vcpus}</Row>
-            {i.power_state === "running" && i.state === "active" && (
-              <>
-                <Row label="CPU agora">
-                  <Meter value={i.cpu_usage} title="CPU" />
-                </Row>
-                <Row label="Memória agora">
-                  <Meter
-                    value={i.memory_mb ? i.memory_used_mb / i.memory_mb : 0}
-                    label={`${mib(i.memory_used_mb)} / ${mib(i.memory_mb)}`}
-                    title="Memória"
-                  />
-                </Row>
-                <Row label="Disco usado">
-                  <DiskUsage disk={i.disk} detailed />
-                </Row>
-                <Row label="Rede agora">
-                  <span className="text-sm tabular-nums">
-                    ↓ {rate(i.net_in_bps)} · ↑ {rate(i.net_out_bps)}
-                  </span>
-                </Row>
-                <Row label="Ligada há">{uptime(i.uptime_seconds)}</Row>
-              </>
+      {tab === "overview" && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card title="Detalhes" className="lg:col-span-2">
+            <DescriptionList
+              items={[
+                ["Nome", i.name],
+                ["Tipo", i.kind === "vm" ? "Máquina virtual" : "Container"],
+                ["Projeto", projectNames.get(i.project_id) ?? "—"],
+                ["Região / zona", i.region_name ? `${i.region_name} · ${i.zone_name}` : "—"],
+                ["vCPUs", i.vcpus],
+                ["Memória", `${(i.memory_mb / 1024).toFixed(1)} GiB`],
+                ["Disco raiz", `${i.root_disk_gb} GiB`],
+                [
+                  "IP",
+                  i.ipv4 ? (
+                    <span className="font-mono">
+                      {i.ipv4} <span className="text-slate-500">via {i.gateway}</span>
+                    </span>
+                  ) : (
+                    "—"
+                  ),
+                ],
+                [
+                  "Tags",
+                  i.tags.length ? (
+                    <span className="flex flex-wrap gap-1">
+                      {i.tags.map((t) => (
+                        <Badge key={t}>{t}</Badge>
+                      ))}
+                    </span>
+                  ) : (
+                    "—"
+                  ),
+                ],
+                ["Visto pela última vez", formatDate(i.last_seen_at)],
+              ]}
+            />
+          </Card>
+
+          <Card title="Utilização" description={running ? "Agora" : undefined}>
+            {running ? (
+              <DescriptionList
+                columns={1}
+                items={[
+                  ["CPU", <Meter key="c" value={i.cpu_usage} title="CPU" />],
+                  [
+                    "Memória",
+                    <Meter
+                      key="m"
+                      value={i.memory_mb ? i.memory_used_mb / i.memory_mb : 0}
+                      label={`${mib(i.memory_used_mb)} / ${mib(i.memory_mb)}`}
+                      title="Memória"
+                    />,
+                  ],
+                  ["Disco usado", <DiskUsage key="d" disk={i.disk} detailed />],
+                  [
+                    "Rede",
+                    <span key="n" className="tabular-nums">
+                      ↓ {rate(i.net_in_bps)} · ↑ {rate(i.net_out_bps)}
+                    </span>,
+                  ],
+                  ["Ligada há", uptime(i.uptime_seconds)],
+                ]}
+              />
+            ) : (
+              <Empty icon="power">Sem consumo: a instância não está ligada.</Empty>
             )}
-            <Row label="Memória">{(i.memory_mb / 1024).toFixed(1)} GiB</Row>
-            <Row label="Disco raiz">{i.root_disk_gb} GiB</Row>
-            <Row label="IP">
-              {i.ipv4 ? (
-                <span className="font-mono">
-                  {i.ipv4} <span className="text-slate-500">via {i.gateway}</span>
-                </span>
-              ) : (
-                "—"
-              )}
-            </Row>
-            <Row label="Tags">
-              {i.tags.length ? (
-                <span className="flex flex-wrap gap-1">
-                  {i.tags.map((t) => (
-                    <Badge key={t}>{t}</Badge>
-                  ))}
-                </span>
-              ) : (
-                "—"
-              )}
-            </Row>
-            <Row label="Visto pela última vez">{formatDate(i.last_seen_at)}</Row>
-          </dl>
-        </Card>
+          </Card>
 
+          <Card
+            title="Operações recentes"
+            className="lg:col-span-3"
+            actions={
+              <Link href={`/instances/${id}?tab=history`} replace className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+                Ver todas
+              </Link>
+            }
+          >
+            {jobs.data?.length === 0 && <Empty icon="history">Nenhuma operação nesta instância.</Empty>}
+            <ul className="divide-y divide-slate-100 dark:divide-slate-800">
+              {jobs.data?.slice(0, 5).map((job) => (
+                <ActivityRow key={job.id} job={job} showResource={false} />
+              ))}
+            </ul>
+          </Card>
+        </div>
+      )}
+
+      {tab === "metrics" &&
+        (i.state === "active" ? (
+          <InstanceMetrics instanceId={i.id} tenantId={tenantId} />
+        ) : (
+          <Card>
+            <Empty icon="dashboard">Métricas aparecem quando a instância estiver ativa.</Empty>
+          </Card>
+        ))}
+
+      {tab === "history" && (
         <Card
           title="Histórico"
           actions={
             <Link href="/history" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
-              Ver tudo
+              Histórico do cliente
             </Link>
           }
         >
-          {jobs.data?.length === 0 && <Empty>Nenhuma operação nesta instância.</Empty>}
+          {jobs.data?.length === 0 && <Empty icon="history">Nenhuma operação nesta instância.</Empty>}
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {jobs.data?.map((job) => (
               <ActivityRow key={job.id} job={job} showResource={false} />
             ))}
           </ul>
         </Card>
-      </div>
-
-      {i.state === "active" && tenantId && <InstanceMetrics instanceId={i.id} tenantId={tenantId} />}
+      )}
     </div>
   );
 }

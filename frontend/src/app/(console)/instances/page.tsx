@@ -4,9 +4,11 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
+import { Icon } from "@/components/icons";
 import { NoTenant } from "@/components/no-tenant";
+import { PageHeader, ResourceIcon, SearchInput, Toolbar } from "@/components/page";
 import { PowerActions } from "@/components/power-actions";
-import { Button, Card, Empty, ErrorBox, PowerBadge, Select, StateBadge } from "@/components/ui";
+import { Button, Card, Empty, ErrorBox, PowerBadge, Select, StateBadge, tbl } from "@/components/ui";
 import { Meter, SortHeader, mib, uptime, useSorted } from "@/components/viz";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { useProjectNames, useProjects } from "@/lib/queries";
@@ -26,6 +28,7 @@ export default function InstancesPage() {
   const [projectId, setProjectId] = useState("");
   const [kind, setKind] = useState<Kind | "">("");
   const [power, setPower] = useState<Power | "">("");
+  const [search, setSearch] = useState("");
 
   const list = useInfiniteQuery({
     queryKey: ["instances", tenantId, projectId, kind, power],
@@ -49,7 +52,11 @@ export default function InstancesPage() {
     refetchInterval: 15_000, // the reconciler refreshes usage every ~15s
   });
 
-  const items = list.data?.pages.flatMap((p) => p.items) ?? [];
+  const loaded = list.data?.pages.flatMap((p) => p.items) ?? [];
+  const needle = search.trim().toLowerCase();
+  const items = needle
+    ? loaded.filter((i) => i.name.toLowerCase().includes(needle) || i.ipv4?.includes(needle))
+    : loaded;
   const { sorted, sort, toggle } = useSorted<Instance, SortKey>(
     items,
     {
@@ -63,14 +70,27 @@ export default function InstancesPage() {
 
   if (!tenantId) return <NoTenant />;
 
+  const filtered = !!(projectId || kind || power || needle);
+  const create = (
+    <Link href="/instances/new">
+      <Button>
+        <Icon name="plus" /> Criar instância
+      </Button>
+    </Link>
+  );
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold">Instâncias</h1>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/instances/new">
-            <Button>Nova instância</Button>
-          </Link>
+      <PageHeader
+        title="Máquinas virtuais"
+        description="VMs e containers do cliente, com estado, consumo atual e ações de energia."
+        actions={create}
+      />
+
+      <ErrorBox message={list.isError ? errorMessage(list.error) : null} />
+      <Card flush>
+        <Toolbar count={list.isSuccess ? `${items.length} ${items.length === 1 ? "item" : "itens"}` : undefined}>
+          <SearchInput value={search} onChange={setSearch} placeholder="Filtrar por nome ou IP…" />
           <Select aria-label="Projeto" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
             <option value="">Todos os projetos</option>
             {projects.data?.map((p) => (
@@ -91,60 +111,64 @@ export default function InstancesPage() {
             <option value="paused">Pausadas</option>
             <option value="unknown">Desconhecido</option>
           </Select>
-        </div>
-      </div>
-
-      <ErrorBox message={list.isError ? errorMessage(list.error) : null} />
-      <Card>
-        {list.isSuccess && items.length === 0 && <Empty>Nenhuma instância encontrada.</Empty>}
+        </Toolbar>
+        {list.isSuccess && items.length === 0 &&
+          (filtered ? (
+            <Empty title="Nenhuma instância encontrada">Nenhuma instância corresponde aos filtros.</Empty>
+          ) : (
+            <Empty title="Nenhuma instância ainda" icon="monitor" action={create}>
+              Crie a primeira VM do cliente escolhendo região, imagem e tamanho.
+            </Empty>
+          ))}
         {items.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="text-xs text-slate-500">
+          <div className={tbl.wrap}>
+            <table className={tbl.table}>
+              <thead className={tbl.thead}>
                 <tr>
                   <SortHeader label="Nome" k="name" sort={sort} toggle={toggle} />
-                  <th className="py-2 pr-4 font-medium uppercase tracking-wide">Zona</th>
-                  <th className="py-2 pr-4 font-medium uppercase tracking-wide">Estado</th>
+                  <th className={tbl.th}>Status</th>
+                  <th className={tbl.th}>Zona</th>
                   <SortHeader label="CPU" k="cpu" sort={sort} toggle={toggle} />
                   <SortHeader label="Memória" k="memory" sort={sort} toggle={toggle} />
-                  <th className="py-2 pr-4 text-right font-medium uppercase tracking-wide">Disco</th>
-                  <th className="py-2 pr-4 font-medium uppercase tracking-wide">IP</th>
+                  <th className={`${tbl.th} text-right`}>Disco</th>
+                  <th className={tbl.th}>IP</th>
                   <SortHeader label="Ligada há" k="uptime" sort={sort} toggle={toggle} align="right" />
-                  <th className="py-2 font-medium uppercase tracking-wide">Ações</th>
+                  <th className={tbl.th}>
+                    <span className="sr-only">Ações</span>
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className={tbl.tbody}>
                 {sorted.map((i) => {
                   const running = i.state === "active" && i.power_state === "running";
                   return (
-                    <tr key={i.id} className="align-middle">
-                      <td className="py-2.5 pr-4">
-                        <Link
-                          href={`/instances/${i.id}`}
-                          className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
-                        >
-                          {i.name}
-                        </Link>
-                        <div className="text-xs text-slate-500">
-                          {i.kind === "vm" ? "VM" : "Container"} · {projectNames.get(i.project_id) ?? "—"} ·{" "}
-                          {i.vcpus} vCPU
+                    <tr key={i.id} className={tbl.tr}>
+                      <td className={tbl.td}>
+                        <div className="flex items-center gap-2">
+                          <ResourceIcon kind={i.kind === "vm" ? "vm" : "container"} />
+                          <Link href={`/instances/${i.id}`} className={tbl.link}>
+                            {i.name}
+                          </Link>
+                        </div>
+                        <div className="mt-0.5 pl-7 text-xs text-slate-500">
+                          {projectNames.get(i.project_id) ?? "—"} · {i.vcpus} vCPU
                         </div>
                       </td>
-                      <td className="py-2.5 pr-4">
+                      <td className={tbl.td}>
+                        {i.state === "active" ? <PowerBadge state={i.power_state} /> : <StateBadge state={i.state} />}
+                      </td>
+                      <td className={tbl.td}>
                         {i.zone_name ?? "—"}
                         {i.region_name && <div className="text-xs text-slate-500">{i.region_name}</div>}
                       </td>
-                      <td className="py-2.5 pr-4">
-                        {i.state === "active" ? <PowerBadge state={i.power_state} /> : <StateBadge state={i.state} />}
-                      </td>
-                      <td className="py-2.5 pr-4">
+                      <td className={tbl.td}>
                         {running ? (
                           <Meter value={i.cpu_usage} title={`CPU de ${i.name}`} />
                         ) : (
                           <span className="text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="py-2.5 pr-4">
+                      <td className={tbl.td}>
                         {running ? (
                           <Meter
                             value={memRatio(i)}
@@ -155,12 +179,12 @@ export default function InstancesPage() {
                           <span className="text-slate-400">{mib(i.memory_mb)}</span>
                         )}
                       </td>
-                      <td className="py-2.5 pr-4 text-right tabular-nums">{i.root_disk_gb} GiB</td>
-                      <td className="py-2.5 pr-4 font-mono text-xs">{i.ipv4?.split("/")[0] ?? "—"}</td>
-                      <td className="py-2.5 pr-4 text-right tabular-nums text-slate-600 dark:text-slate-400">
+                      <td className={`${tbl.td} text-right tabular-nums`}>{i.root_disk_gb} GiB</td>
+                      <td className={`${tbl.td} font-mono text-xs`}>{i.ipv4?.split("/")[0] ?? "—"}</td>
+                      <td className={`${tbl.td} text-right tabular-nums text-slate-600 dark:text-slate-400`}>
                         {running ? uptime(i.uptime_seconds) : "—"}
                       </td>
-                      <td className="py-2.5">
+                      <td className={`${tbl.td} w-12 text-right`}>
                         <PowerActions instance={i} compact />
                       </td>
                     </tr>
@@ -171,7 +195,7 @@ export default function InstancesPage() {
           </div>
         )}
         {list.hasNextPage && (
-          <div className="pt-4 text-center">
+          <div className="border-t border-slate-200 py-3 text-center dark:border-slate-800">
             <Button variant="secondary" onClick={() => list.fetchNextPage()} disabled={list.isFetchingNextPage}>
               Carregar mais
             </Button>

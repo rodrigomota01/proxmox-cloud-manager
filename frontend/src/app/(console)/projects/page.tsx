@@ -4,7 +4,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { NoTenant } from "@/components/no-tenant";
-import { Button, Card, Dialog, Empty, ErrorBox, Field, Input, formatDate } from "@/components/ui";
+import { Menu, PageHeader, ResourceIcon, SearchInput, Toolbar } from "@/components/page";
+import { Button, Card, Dialog, Empty, ErrorBox, Field, Input, formatDate, tbl } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { useProjects } from "@/lib/queries";
 import { usePermissions, useSession } from "@/lib/session";
@@ -135,40 +136,81 @@ export default function ProjectsPage() {
   const perms = usePermissions(tenantId ? `tenant:${tenantId}` : null);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
+  const [search, setSearch] = useState("");
   if (!tenantId) return <NoTenant />;
   const canManage = perms.has("project:create");
 
+  const q = search.trim().toLowerCase();
+  const visible = (projects.data ?? []).filter(
+    (p) => !q || p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q),
+  );
+
   return (
-    <div className="max-w-4xl space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold">Projetos</h1>
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            Projetos organizam as VMs de {tenant?.name}. Membros com acesso a um projeto só veem as VMs dele.
-          </p>
-        </div>
-        {canManage && <Button onClick={() => setCreating(true)}>Novo projeto</Button>}
-      </div>
+    <div className="space-y-4">
+      <PageHeader
+        title="Projetos"
+        description={`Projetos organizam as VMs de ${tenant?.name ?? "cliente"}. Membros com acesso a um projeto só veem as VMs dele.`}
+        actions={canManage && <Button onClick={() => setCreating(true)}>Novo projeto</Button>}
+      />
       <ErrorBox message={projects.isError ? errorMessage(projects.error) : null} />
-      <Card>
-        {projects.data?.length === 0 && <Empty>Nenhum projeto.</Empty>}
-        <ul className="divide-y divide-slate-100 dark:divide-slate-800">
-          {projects.data?.map((p) => (
-            <li key={p.id} className="flex items-center justify-between gap-4 py-3 text-sm">
-              <div>
-                <span className="font-medium">{p.name}</span>{" "}
-                <span className="font-mono text-xs text-slate-500">{p.slug}</span>
-                {p.description && <div className="text-xs text-slate-500">{p.description}</div>}
-                <div className="text-xs text-slate-500">Criado em {formatDate(p.created_at)}</div>
-              </div>
-              {canManage && (
-                <Button variant="ghost" onClick={() => setEditing(p)}>
-                  Editar
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
+      <Card flush>
+        <Toolbar count={projects.data ? `${visible.length} de ${projects.data.length} projetos` : undefined}>
+          <SearchInput value={search} onChange={setSearch} />
+        </Toolbar>
+        {projects.data?.length === 0 ? (
+          <Empty
+            title="Nenhum projeto"
+            icon="folder"
+            action={canManage && <Button onClick={() => setCreating(true)}>Novo projeto</Button>}
+          >
+            Crie um projeto para agrupar as VMs.
+          </Empty>
+        ) : projects.data && visible.length === 0 ? (
+          <Empty title="Nenhum resultado">Nenhum projeto corresponde ao filtro.</Empty>
+        ) : (
+          <div className={tbl.wrap}>
+            <table className={tbl.table}>
+              <thead className={tbl.thead}>
+                <tr>
+                  <th className={tbl.th}>Nome</th>
+                  <th className={tbl.th}>Identificador</th>
+                  <th className={tbl.th}>Descrição</th>
+                  <th className={tbl.th}>Criado em</th>
+                  {canManage && (
+                    <th className={tbl.th}>
+                      <span className="sr-only">Ações</span>
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody className={tbl.tbody}>
+                {visible.map((p) => (
+                  <tr key={p.id} className={tbl.tr}>
+                    <td className={tbl.td}>
+                      <span className="flex items-center gap-2">
+                        <ResourceIcon kind="project" />
+                        <span className="font-medium">{p.name}</span>
+                      </span>
+                    </td>
+                    <td className={`${tbl.td} font-mono text-xs text-slate-500`}>{p.slug}</td>
+                    <td className={`${tbl.td} text-slate-600 dark:text-slate-400`}>{p.description || "—"}</td>
+                    <td className={`${tbl.td} whitespace-nowrap text-slate-600 dark:text-slate-400`}>
+                      {formatDate(p.created_at)}
+                    </td>
+                    {canManage && (
+                      <td className={`${tbl.td} text-right`}>
+                        <Menu
+                          ariaLabel={`Ações de ${p.name}`}
+                          items={[{ label: "Editar ou excluir", onClick: () => setEditing(p) }]}
+                        />
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
       <NewProjectDialog open={creating} onClose={() => setCreating(false)} />
       <EditProjectDialog key={editing?.id ?? "none"} project={editing} onClose={() => setEditing(null)} />

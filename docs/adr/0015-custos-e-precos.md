@@ -39,7 +39,9 @@ externo ainda; a arquitetura precisa deixar a integração possível depois.
   instância e dia; CSV gerado no frontend.
 - **Visibilidade**: `usage_records` com RLS (o cliente lê as suas; só o worker, em
   escopo de plataforma, escreve). `billing:view` no tenant vê tudo do cliente; no
-  projeto (PROJECT_ADMIN), só os projetos dele. Qualquer membro lê os preços vigentes
+  projeto, só os projetos dele. Desde 2026-10-08 todo papel de tenant/projeto tem
+  `billing:view` (USER, OPERATOR e READ_ONLY inclusive): quem tem acesso a um projeto vê
+  o custo dele. Qualquer membro lê os preços vigentes
   do próprio cliente (`/billing/prices`), para a estimativa no formulário de criação.
   Admin da plataforma vê o custo por cliente (`/admin/billing/summary`) e o detalhe de
   um cliente entrando no tenant, como nas outras telas.

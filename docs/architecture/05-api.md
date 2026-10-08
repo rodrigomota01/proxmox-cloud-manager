@@ -149,6 +149,7 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | GET | `/quotas` | membro do tenant → `{resource, limit, used, available}` (2a ✅) |
 | GET | `/billing/prices` | membro do tenant (preços vigentes do cliente; a estimativa da criação é calculada com eles) ✅ |
 | GET | `/billing/summary?month=YYYY-MM` | `billing:view` (tenant: tudo; projeto: só os seus) — acumulado, custo atual, previsão, por recurso/projeto/instância/dia (ADR-0015) ✅ |
+| GET | `/kubernetes/clusters`, `/kubernetes/clusters/{id}` | `k8s:view` (tenant ou qualquer projeto dele) — clusters vinculados ao tenant: saúde, carga e workloads, sem kubeconfig ✅ |
 
 ### Jobs, eventos, auditoria
 
@@ -196,6 +197,7 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | GET/DELETE | `/admin/kubernetes/clusters/{id}` | `cluster:manage` — detalhe (nós, namespaces, workloads, pods, services, ingresses); DELETE só de manuais ✅ |
 | PUT | `/admin/kubernetes/clusters/{id}/kubeconfig` | `cluster:manage` — troca o kubeconfig de um manual ✅ |
 | GET | `/admin/kubernetes/clusters/{id}/kubeconfig` | `cluster:manage` — download auditado, `no-store` ✅ |
+| PUT | `/admin/kubernetes/clusters/{id}/tenant` | `cluster:manage` — vincula o cluster a um tenant (`null` desvincula), auditado ✅ |
 | GET | `/admin/jobs` · `/admin/jobs/{id}` | `cluster:manage` (inclui dados dos eventos: UPID, node) |
 | GET | `/admin/audit-logs` | `platform:admin` ou `audit:view` (platform) |
 

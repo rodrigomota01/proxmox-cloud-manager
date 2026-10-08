@@ -4,31 +4,32 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { relativeTime } from "@/components/activity";
-import { Badge, Button, Card, Empty, ErrorBox, Field, Input, Spinner } from "@/components/ui";
+import { Toolbar } from "@/components/page";
+import { Alert, Badge, Button, Card, Empty, ErrorBox, Field, Input, Spinner, Status, type StatusTone, tbl } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { useJob } from "@/lib/jobs";
 
 type Address = Schemas["AddressOut"];
 
-const STATUS: Record<string, { label: string; tone: "green" | "gray" | "amber" | "red" | "blue"; hint: string }> = {
-  free: { label: "livre", tone: "green", hint: "Livre no cadastro e nenhuma VM usa." },
-  in_use: { label: "em uso", tone: "blue", hint: "Marcado em uso e uma VM deste servidor usa (IP ou MAC)." },
+const STATUS: Record<string, { label: string; tone: StatusTone; hint: string }> = {
+  free: { label: "livre", tone: "ok", hint: "Livre no cadastro e nenhuma VM usa." },
+  in_use: { label: "em uso", tone: "info", hint: "Marcado em uso e uma VM deste servidor usa (IP ou MAC)." },
   detached: {
     label: "VM sem este IP",
-    tone: "amber",
+    tone: "warn",
     hint: "Marcado para uma VM que existe, mas ela não tem o IP configurado. Comum com NAT/load balancer: confira antes de liberar.",
   },
   stale: {
     label: "sem VM",
-    tone: "amber",
+    tone: "warn",
     hint: "Marcado em uso, mas nenhuma VM deste servidor usa nem tem o nome registrado. Candidato a liberar.",
   },
   conflict: {
     label: "conflito",
-    tone: "red",
+    tone: "error",
     hint: "Livre no cadastro, mas uma VM usa: a próxima alocação desse IP colidiria. Marque como em uso no cadastro.",
   },
-  unverified: { label: "não verificado", tone: "gray", hint: "As placas de rede das VMs ainda não foram lidas." },
+  unverified: { label: "não verificado", tone: "unknown", hint: "As placas de rede das VMs ainda não foram lidas." },
 };
 const ORDER = ["conflict", "stale", "detached", "free", "in_use", "unverified"];
 
@@ -48,7 +49,7 @@ function IpamSync() {
   const running = sync.isPending || (jobId !== null && !done);
   const s = status.data;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-5 py-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <span className="text-slate-600 dark:text-slate-400">
         {!s
           ? "…"
@@ -89,11 +90,10 @@ function Networks({ clusterId, report }: { clusterId: string; report: Schemas["I
   const line = (n: Schemas["NetworkOut"]) =>
     `${n.cidr} · gateway ${n.gateway}${n.vlan ? ` · VLAN ${n.vlan}` : ""}${n.bridge ? ` · ${n.bridge}` : ""}`;
   return (
-    <Card title="Redes deste servidor">
-      <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
-        O cadastro não guarda gateway, máscara nem VLAN. Aqui fica como configurar os IPs de cada faixa nas VMs
-        novas. IPs com /31 não precisam: o gateway é o par do /31.
-      </p>
+    <Card
+      title="Redes deste servidor"
+      description="O cadastro não guarda gateway, máscara nem VLAN. Aqui fica como configurar os IPs de cada faixa nas VMs novas. IPs com /31 não precisam: o gateway é o par do /31."
+    >
       <ErrorBox message={add.isError ? errorMessage(add.error) : remove.isError ? errorMessage(remove.error) : null} />
       <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
         {report.networks.map((n) => (
@@ -123,12 +123,12 @@ function Networks({ clusterId, report }: { clusterId: string; report: Schemas["I
         ))}
         {!report.networks.length && !report.suggestions.length && (
           <li className="py-2">
-            <Empty>Nenhuma rede configurada.</Empty>
+            <Empty icon="globe">Nenhuma rede configurada.</Empty>
           </li>
         )}
       </ul>
       <form
-        className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_6rem_6rem_auto] sm:items-end"
+        className="mt-4 grid gap-2 border-t border-slate-100 pt-4 dark:border-slate-800 sm:grid-cols-[1fr_1fr_6rem_6rem_auto] sm:items-end"
         onSubmit={(e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
@@ -184,55 +184,56 @@ export function IpamPanel({ clusterId, onGuest }: { clusterId: string; onGuest?:
       <ErrorBox message={report.isError ? errorMessage(report.error) : null} />
       {r && (
         <>
-          <Card title="IPs do cadastro neste servidor">
-            <div className="mb-3 flex flex-wrap gap-2 text-xs">
-              {[["", `Todos (${r.addresses.length})`], ...ORDER.filter((k) => r.counts[k]).map((k) => [k, `${STATUS[k].label} (${r.counts[k]})`])].map(
-                ([key, label]) => (
-                  <button
-                    key={key}
-                    onClick={() => setFilter(key)}
-                    className={`rounded-full border px-2 py-0.5 ${
-                      filter === key
-                        ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
-                        : "border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ),
-              )}
-            </div>
+          <Card title="IPs do cadastro neste servidor" flush>
+            <Toolbar count={`${shown.length} IP(s)`}>
+              <div className="flex flex-wrap gap-2 text-xs">
+                {[["", `Todos (${r.addresses.length})`], ...ORDER.filter((k) => r.counts[k]).map((k) => [k, `${STATUS[k].label} (${r.counts[k]})`])].map(
+                  ([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setFilter(key)}
+                      className={`rounded-full border px-2 py-0.5 ${
+                        filter === key
+                          ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                          : "border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ),
+                )}
+              </div>
+            </Toolbar>
             {shown.length === 0 ? (
               <Empty>Nenhum IP do cadastro está associado a este servidor (pve_node_owner).</Empty>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="text-xs uppercase tracking-wide text-slate-500">
+              <div className={tbl.wrap}>
+                <table className={tbl.table}>
+                  <thead className={tbl.thead}>
                     <tr>
-                      <th className="py-2 pr-4 font-medium">IP</th>
-                      <th className="py-2 pr-4 font-medium">Situação</th>
-                      <th className="py-2 pr-4 font-medium">No cadastro</th>
-                      <th className="py-2 font-medium">No Proxmox</th>
+                      <th className={tbl.th}>IP</th>
+                      <th className={tbl.th}>Situação</th>
+                      <th className={tbl.th}>No cadastro</th>
+                      <th className={tbl.th}>No Proxmox</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody className={tbl.tbody}>
                     {shown.map((a) => (
-                      <tr key={a.id}>
-                        <td className="py-2 pr-4 font-mono text-xs">
+                      <tr key={a.id} className={tbl.tr}>
+                        <td className={`${tbl.td} font-mono text-xs`}>
                           {a.address}
                           {a.prefix != null && <span className="text-slate-500">/{a.prefix}</span>}
                         </td>
-                        <td className="py-2 pr-4" title={STATUS[a.status]?.hint}>
-                          <Badge tone={STATUS[a.status]?.tone ?? "gray"}>
-                            {a.status === "conflict" || a.status === "stale" ? "⚠ " : ""}
+                        <td className={tbl.td}>
+                          <Status tone={STATUS[a.status]?.tone ?? "unknown"} title={STATUS[a.status]?.hint}>
                             {STATUS[a.status]?.label ?? a.status}
-                          </Badge>
+                          </Status>
                         </td>
-                        <td className="py-2 pr-4 text-xs">
+                        <td className={`${tbl.td} text-xs`}>
                           <div>{a.hostname ?? <span className="text-slate-400">—</span>}</div>
                           {a.mac && <div className="font-mono text-slate-500">{a.mac}</div>}
                         </td>
-                        <td className="py-2 text-xs">
+                        <td className={`${tbl.td} text-xs`}>
                           {a.guest ? (
                             <>
                               {onGuest ? (
@@ -260,18 +261,18 @@ export function IpamPanel({ clusterId, onGuest }: { clusterId: string; onGuest?:
               </div>
             )}
             {!r.nics_known && (
-              <p className="mt-3 text-xs text-slate-500">
+              <p className="px-5 py-3 text-xs text-slate-500">
                 As placas de rede das VMs ainda não foram lidas; a verificação aparece após a próxima sincronização.
               </p>
             )}
           </Card>
           {r.unregistered.length > 0 && (
             <Card title={`IPs públicos fora do cadastro (${r.unregistered.length})`}>
-              <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
+              <Alert variant="warning">
                 Configurados em VMs deste servidor, mas ausentes do cadastro: cadastre-os para não serem oferecidos a
                 outra VM.
-              </p>
-              <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+              </Alert>
+              <ul className="mt-3 divide-y divide-slate-100 text-sm dark:divide-slate-800">
                 {r.unregistered.map((u) => (
                   <li key={u.ip} className="flex justify-between gap-3 py-2">
                     <span className="font-mono text-xs">{u.ip}</span>
