@@ -76,6 +76,14 @@ terminal LXC/serial (termproxy + xterm.js), SSH no browser com certificados efê
 
 ## Fase 4 — Quotas completas, preço e uso
 
+**Custos (adiantado, 2026-10-07, [ADR-0015](adr/0015-custos-e-precos.md)):** tabelas de
+preço versionadas (padrão + por cliente), acúmulo por segundo em `usage_records` pelo
+worker, custo atual/acumulado/previsão no dashboard do cliente e da plataforma, tela
+de custos por projeto/instância/dia com CSV, custo por cliente para admin, estimativa
+no formulário de criação. Falta: quotas de snapshots/IPs/containers e por projeto,
+cobrança de discos/NICs adicionais, export para billing externo.
+
+
 Quotas de snapshots/IPs/containers e por projeto, tabelas de preço versionadas, preço
 por tenant, estimativa no formulário de criação, coleta horária de uso
 (`usage_records`), relatório de custo por projeto, export CSV. Arquitetura pronta para

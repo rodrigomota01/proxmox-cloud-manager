@@ -2289,6 +2289,127 @@
         "title": "ConnectionTest",
         "type": "object"
       },
+      "CostOut": {
+        "properties": {
+          "disk": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Disk",
+            "type": "string"
+          },
+          "instance": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Instance",
+            "type": "string"
+          },
+          "memory": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Memory",
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total",
+            "type": "string"
+          },
+          "vcpu": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Vcpu",
+            "type": "string"
+          }
+        },
+        "required": [
+          "vcpu",
+          "memory",
+          "disk",
+          "instance",
+          "total"
+        ],
+        "title": "CostOut",
+        "type": "object"
+      },
+      "CostSummaryOut": {
+        "properties": {
+          "accrued": {
+            "$ref": "#/components/schemas/CostOut"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/DayCostOut"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "forecast": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast"
+          },
+          "instances": {
+            "items": {
+              "$ref": "#/components/schemas/InstanceCostOut"
+            },
+            "title": "Instances",
+            "type": "array"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "prices": {
+            "$ref": "#/components/schemas/PricesOut"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectCostOut"
+            },
+            "title": "Projects",
+            "type": "array"
+          },
+          "run_rate": {
+            "$ref": "#/components/schemas/CostOut"
+          },
+          "run_rate_hourly": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Run Rate Hourly",
+            "type": "string"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "month",
+          "current",
+          "timezone",
+          "prices",
+          "accrued",
+          "run_rate",
+          "run_rate_hourly",
+          "forecast",
+          "projects",
+          "instances",
+          "days"
+        ],
+        "title": "CostSummaryOut",
+        "type": "object"
+      },
       "CredentialsOut": {
         "properties": {
           "rotated_at": {
@@ -2367,6 +2488,26 @@
           "recent_jobs"
         ],
         "title": "DashboardSummary",
+        "type": "object"
+      },
+      "DayCostOut": {
+        "properties": {
+          "cost": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cost",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "cost"
+        ],
+        "title": "DayCostOut",
         "type": "object"
       },
       "DiskUsageOut": {
@@ -2824,6 +2965,90 @@
           "instance"
         ],
         "title": "InstanceAccepted",
+        "type": "object"
+      },
+      "InstanceCostOut": {
+        "properties": {
+          "accrued": {
+            "$ref": "#/components/schemas/CostOut"
+          },
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "disk_gb": {
+            "title": "Disk Gb",
+            "type": "integer"
+          },
+          "hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Hours",
+            "type": "string"
+          },
+          "instance_id": {
+            "format": "uuid",
+            "title": "Instance Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "memory_mb": {
+            "title": "Memory Mb",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "power_state": {
+            "title": "Power State",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "run_rate_monthly": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Run Rate Monthly",
+            "type": "string"
+          },
+          "running_hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Running Hours",
+            "type": "string"
+          },
+          "vcpus": {
+            "title": "Vcpus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "instance_id",
+          "name",
+          "project_id",
+          "kind",
+          "power_state",
+          "vcpus",
+          "memory_mb",
+          "disk_gb",
+          "deleted",
+          "hours",
+          "running_hours",
+          "accrued",
+          "run_rate_monthly"
+        ],
+        "title": "InstanceCostOut",
         "type": "object"
       },
       "InstanceCreate": {
@@ -3585,6 +3810,1370 @@
           "finished_at"
         ],
         "title": "JobOut",
+        "type": "object"
+      },
+      "K8sClusterCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "kubeconfig": {
+            "maxLength": 262144,
+            "minLength": 20,
+            "title": "Kubeconfig",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kubeconfig"
+        ],
+        "title": "K8sClusterCreate",
+        "type": "object"
+      },
+      "K8sClusterDetail": {
+        "properties": {
+          "api_server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Server"
+          },
+          "cert_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cert Expires At"
+          },
+          "certs_expire_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Certs Expire On"
+          },
+          "dates_differ": {
+            "title": "Dates Differ",
+            "type": "boolean"
+          },
+          "days_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Left"
+          },
+          "expires_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires On"
+          },
+          "has_kubeconfig": {
+            "title": "Has Kubeconfig",
+            "type": "boolean"
+          },
+          "httproutes": {
+            "items": {
+              "$ref": "#/components/schemas/K8sHttpRouteOut"
+            },
+            "title": "Httproutes",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ingresses": {
+            "items": {
+              "$ref": "#/components/schemas/K8sIngressOut"
+            },
+            "title": "Ingresses",
+            "type": "array"
+          },
+          "k8s_nodes": {
+            "items": {
+              "$ref": "#/components/schemas/K8sNodeOut"
+            },
+            "title": "K8S Nodes",
+            "type": "array"
+          },
+          "kubeconfig_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kubeconfig Error"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "namespaces": {
+            "items": {
+              "$ref": "#/components/schemas/K8sNamespaceOut"
+            },
+            "title": "Namespaces",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/K8sTableNodeOut"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "pods": {
+            "items": {
+              "$ref": "#/components/schemas/K8sPodOut"
+            },
+            "title": "Pods",
+            "type": "array"
+          },
+          "pods_truncated": {
+            "title": "Pods Truncated",
+            "type": "boolean"
+          },
+          "server_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Url"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/K8sServiceOut"
+            },
+            "title": "Services",
+            "type": "array"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/K8sSummaryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "enum": [
+              "table",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "source_modified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Modified At"
+          },
+          "status": {
+            "enum": [
+              "expired",
+              "critical",
+              "warning",
+              "ok",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "synced_at": {
+            "format": "date-time",
+            "title": "Synced At",
+            "type": "string"
+          },
+          "workloads": {
+            "items": {
+              "$ref": "#/components/schemas/K8sWorkloadOut"
+            },
+            "title": "Workloads",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "source",
+          "api_server",
+          "server_url",
+          "certs_expire_on",
+          "cert_expires_at",
+          "expires_on",
+          "days_left",
+          "status",
+          "dates_differ",
+          "nodes",
+          "has_kubeconfig",
+          "kubeconfig_error",
+          "source_modified_at",
+          "synced_at",
+          "snapshot",
+          "k8s_nodes",
+          "namespaces",
+          "workloads",
+          "pods",
+          "pods_truncated",
+          "services",
+          "ingresses",
+          "httproutes"
+        ],
+        "title": "K8sClusterDetail",
+        "type": "object"
+      },
+      "K8sClusterOut": {
+        "properties": {
+          "api_server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Server"
+          },
+          "cert_expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cert Expires At"
+          },
+          "certs_expire_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Certs Expire On"
+          },
+          "dates_differ": {
+            "title": "Dates Differ",
+            "type": "boolean"
+          },
+          "days_left": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Left"
+          },
+          "expires_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires On"
+          },
+          "has_kubeconfig": {
+            "title": "Has Kubeconfig",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kubeconfig_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kubeconfig Error"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/K8sTableNodeOut"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "server_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Url"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/K8sSummaryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "enum": [
+              "table",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "source_modified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Modified At"
+          },
+          "status": {
+            "enum": [
+              "expired",
+              "critical",
+              "warning",
+              "ok",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "synced_at": {
+            "format": "date-time",
+            "title": "Synced At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "source",
+          "api_server",
+          "server_url",
+          "certs_expire_on",
+          "cert_expires_at",
+          "expires_on",
+          "days_left",
+          "status",
+          "dates_differ",
+          "nodes",
+          "has_kubeconfig",
+          "kubeconfig_error",
+          "source_modified_at",
+          "synced_at",
+          "snapshot"
+        ],
+        "title": "K8sClusterOut",
+        "type": "object"
+      },
+      "K8sHttpRouteOut": {
+        "description": "Gateway API route. Address and TLS come from the Gateway listeners it attaches to.",
+        "properties": {
+          "address": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Address",
+            "type": "array"
+          },
+          "hostnames": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hostnames",
+            "type": "array"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "namespace": {
+            "title": "Namespace",
+            "type": "string"
+          },
+          "parents": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Parents",
+            "type": "array"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/K8sHttpRouteRuleOut"
+            },
+            "title": "Rules",
+            "type": "array"
+          },
+          "tls": {
+            "title": "Tls",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "namespace",
+          "name",
+          "hostnames",
+          "parents",
+          "rules",
+          "address",
+          "tls",
+          "problem"
+        ],
+        "title": "K8sHttpRouteOut",
+        "type": "object"
+      },
+      "K8sHttpRouteRuleOut": {
+        "properties": {
+          "backends": {
+            "title": "Backends",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "backends"
+        ],
+        "title": "K8sHttpRouteRuleOut",
+        "type": "object"
+      },
+      "K8sIngressOut": {
+        "properties": {
+          "address": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Address",
+            "type": "array"
+          },
+          "ingress_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingress Class"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "namespace": {
+            "title": "Namespace",
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/K8sIngressRuleOut"
+            },
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "namespace",
+          "name",
+          "ingress_class",
+          "rules",
+          "address"
+        ],
+        "title": "K8sIngressOut",
+        "type": "object"
+      },
+      "K8sIngressRuleOut": {
+        "properties": {
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "tls": {
+            "title": "Tls",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "host",
+          "path",
+          "service",
+          "tls"
+        ],
+        "title": "K8sIngressRuleOut",
+        "type": "object"
+      },
+      "K8sKubeconfigPut": {
+        "additionalProperties": false,
+        "properties": {
+          "kubeconfig": {
+            "maxLength": 262144,
+            "minLength": 20,
+            "title": "Kubeconfig",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kubeconfig"
+        ],
+        "title": "K8sKubeconfigPut",
+        "type": "object"
+      },
+      "K8sNamespaceOut": {
+        "properties": {
+          "cpu_requests": {
+            "title": "Cpu Requests",
+            "type": "number"
+          },
+          "cpu_usage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Usage"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "httproutes": {
+            "title": "Httproutes",
+            "type": "integer"
+          },
+          "ingresses": {
+            "title": "Ingresses",
+            "type": "integer"
+          },
+          "mem_requests": {
+            "title": "Mem Requests",
+            "type": "number"
+          },
+          "mem_usage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mem Usage"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "pods": {
+            "title": "Pods",
+            "type": "integer"
+          },
+          "problems": {
+            "title": "Problems",
+            "type": "integer"
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          },
+          "services": {
+            "title": "Services",
+            "type": "integer"
+          },
+          "workloads": {
+            "title": "Workloads",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "phase",
+          "created_at",
+          "pods",
+          "running",
+          "problems",
+          "workloads",
+          "services",
+          "ingresses",
+          "httproutes",
+          "cpu_usage",
+          "mem_usage",
+          "cpu_requests",
+          "mem_requests"
+        ],
+        "title": "K8sNamespaceOut",
+        "type": "object"
+      },
+      "K8sNodeOut": {
+        "properties": {
+          "cpu_allocatable": {
+            "title": "Cpu Allocatable",
+            "type": "number"
+          },
+          "cpu_capacity": {
+            "title": "Cpu Capacity",
+            "type": "number"
+          },
+          "cpu_requests": {
+            "title": "Cpu Requests",
+            "type": "number"
+          },
+          "cpu_usage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Usage"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "mem_allocatable": {
+            "title": "Mem Allocatable",
+            "type": "number"
+          },
+          "mem_capacity": {
+            "title": "Mem Capacity",
+            "type": "number"
+          },
+          "mem_requests": {
+            "title": "Mem Requests",
+            "type": "number"
+          },
+          "mem_usage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mem Usage"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "os": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Os"
+          },
+          "pods": {
+            "title": "Pods",
+            "type": "integer"
+          },
+          "pods_capacity": {
+            "title": "Pods Capacity",
+            "type": "integer"
+          },
+          "pressure": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pressure",
+            "type": "array"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "unschedulable": {
+            "title": "Unschedulable",
+            "type": "boolean"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "name",
+          "ready",
+          "unschedulable",
+          "roles",
+          "version",
+          "os",
+          "ip",
+          "pressure",
+          "cpu_capacity",
+          "cpu_allocatable",
+          "cpu_requests",
+          "cpu_usage",
+          "mem_capacity",
+          "mem_allocatable",
+          "mem_requests",
+          "mem_usage",
+          "pods",
+          "pods_capacity",
+          "created_at"
+        ],
+        "title": "K8sNodeOut",
+        "type": "object"
+      },
+      "K8sPodOut": {
+        "properties": {
+          "cpu_usage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Usage"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "mem_usage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mem Usage"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "namespace": {
+            "title": "Namespace",
+            "type": "string"
+          },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner"
+          },
+          "problem": {
+            "title": "Problem",
+            "type": "boolean"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "string"
+          },
+          "restarts": {
+            "title": "Restarts",
+            "type": "integer"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "namespace",
+          "name",
+          "node",
+          "status",
+          "problem",
+          "ready",
+          "restarts",
+          "owner",
+          "ip",
+          "started_at",
+          "cpu_usage",
+          "mem_usage"
+        ],
+        "title": "K8sPodOut",
+        "type": "object"
+      },
+      "K8sServiceOut": {
+        "properties": {
+          "cluster_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Ip"
+          },
+          "external": {
+            "items": {
+              "type": "string"
+            },
+            "title": "External",
+            "type": "array"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "namespace": {
+            "title": "Namespace",
+            "type": "string"
+          },
+          "ports": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ports",
+            "type": "array"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "required": [
+          "namespace",
+          "name",
+          "type",
+          "cluster_ip",
+          "external",
+          "ports"
+        ],
+        "title": "K8sServiceOut",
+        "type": "object"
+      },
+      "K8sSummaryOut": {
+        "description": "Last collection. Usage fields are null without metrics-server.",
+        "properties": {
+          "collected_at": {
+            "format": "date-time",
+            "title": "Collected At",
+            "type": "string"
+          },
+          "cpu_allocatable": {
+            "title": "Cpu Allocatable",
+            "type": "number"
+          },
+          "cpu_capacity": {
+            "title": "Cpu Capacity",
+            "type": "number"
+          },
+          "cpu_requests": {
+            "title": "Cpu Requests",
+            "type": "number"
+          },
+          "cpu_usage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Usage"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "gateway_api": {
+            "title": "Gateway Api",
+            "type": "boolean"
+          },
+          "health": {
+            "enum": [
+              "healthy",
+              "warning",
+              "critical",
+              "unreachable"
+            ],
+            "title": "Health",
+            "type": "string"
+          },
+          "httproutes": {
+            "title": "Httproutes",
+            "type": "integer"
+          },
+          "ingresses": {
+            "title": "Ingresses",
+            "type": "integer"
+          },
+          "mem_allocatable": {
+            "title": "Mem Allocatable",
+            "type": "number"
+          },
+          "mem_capacity": {
+            "title": "Mem Capacity",
+            "type": "number"
+          },
+          "mem_requests": {
+            "title": "Mem Requests",
+            "type": "number"
+          },
+          "mem_usage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mem Usage"
+          },
+          "metrics": {
+            "title": "Metrics",
+            "type": "boolean"
+          },
+          "namespaces": {
+            "title": "Namespaces",
+            "type": "integer"
+          },
+          "nodes": {
+            "title": "Nodes",
+            "type": "integer"
+          },
+          "nodes_ready": {
+            "title": "Nodes Ready",
+            "type": "integer"
+          },
+          "ok_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ok At"
+          },
+          "pods": {
+            "title": "Pods",
+            "type": "integer"
+          },
+          "pods_problem": {
+            "title": "Pods Problem",
+            "type": "integer"
+          },
+          "pods_running": {
+            "title": "Pods Running",
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "services": {
+            "title": "Services",
+            "type": "integer"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "workloads": {
+            "title": "Workloads",
+            "type": "integer"
+          },
+          "workloads_unready": {
+            "title": "Workloads Unready",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "health",
+          "reasons",
+          "error",
+          "version",
+          "collected_at",
+          "ok_at",
+          "nodes",
+          "nodes_ready",
+          "namespaces",
+          "pods",
+          "pods_running",
+          "pods_problem",
+          "workloads",
+          "workloads_unready",
+          "services",
+          "ingresses",
+          "httproutes",
+          "gateway_api",
+          "metrics",
+          "cpu_capacity",
+          "cpu_allocatable",
+          "cpu_requests",
+          "cpu_usage",
+          "mem_capacity",
+          "mem_allocatable",
+          "mem_requests",
+          "mem_usage"
+        ],
+        "title": "K8sSummaryOut",
+        "type": "object"
+      },
+      "K8sTableNodeOut": {
+        "properties": {
+          "host": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "required": [
+          "id",
+          "host",
+          "role"
+        ],
+        "title": "K8sTableNodeOut",
+        "type": "object"
+      },
+      "K8sWorkloadOut": {
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "desired": {
+            "title": "Desired",
+            "type": "integer"
+          },
+          "images": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Images",
+            "type": "array"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "namespace": {
+            "title": "Namespace",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "namespace",
+          "name",
+          "desired",
+          "ready",
+          "images",
+          "created_at"
+        ],
+        "title": "K8sWorkloadOut",
         "type": "object"
       },
       "KeyCreate": {
@@ -4438,6 +6027,79 @@
         "title": "PermissionsOut",
         "type": "object"
       },
+      "PlatformCostOut": {
+        "properties": {
+          "accrued": {
+            "$ref": "#/components/schemas/CostOut"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/DayCostOut"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "forecast": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "run_rate_hourly": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Run Rate Hourly",
+            "type": "string"
+          },
+          "run_rate_monthly": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Run Rate Monthly",
+            "type": "string"
+          },
+          "tenants": {
+            "items": {
+              "$ref": "#/components/schemas/TenantCostOut"
+            },
+            "title": "Tenants",
+            "type": "array"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "month",
+          "current",
+          "timezone",
+          "accrued",
+          "run_rate_monthly",
+          "run_rate_hourly",
+          "forecast",
+          "tenants",
+          "days"
+        ],
+        "title": "PlatformCostOut",
+        "type": "object"
+      },
       "PlatformRoles": {
         "additionalProperties": false,
         "properties": {
@@ -4456,6 +6118,276 @@
         "title": "PlatformRoles",
         "type": "object"
       },
+      "PriceChangeOut": {
+        "properties": {
+          "effective_from": {
+            "format": "date-time",
+            "title": "Effective From",
+            "type": "string"
+          },
+          "monthly_price": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Monthly Price",
+            "type": "string"
+          },
+          "resource": {
+            "title": "Resource",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource",
+          "monthly_price",
+          "effective_from"
+        ],
+        "title": "PriceChangeOut",
+        "type": "object"
+      },
+      "PriceSet": {
+        "additionalProperties": false,
+        "description": "Monthly price (730 h) per unit: vCPU and GiB of RAM while running; GiB of\nallocated disk and the per-instance fee while the instance exists.",
+        "properties": {
+          "disk_gb": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,19}0*$)\\d{0,12}\\.\\d{0,6}0*$)",
+                "type": "string"
+              }
+            ],
+            "title": "Disk Gb"
+          },
+          "instance": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,19}0*$)\\d{0,12}\\.\\d{0,6}0*$)",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Instance"
+          },
+          "memory_gb": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,19}0*$)\\d{0,12}\\.\\d{0,6}0*$)",
+                "type": "string"
+              }
+            ],
+            "title": "Memory Gb"
+          },
+          "vcpu": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,12}|(?=[\\d.]{1,19}0*$)\\d{0,12}\\.\\d{0,6}0*$)",
+                "type": "string"
+              }
+            ],
+            "title": "Vcpu"
+          }
+        },
+        "required": [
+          "vcpu",
+          "memory_gb",
+          "disk_gb"
+        ],
+        "title": "PriceSet",
+        "type": "object"
+      },
+      "PriceTableCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Description",
+            "type": "string"
+          },
+          "is_default": {
+            "default": false,
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "prices": {
+            "$ref": "#/components/schemas/PriceSet"
+          }
+        },
+        "required": [
+          "name",
+          "prices"
+        ],
+        "title": "PriceTableCreate",
+        "type": "object"
+      },
+      "PriceTableOut": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/PriceChangeOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "prices": {
+            "additionalProperties": {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            "title": "Prices",
+            "type": "object"
+          },
+          "tenants": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Tenants",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "is_default",
+          "prices",
+          "tenants",
+          "history"
+        ],
+        "title": "PriceTableOut",
+        "type": "object"
+      },
+      "PriceTableUpdate": {
+        "additionalProperties": false,
+        "description": "Absent field: unchanged. New prices apply from now on; what was already accrued\nkeeps the old price. `is_default` can only be turned on (that moves the flag).",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Default"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "prices": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriceSet"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "PriceTableUpdate",
+        "type": "object"
+      },
+      "PricesOut": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "hours_per_month": {
+            "title": "Hours Per Month",
+            "type": "integer"
+          },
+          "price_table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Table"
+          },
+          "prices": {
+            "additionalProperties": {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            "title": "Prices",
+            "type": "object"
+          }
+        },
+        "required": [
+          "currency",
+          "hours_per_month",
+          "price_table",
+          "prices"
+        ],
+        "title": "PricesOut",
+        "type": "object"
+      },
       "ProfileUpdate": {
         "additionalProperties": false,
         "properties": {
@@ -4470,6 +6402,51 @@
           "display_name"
         ],
         "title": "ProfileUpdate",
+        "type": "object"
+      },
+      "ProjectCostOut": {
+        "properties": {
+          "accrued": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Accrued",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "run_rate_monthly": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Run Rate Monthly",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "name",
+          "accrued",
+          "run_rate_monthly"
+        ],
+        "title": "ProjectCostOut",
         "type": "object"
       },
       "ProjectCreate": {
@@ -5149,6 +7126,90 @@
         "title": "TemplateRefOut",
         "type": "object"
       },
+      "TenantCostOut": {
+        "properties": {
+          "accrued": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Accrued",
+            "type": "string"
+          },
+          "custom_price_table": {
+            "title": "Custom Price Table",
+            "type": "boolean"
+          },
+          "forecast": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "price_table": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Table"
+          },
+          "price_table_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Table Id"
+          },
+          "run_rate_monthly": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Run Rate Monthly",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "name",
+          "slug",
+          "status",
+          "price_table_id",
+          "price_table",
+          "custom_price_table",
+          "accrued",
+          "run_rate_monthly",
+          "forecast"
+        ],
+        "title": "TenantCostOut",
+        "type": "object"
+      },
       "TenantCreate": {
         "additionalProperties": false,
         "properties": {
@@ -5217,6 +7278,28 @@
           "created_at"
         ],
         "title": "TenantOut",
+        "type": "object"
+      },
+      "TenantPriceTable": {
+        "additionalProperties": false,
+        "properties": {
+          "price_table_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Table Id"
+          }
+        },
+        "required": [
+          "price_table_id"
+        ],
+        "title": "TenantPriceTable",
         "type": "object"
       },
       "TenantSummary": {
@@ -6101,6 +8184,59 @@
           }
         },
         "summary": "Admin Alerts Summary",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/billing/summary": {
+      "get": {
+        "description": "Cost per tenant (client) in the month; the detail of one tenant is its own\n/billing/summary (platform admins may enter any tenant).",
+        "operationId": "platform_summary_api_v1_admin_billing_summary_get",
+        "parameters": [
+          {
+            "description": "YYYY-MM",
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM",
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformCostOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Platform Summary",
         "tags": [
           "admin"
         ]
@@ -7244,6 +9380,245 @@
         ]
       }
     },
+    "/api/v1/admin/kubernetes/clusters": {
+      "get": {
+        "description": "Soonest certificate expiry first; clusters without a known date last.",
+        "operationId": "list_clusters_api_v1_admin_kubernetes_clusters_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/K8sClusterOut"
+                  },
+                  "title": "Response List Clusters Api V1 Admin Kubernetes Clusters Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Clusters",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "A cluster outside the legacy table. Collected like the others from the next pass.",
+        "operationId": "create_cluster_api_v1_admin_kubernetes_clusters_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/K8sClusterCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/K8sClusterOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Cluster",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/kubernetes/clusters/{cluster_id}": {
+      "delete": {
+        "description": "Only clusters registered here; nothing is done to the cluster itself.",
+        "operationId": "delete_cluster_api_v1_admin_kubernetes_clusters__cluster_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Cluster",
+        "tags": [
+          "admin"
+        ]
+      },
+      "get": {
+        "operationId": "get_cluster_api_v1_admin_kubernetes_clusters__cluster_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/K8sClusterDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Cluster",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/kubernetes/clusters/{cluster_id}/kubeconfig": {
+      "get": {
+        "description": "The kubeconfig grants access to the cluster: every download is audited.",
+        "operationId": "download_kubeconfig_api_v1_admin_kubernetes_clusters__cluster_id__kubeconfig_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/yaml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Kubeconfig",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "operationId": "replace_kubeconfig_api_v1_admin_kubernetes_clusters__cluster_id__kubeconfig_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/K8sKubeconfigPut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/K8sClusterOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replace Kubeconfig",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/nodes": {
       "get": {
         "operationId": "list_nodes_api_v1_admin_nodes_get",
@@ -7615,6 +9990,157 @@
         ]
       }
     },
+    "/api/v1/admin/price-tables": {
+      "get": {
+        "operationId": "list_price_tables_api_v1_admin_price_tables_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PriceTableOut"
+                  },
+                  "title": "Response List Price Tables Api V1 Admin Price Tables Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Price Tables",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "create_price_table_api_v1_admin_price_tables_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceTableCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceTableOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Price Table",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/price-tables/{table_id}": {
+      "delete": {
+        "operationId": "delete_price_table_api_v1_admin_price_tables__table_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "table_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Table Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Price Table",
+        "tags": [
+          "admin"
+        ]
+      },
+      "patch": {
+        "operationId": "update_price_table_api_v1_admin_price_tables__table_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "table_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Table Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceTableUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceTableOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Price Table",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/regions": {
       "get": {
         "operationId": "admin_list_regions_api_v1_admin_regions_get",
@@ -7831,6 +10357,60 @@
           }
         },
         "summary": "List All Tenants",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/tenants/{tenant_id}/price-table": {
+      "put": {
+        "description": "From now on; what the tenant already accrued keeps the prices of the time.",
+        "operationId": "set_tenant_price_table_api_v1_admin_tenants__tenant_id__price_table_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantPriceTable"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantPriceTable"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Tenant Price Table",
         "tags": [
           "admin"
         ]
@@ -8895,6 +11475,90 @@
         "summary": "Refresh",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/billing/prices": {
+      "get": {
+        "description": "Today's prices for the tenant: any member (the creation form shows an estimate).",
+        "operationId": "tenant_prices_api_v1_billing_prices_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PricesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tenant Prices",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/summary": {
+      "get": {
+        "operationId": "tenant_summary_api_v1_billing_summary_get",
+        "parameters": [
+          {
+            "description": "YYYY-MM",
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM",
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tenant Summary",
+        "tags": [
+          "billing"
         ]
       }
     },

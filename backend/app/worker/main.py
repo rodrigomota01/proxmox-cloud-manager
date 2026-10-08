@@ -1,10 +1,13 @@
-"""Worker entrypoint: two concurrent loops.
+"""Worker entrypoint: three concurrent loops.
 
 - jobs: CM_JOB_CONCURRENCY runners drain the Postgres queue (FOR UPDATE SKIP LOCKED)
   and sleep until a NOTIFY on the jobs channel (or a poll timeout, which also picks up
   retries whose run_after has passed and jobs whose lease expired).
 - reconciler: every CM_RECONCILE_INTERVAL_SECONDS, every cluster with credentials, in
-  parallel (CM_RECONCILE_CONCURRENCY), each bounded by CM_RECONCILE_TIMEOUT_SECONDS.
+  parallel (CM_RECONCILE_CONCURRENCY), each bounded by CM_RECONCILE_TIMEOUT_SECONDS;
+  then alerts and, every CM_BILLING_INTERVAL_SECONDS, cost accrual.
+- kubernetes: every CM_K8S_POLL_INTERVAL_SECONDS, read-only collection from each
+  cluster's API (its own loop: a slow cluster never delays the Proxmox sync).
 
 Several workers may run: SKIP LOCKED spreads jobs, and a transaction-level advisory
 lock per cluster keeps one reconciler per cluster.
@@ -23,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.alerts import notify
 from app.alerts.evaluator import run_alerts
+from app.billing.accrual import accrue
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.db.session import create_engine, create_sessionmaker, set_platform_scope
@@ -34,6 +38,9 @@ from app.ipam.service import source_for
 from app.ipam.sync import poll_guest_nics, sync_ipam
 from app.jobs import handlers  # noqa: F401 - registers job handlers
 from app.jobs.queue import CHANNEL, run_one
+from app.k8s.collect import poll_clusters
+from app.k8s.service import source_for as k8s_source_for
+from app.k8s.sync import sync_k8s
 from app.providers.base import ProviderError
 from app.providers.registry import ProviderRegistry
 
@@ -129,8 +136,9 @@ async def refresh_ipam(
     sessionmaker: async_sessionmaker[AsyncSession],
     registry: ProviderRegistry,
 ) -> None:
-    """NICs of every guest (for IP matching), then the IPAM copy when configured. A
-    MySQL outage only delays the copy; it never stops the reconcile loop."""
+    """NICs of every guest (for IP matching), then the IPAM copy and the Kubernetes
+    clusters when configured. A MySQL outage only delays the copies; it never stops
+    the reconcile loop."""
     await poll_guest_nics(sessionmaker, registry)
     source = source_for(settings)
     if source is None:
@@ -140,6 +148,15 @@ async def refresh_ipam(
         logger.info("ipam synced", extra={"stats": stats})
     except Exception as exc:
         logger.warning("ipam sync failed", extra={"error": str(exc)})
+    # Kubernetes clusters live in the same database; failures stay independent
+    k8s = k8s_source_for(settings)
+    if k8s is None:
+        return
+    try:
+        stats = await sync_k8s(sessionmaker, k8s, registry.secrets)
+        logger.info("kubernetes clusters synced", extra={"stats": stats})
+    except Exception as exc:
+        logger.warning("kubernetes clusters sync failed", extra={"error": str(exc)})
 
 
 JOB_POLL_SECONDS = 5.0
@@ -205,7 +222,7 @@ async def reconcile_loop(
     stop: asyncio.Event,
 ) -> None:
     loop = asyncio.get_running_loop()
-    next_disk_poll = next_ipam = 0.0
+    next_disk_poll = next_ipam = next_billing = 0.0
     while not stop.is_set():
         try:
             await reconcile_all(
@@ -222,10 +239,38 @@ async def reconcile_loop(
             changes = await run_alerts(sessionmaker)
             if changes:
                 logger.info("alerts changed", extra={"changes": len(changes)})
+            if loop.time() >= next_billing:
+                # right after a sync: costs follow the power states just observed
+                next_billing = loop.time() + settings.billing_interval_seconds
+                await accrue(sessionmaker, settings.billing_max_gap_seconds)
         except Exception:  # keep the loop alive; the next tick retries
             logger.exception("reconcile loop error")
         try:
             await asyncio.wait_for(stop.wait(), timeout=settings.reconcile_interval_seconds)
+        except TimeoutError:
+            continue
+
+
+async def k8s_loop(
+    settings: Settings,
+    sessionmaker: async_sessionmaker[AsyncSession],
+    registry: ProviderRegistry,
+    stop: asyncio.Event,
+) -> None:
+    """Its own loop: remote clusters can be slow, and must not delay the Proxmox sync."""
+    while not stop.is_set():
+        try:
+            counts = await poll_clusters(
+                sessionmaker, registry.secrets,
+                concurrency=settings.k8s_poll_concurrency,
+                cluster_timeout=settings.k8s_poll_timeout_seconds,
+            )
+            if counts:
+                logger.info("kubernetes clusters collected", extra={"health": counts})
+        except Exception:  # keep the loop alive; the next tick retries
+            logger.exception("kubernetes loop error")
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=settings.k8s_poll_interval_seconds)
         except TimeoutError:
             continue
 
@@ -248,6 +293,7 @@ async def run(settings: Settings | None = None) -> None:
         await asyncio.gather(
             job_loop(settings, sessionmaker, registry, stop),
             reconcile_loop(settings, sessionmaker, registry, stop),
+            k8s_loop(settings, sessionmaker, registry, stop),
         )
     finally:
         await engine.dispose()

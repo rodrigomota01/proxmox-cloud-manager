@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { NoTenant } from "@/components/no-tenant";
 import { Button, Card, ErrorBox, Field, Input, Select } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { money, num } from "@/lib/money";
 import { useProjects } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 
@@ -35,6 +36,12 @@ export default function NewInstancePage() {
   const keys = useQuery({
     queryKey: ["ssh-keys"],
     queryFn: async () => unwrap(await api.GET("/api/v1/ssh-keys")),
+  });
+  const prices = useQuery({
+    queryKey: ["billing", "prices", tenantId],
+    queryFn: async () => unwrap(await api.GET("/api/v1/billing/prices")),
+    enabled: tenantId !== null,
+    staleTime: 60_000,
   });
   const quotas = useQuery({
     queryKey: ["quotas", tenantId],
@@ -76,6 +83,15 @@ export default function NewInstancePage() {
     };
     return (quotas.data ?? []).filter((q) => request[q.resource] > q.available);
   }, [quotas.data, vcpus, memoryGb, diskGb]);
+
+  // same rule as the backend: compute while running; disk and the fee while it exists
+  const estimate = useMemo(() => {
+    const p = prices.data?.prices;
+    if (!p) return null;
+    const stopped = num(p.disk_gb) * diskGb + num(p.instance);
+    const running = stopped + num(p.vcpu) * vcpus + num(p.memory_gb) * memoryGb;
+    return { running, stopped, hourly: running / (prices.data?.hours_per_month ?? 730) };
+  }, [prices.data, vcpus, memoryGb, diskGb]);
 
   const create = useMutation({
     // the key is minted per submit: a retried request never creates two instances
@@ -264,6 +280,15 @@ export default function NewInstancePage() {
                   {QUOTA_LABEL[q.resource] ?? q.resource}: {q.available} de {q.limit} livres
                 </div>
               ))}
+            </div>
+          )}
+          {estimate && estimate.running > 0 && (
+            <div className="mt-4 rounded-md bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
+              <span className="font-medium">Custo estimado: {money(estimate.running, prices.data!.currency)}/mês</span>{" "}
+              <span className="text-slate-600 dark:text-slate-400">
+                ligada ({money(estimate.hourly, prices.data!.currency, true)}/hora) ·{" "}
+                {money(estimate.stopped, prices.data!.currency)}/mês desligada
+              </span>
             </div>
           )}
         </Card>

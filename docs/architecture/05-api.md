@@ -147,8 +147,8 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | Método | Rota | Permissão |
 |---|---|---|
 | GET | `/quotas` | membro do tenant → `{resource, limit, used, available}` (2a ✅) |
-| POST | `/pricing/estimate` | autenticado (calcula custo de um spec) |
-| GET | `/billing/usage?from=&to=&group_by=project` | `billing:view` |
+| GET | `/billing/prices` | membro do tenant (preços vigentes do cliente; a estimativa da criação é calculada com eles) ✅ |
+| GET | `/billing/summary?month=YYYY-MM` | `billing:view` (tenant: tudo; projeto: só os seus) — acumulado, custo atual, previsão, por recurso/projeto/instância/dia (ADR-0015) ✅ |
 
 ### Jobs, eventos, auditoria
 
@@ -188,7 +188,14 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | GET/PUT | `/admin/tenants/{id}/quotas` | `quota:manage` (sem linha = padrão da plataforma) |
 | GET | `/admin/clusters/{id}/templates` | `template:publish` (templates visíveis ao token) |
 | GET/POST/PATCH | `/admin/images` · `/admin/images/{id}` | `template:publish` (exige drive de cloud-init) |
-| GET/POST | `/admin/price-tables` | `billing:manage` |
+| GET/POST | `/admin/price-tables` | `billing:manage` ✅ |
+| PATCH/DELETE | `/admin/price-tables/{id}` | `billing:manage` (preço novo vale a partir de agora; padrão/em uso não exclui) ✅ |
+| PUT | `/admin/tenants/{id}/price-table` | `billing:manage` (null = tabela padrão) ✅ |
+| GET | `/admin/billing/summary?month=YYYY-MM` | `billing:view` (platform) — custo por cliente ✅ |
+| GET/POST | `/admin/kubernetes/clusters` | `cluster:manage` — clusters (tabela + manuais) com saúde e carga; POST cadastra um manual (ADR-0016/0017) ✅ |
+| GET/DELETE | `/admin/kubernetes/clusters/{id}` | `cluster:manage` — detalhe (nós, namespaces, workloads, pods, services, ingresses); DELETE só de manuais ✅ |
+| PUT | `/admin/kubernetes/clusters/{id}/kubeconfig` | `cluster:manage` — troca o kubeconfig de um manual ✅ |
+| GET | `/admin/kubernetes/clusters/{id}/kubeconfig` | `cluster:manage` — download auditado, `no-store` ✅ |
 | GET | `/admin/jobs` · `/admin/jobs/{id}` | `cluster:manage` (inclui dados dos eventos: UPID, node) |
 | GET | `/admin/audit-logs` | `platform:admin` ou `audit:view` (platform) |
 

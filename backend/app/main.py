@@ -14,6 +14,7 @@ from app.admin import router as admin
 from app.alerts import router as alerts
 from app.api import health
 from app.auth import router as auth
+from app.billing import router as billing
 from app.compute import router as compute
 from app.core.config import Settings, get_settings
 from app.core.errors import install_error_handlers, problem
@@ -26,6 +27,7 @@ from app.images import router as images
 from app.infra.mailer import build_mailer
 from app.infra.secrets import SecretsError, build_secrets_backend
 from app.ipam import router as ipam
+from app.k8s import router as k8s
 from app.providers.registry import ProviderRegistry
 from app.regions import router as regions
 from app.sshkeys import router as sshkeys
@@ -95,6 +97,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     v1.include_router(alerts.router)
     v1.include_router(alerts.admin_router)
     v1.include_router(ipam.router)
+    v1.include_router(billing.router)
+    v1.include_router(billing.admin_router)
+    v1.include_router(k8s.router)
     app.include_router(v1)
 
     return app

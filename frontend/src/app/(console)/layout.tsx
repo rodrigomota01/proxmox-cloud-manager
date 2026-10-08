@@ -21,8 +21,10 @@ const ADMIN_NAV = [
   { href: "/admin/nodes", label: "Hypervisors" },
   { href: "/admin/regions", label: "Regiões e zonas" },
   { href: "/admin/images", label: "Imagens" },
+  { href: "/admin/kubernetes", label: "Kubernetes" },
   { href: "/admin/alerts", label: "Regras de alerta" },
   { href: "/admin/tenants", label: "Clientes e quotas" },
+  { href: "/admin/pricing", label: "Preços" },
   { href: "/admin/users", label: "Usuários" },
 ];
 
@@ -100,6 +102,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <nav className="space-y-1">
               <NavLink href="/projects" label="Projetos" />
               {tenantPerms.has("member:manage") && <NavLink href="/members" label="Membros" />}
+              {(tenantPerms.has("billing:view") || isPlatformAdmin) && <NavLink href="/costs" label="Custos" />}
             </nav>
           </>
         )}
