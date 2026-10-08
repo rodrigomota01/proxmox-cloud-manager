@@ -9,20 +9,22 @@ import { Card, tbl } from "@/components/ui";
 import { api, ApiError, unwrap, type Schemas } from "@/lib/api/client";
 import { money, monthLabel, num } from "@/lib/money";
 
-/** Cost per day of the month: one bar per day (days without cost stay empty). */
-export function DailyCostBars({
+/** One bar per day of the month (days without a value stay empty). */
+export function DailyBars({
   month,
   days,
-  currency,
+  format,
+  what,
 }: {
   month: string;
-  days: Schemas["DayCostOut"][];
-  currency: string;
+  days: { date: string; value: number }[];
+  format: (v: number) => string;
+  what: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const [y, m] = month.split("-").map(Number);
   const count = new Date(y, m, 0).getDate();
-  const byDay = new Map(days.map((d) => [Number(d.date.slice(8, 10)), num(d.cost)]));
+  const byDay = new Map(days.map((d) => [Number(d.date.slice(8, 10)), d.value]));
   const values = Array.from({ length: count }, (_, i) => byDay.get(i + 1) ?? 0);
   const max = Math.max(...values);
   const h = hover !== null ? values[hover] : null;
@@ -30,13 +32,13 @@ export function DailyCostBars({
     <div>
       <div className="mb-1 h-5 text-xs tabular-nums text-slate-600 dark:text-slate-400" aria-live="polite">
         {h !== null && hover !== null
-          ? `${String(hover + 1).padStart(2, "0")}/${String(m).padStart(2, "0")}: ${money(h, currency)}`
-          : `Máximo diário: ${money(max, currency)}`}
+          ? `${String(hover + 1).padStart(2, "0")}/${String(m).padStart(2, "0")}: ${format(h)}`
+          : `Máximo diário: ${format(max)}`}
       </div>
       <div
         className="flex h-32 items-end gap-[2px] border-b border-[var(--viz-axis)]"
         role="img"
-        aria-label={`Custo por dia em ${monthLabel(month)}`}
+        aria-label={`${what} por dia em ${monthLabel(month)}`}
         onMouseLeave={() => setHover(null)}
       >
         {values.map((v, i) => (
@@ -44,7 +46,7 @@ export function DailyCostBars({
             key={i}
             className="flex h-full flex-1 items-end"
             onMouseEnter={() => setHover(i)}
-            title={`${i + 1}: ${money(v, currency)}`}
+            title={`${i + 1}: ${format(v)}`}
           >
             <div
               className="w-full rounded-t-[4px]"
@@ -63,6 +65,26 @@ export function DailyCostBars({
         <span>{count}</span>
       </div>
     </div>
+  );
+}
+
+/** Cost per day of the month. */
+export function DailyCostBars({
+  month,
+  days,
+  currency,
+}: {
+  month: string;
+  days: Schemas["DayCostOut"][];
+  currency: string;
+}) {
+  return (
+    <DailyBars
+      month={month}
+      days={days.map((d) => ({ date: d.date, value: num(d.cost) }))}
+      format={(v) => money(v, currency)}
+      what="Custo"
+    />
   );
 }
 

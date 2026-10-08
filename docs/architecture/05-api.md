@@ -147,8 +147,10 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | Método | Rota | Permissão |
 |---|---|---|
 | GET | `/quotas` | membro do tenant → `{resource, limit, used, available}` (2a ✅) |
-| GET | `/billing/prices` | membro do tenant (preços vigentes do cliente; a estimativa da criação é calculada com eles) ✅ |
-| GET | `/billing/summary?month=YYYY-MM` | `billing:view` (tenant: tudo; projeto: só os seus) — acumulado, custo atual, previsão, por recurso/projeto/instância/dia (ADR-0015) ✅ |
+| GET | `/billing/access` | membro do tenant — o que ele vê em Custos: `full`, `usage` ou `none` (admin da plataforma: sempre `full`) ✅ |
+| GET | `/billing/prices` | membro do tenant, com visibilidade `full` (preços vigentes do cliente; a estimativa da criação é calculada com eles) ✅ |
+| GET | `/billing/summary?month=YYYY-MM` | `billing:view` (tenant: tudo; projeto: só os seus), visibilidade `full` — acumulado, custo atual, previsão, por recurso/projeto/instância/dia (ADR-0015) ✅ |
+| GET | `/billing/usage?month=YYYY-MM` | `billing:view` (mesma regra), visibilidade `full` ou `usage` — sem preços: vCPU·h, GiB·h de RAM e disco por projeto/VM/dia, o alocado agora e os clusters Kubernetes vinculados (com `k8s:view`) ✅ |
 | GET | `/kubernetes/clusters`, `/kubernetes/clusters/{id}` | `k8s:view` (tenant ou qualquer projeto dele) — clusters vinculados ao tenant: saúde, carga e workloads, sem kubeconfig ✅ |
 
 ### Jobs, eventos, auditoria
@@ -192,6 +194,7 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | GET/POST | `/admin/price-tables` | `billing:manage` ✅ |
 | PATCH/DELETE | `/admin/price-tables/{id}` | `billing:manage` (preço novo vale a partir de agora; padrão/em uso não exclui) ✅ |
 | PUT | `/admin/tenants/{id}/price-table` | `billing:manage` (null = tabela padrão) ✅ |
+| PUT | `/admin/tenants/{id}/cost-visibility` | `billing:manage` — `full`, `usage` (só consumo, sem valores) ou `none` (auditado) ✅ |
 | GET | `/admin/billing/summary?month=YYYY-MM` | `billing:view` (platform) — custo por cliente ✅ |
 | GET/POST | `/admin/kubernetes/clusters` | `cluster:manage` — clusters (tabela + manuais) com saúde e carga; POST cadastra um manual (ADR-0016/0017) ✅ |
 | GET/DELETE | `/admin/kubernetes/clusters/{id}` | `cluster:manage` — detalhe (nós, namespaces, workloads, pods, services, ingresses); DELETE só de manuais ✅ |

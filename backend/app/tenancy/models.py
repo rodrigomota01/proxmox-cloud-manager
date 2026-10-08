@@ -1,14 +1,31 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, Text, UniqueConstraint, func, text
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, Timestamps, UUIDPk
 
+# What the tenant's members see of its billing (platform billing viewers see everything):
+# full = costs and usage; usage = consumed/allocated resources, no prices; none = nothing.
+COST_VISIBILITY = ("full", "usage", "none")
+
 
 class Tenant(UUIDPk, Timestamps, Base):
     __tablename__ = "tenants"
+    __table_args__ = (
+        CheckConstraint(f"cost_visibility IN {COST_VISIBILITY}", name="cost_visibility"),
+    )
 
     slug: Mapped[str] = mapped_column(Text, unique=True)
     name: Mapped[str] = mapped_column(Text)
@@ -17,6 +34,8 @@ class Tenant(UUIDPk, Timestamps, Base):
     price_table_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("price_tables.id", ondelete="SET NULL")
     )
+    # changed only through /admin (billing:manage)
+    cost_visibility: Mapped[str] = mapped_column(Text, server_default="full")
 
 
 class TenantMembership(UUIDPk, Base):

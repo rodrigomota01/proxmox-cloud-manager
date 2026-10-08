@@ -207,6 +207,14 @@ function NewTableDialog({
   );
 }
 
+type CostVisibility = Schemas["TenantCostOut"]["cost_visibility"];
+
+const COST_VISIBILITY: { value: CostVisibility; label: string }[] = [
+  { value: "full", label: "Custos e uso de recursos" },
+  { value: "usage", label: "Somente uso de recursos (sem valores)" },
+  { value: "none", label: "Oculto" },
+];
+
 function TenantAssignments({ tables }: { tables: Schemas["PriceTableOut"][] }) {
   const queryClient = useQueryClient();
   const summary = useQuery({
@@ -226,27 +234,39 @@ function TenantAssignments({ tables }: { tables: Schemas["PriceTableOut"][] }) {
       queryClient.invalidateQueries({ queryKey: ["admin", "price-tables"] });
     },
   });
+  const visibility = useMutation({
+    mutationFn: async ({ tenantId, value }: { tenantId: string; value: CostVisibility }) =>
+      unwrap(
+        await api.PUT("/api/v1/admin/tenants/{tenant_id}/cost-visibility", {
+          params: { path: { tenant_id: tenantId } },
+          body: { cost_visibility: value },
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "billing"] }),
+  });
   const def = tables.find((t) => t.is_default);
+  const error = [assign, visibility, summary].find((q) => q.isError)?.error;
   return (
     <Card
-      title="Tabela por cliente"
-      description="Clientes sem tabela própria usam a padrão. A troca vale a partir de agora; o que já foi acumulado mantém o preço da época."
+      title="Por cliente"
+      description="Clientes sem tabela própria usam a padrão; a troca vale a partir de agora e o que já foi acumulado mantém o preço da época. A visibilidade define o que os usuários do cliente veem em Custos."
       flush
     >
-      {(assign.isError || summary.isError) && (
+      {error && (
         <div className="px-5 pb-3">
-          <ErrorBox message={assign.isError ? errorMessage(assign.error) : summary.isError ? errorMessage(summary.error) : null} />
+          <ErrorBox message={errorMessage(error)} />
         </div>
       )}
       {summary.data?.tenants.length === 0 ? (
         <Empty icon="building">Nenhum cliente.</Empty>
       ) : (
         <div className={tbl.wrap}>
-          <table className={tbl.table}>
+          <table className={`${tbl.table} min-w-[40rem]`}>
             <thead className={tbl.thead}>
               <tr>
                 <th className={tbl.th}>Cliente</th>
                 <th className={tbl.th}>Tabela de preços</th>
+                <th className={tbl.th}>Visível para o cliente</th>
               </tr>
             </thead>
             <tbody className={tbl.tbody}>
@@ -276,6 +296,22 @@ function TenantAssignments({ tables }: { tables: Schemas["PriceTableOut"][] }) {
                             {tb.name}
                           </option>
                         ))}
+                    </Select>
+                  </td>
+                  <td className={tbl.td}>
+                    <Select
+                      aria-label={`O que ${t.name} vê em Custos`}
+                      value={t.cost_visibility}
+                      disabled={visibility.isPending}
+                      onChange={(e) =>
+                        visibility.mutate({ tenantId: t.tenant_id, value: e.target.value as CostVisibility })
+                      }
+                    >
+                      {COST_VISIBILITY.map((v) => (
+                        <option key={v.value} value={v.value}>
+                          {v.label}
+                        </option>
+                      ))}
                     </Select>
                   </td>
                 </tr>
@@ -323,7 +359,7 @@ export default function AdminPricingPage() {
         </Card>
       )}
       {tables.data?.map((t) => <TableEditor key={t.id} table={t} />)}
-      {tables.data && tables.data.length > 0 && <TenantAssignments tables={tables.data} />}
+      {tables.data && <TenantAssignments tables={tables.data} />}
       <NewTableDialog
         open={creating}
         onClose={() => setCreating(false)}

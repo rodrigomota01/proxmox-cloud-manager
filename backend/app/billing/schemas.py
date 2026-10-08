@@ -1,9 +1,11 @@
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+from app.k8s.schemas import Health
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 Price = Annotated[Decimal, Field(ge=0, max_digits=18, decimal_places=6)]
@@ -70,6 +72,20 @@ class TenantPriceTable(Input):
     price_table_id: uuid.UUID | None  # null = the default table
 
 
+# full = costs and usage; usage = consumed/allocated resources only, no prices; none = hidden
+CostVisibility = Literal["full", "usage", "none"]
+
+
+class TenantCostVisibility(Input):
+    cost_visibility: CostVisibility
+
+
+class BillingAccessOut(BaseModel):
+    """What this user sees of the tenant's billing (platform billing viewers: always full)."""
+
+    cost_visibility: CostVisibility
+
+
 # --- reports -----------------------------------------------------------------------------
 
 
@@ -132,6 +148,7 @@ class TenantCostOut(BaseModel):
     price_table_id: uuid.UUID | None
     price_table: str | None
     custom_price_table: bool
+    cost_visibility: CostVisibility
     accrued: Decimal
     run_rate_monthly: Decimal
     forecast: Decimal | None
@@ -148,3 +165,84 @@ class PlatformCostOut(BaseModel):
     forecast: Decimal | None
     tenants: list[TenantCostOut]
     days: list[DayCostOut]
+
+
+# --- usage (no prices) -------------------------------------------------------------------
+
+
+class ResourceHoursOut(BaseModel):
+    """Consumption in the month: vCPU and RAM count while running; disk while it exists."""
+
+    vcpu_hours: Decimal
+    memory_gib_hours: Decimal
+    disk_gib_hours: Decimal
+
+
+class AllocatedOut(BaseModel):
+    """What the live instances hold right now."""
+
+    instances: int
+    running: int
+    vcpus: int
+    memory_mb: int
+    disk_gb: int
+
+
+class ProjectUsageOut(ResourceHoursOut):
+    project_id: uuid.UUID | None
+    name: str | None
+    instances: int
+
+
+class InstanceUsageOut(ResourceHoursOut):
+    instance_id: uuid.UUID
+    name: str
+    project_id: uuid.UUID | None
+    kind: str
+    power_state: str
+    vcpus: int
+    memory_mb: int
+    disk_gb: int
+    deleted: bool
+    hours: Decimal
+    running_hours: Decimal
+
+
+class DayUsageOut(BaseModel):
+    date: date
+    vcpu_hours: Decimal
+    memory_gib_hours: Decimal
+
+
+class ClusterUsageOut(BaseModel):
+    """Last collection of a Kubernetes cluster linked to the tenant (not month-bound).
+    CPU in cores, memory in bytes; usage is None without metrics-server."""
+
+    cluster_id: uuid.UUID
+    name: str
+    health: Health | None
+    collected_at: datetime | None
+    nodes: int
+    nodes_ready: int
+    namespaces: int
+    pods: int
+    cpu_capacity: float
+    cpu_allocatable: float
+    cpu_requests: float
+    cpu_usage: float | None
+    mem_capacity: float
+    mem_allocatable: float
+    mem_requests: float
+    mem_usage: float | None
+
+
+class UsageReportOut(BaseModel):
+    month: str
+    current: bool
+    timezone: str
+    consumed: ResourceHoursOut
+    allocated: AllocatedOut
+    projects: list[ProjectUsageOut]
+    instances: list[InstanceUsageOut]
+    days: list[DayUsageOut]
+    clusters: list[ClusterUsageOut]  # empty without k8s:view

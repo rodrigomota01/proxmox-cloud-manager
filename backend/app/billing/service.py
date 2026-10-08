@@ -12,7 +12,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import ColumnElement, Date, cast, func, literal, select
+from sqlalchemy import BigInteger, ColumnElement, Date, cast, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.billing.accrual import billable
@@ -78,6 +78,75 @@ class InstanceLine(Line):
     instance: Instance = None  # type: ignore[assignment] - set once loaded
     hours: Decimal = ZERO
     running_hours: Decimal = ZERO
+
+
+def _usage_columns():
+    """vCPU-seconds and MiB-seconds while running, GiB-seconds of disk while it exists,
+    seconds existing and running."""
+    def total(unit, seconds):  # bigint: MiB x seconds overflows an integer
+        return func.coalesce(func.sum(cast(unit, BigInteger) * seconds), 0)
+
+    return (
+        total(UsageRecord.vcpus, UsageRecord.running_seconds),
+        total(UsageRecord.memory_mb, UsageRecord.running_seconds),
+        total(UsageRecord.disk_gb, UsageRecord.seconds),
+        func.coalesce(func.sum(UsageRecord.seconds), 0),
+        func.coalesce(func.sum(UsageRecord.running_seconds), 0),
+    )
+
+
+@dataclass
+class Hours:
+    vcpu: Decimal = ZERO
+    memory_gib: Decimal = ZERO
+    disk_gib: Decimal = ZERO
+
+    def __iadd__(self, other: "Hours") -> "Hours":
+        self.vcpu += other.vcpu
+        self.memory_gib += other.memory_gib
+        self.disk_gib += other.disk_gib
+        return self
+
+
+@dataclass
+class UsageLine:
+    hours: Hours = field(default_factory=Hours)
+    seconds: int = 0
+    running_seconds: int = 0
+    instance: Instance = None  # type: ignore[assignment] - set once loaded
+
+
+@dataclass
+class ProjectUsage:
+    hours: Hours = field(default_factory=Hours)
+    instances: int = 0
+
+
+@dataclass
+class Allocated:
+    instances: int = 0
+    running: int = 0
+    vcpus: int = 0
+    memory_mb: int = 0
+    disk_gb: int = 0
+
+    def add(self, i: Instance) -> None:
+        self.instances += 1
+        self.running += i.power_state == "running"
+        self.vcpus += i.vcpus
+        self.memory_mb += i.memory_mb
+        self.disk_gb += i.root_disk_gb
+
+
+@dataclass
+class UsageReport:
+    month: Month
+    total: Hours
+    allocated: Allocated
+    projects: dict[uuid.UUID | None, ProjectUsage]
+    project_names: dict[uuid.UUID, str]
+    instances: list[UsageLine]
+    days: list[tuple[date, Decimal, Decimal]]
 
 
 @dataclass
@@ -169,6 +238,65 @@ class BillingReports:
             forecast=forecast(total, m, now),
             projects=dict(projects_out), project_names=names, instances=instances,
             days=await self._days(*scope),
+        )
+
+    async def usage(
+        self, tenant_id: uuid.UUID, projects: set[uuid.UUID] | None, m: Month
+    ) -> "UsageReport":
+        """Resource consumption in the month (no prices) and what is allocated now."""
+        scope = [UsageRecord.tenant_id == tenant_id, *self._in_month(m)]
+        live = [Instance.tenant_id == tenant_id, *billable()]
+        if projects is not None:
+            scope.append(UsageRecord.project_id.in_(projects))
+            live.append(Instance.project_id.in_(projects))
+
+        by_instance: dict[uuid.UUID, UsageLine] = {}
+        rows = await self.db.execute(
+            select(UsageRecord.instance_id, *_usage_columns()).where(*scope)
+            .group_by(UsageRecord.instance_id)
+        )
+        for iid, cpu, mem, disk, secs, run in rows:
+            by_instance[iid] = UsageLine(
+                hours=Hours(Decimal(cpu) / 3600, Decimal(mem) / 1024 / 3600,
+                            Decimal(disk) / 3600),
+                seconds=secs, running_seconds=run,
+            )
+        allocated = Allocated()
+        for i in (await self.db.execute(select(Instance).where(*live))).scalars():
+            by_instance.setdefault(i.id, UsageLine())
+            allocated.add(i)
+        if by_instance:
+            found = await self.db.execute(select(Instance).where(Instance.id.in_(by_instance)))
+            for i in found.scalars():
+                by_instance[i.id].instance = i
+
+        total, per_project = Hours(), defaultdict(ProjectUsage)
+        for line in by_instance.values():
+            total += line.hours
+            p = per_project[line.instance.project_id]
+            p.hours += line.hours
+            p.instances += 1
+        names = dict((await self.db.execute(
+            select(Project.id, Project.name).where(Project.tenant_id == tenant_id)
+        )).all())
+
+        day = cast(
+            func.timezone(literal(self.tz, literal_execute=True), UsageRecord.period_start), Date
+        )
+        cpu, mem = _usage_columns()[:2]
+        days = [
+            (d, Decimal(c) / 3600, Decimal(g) / 1024 / 3600)
+            for d, c, g in await self.db.execute(
+                select(day, cpu, mem).where(*scope).group_by(day).order_by(day)
+            )
+        ]
+        return UsageReport(
+            month=m, total=total, allocated=allocated, projects=dict(per_project),
+            project_names=names,
+            instances=sorted(by_instance.values(), key=lambda line: (
+                -line.hours.vcpu, -line.hours.disk_gib, line.instance.name,
+            )),
+            days=days,
         )
 
     async def platform(self, m: Month, now: datetime) -> "PlatformReport":

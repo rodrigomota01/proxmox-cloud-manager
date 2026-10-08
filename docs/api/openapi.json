@@ -1499,6 +1499,59 @@
         "title": "AlertSummary",
         "type": "object"
       },
+      "AllocatedOut": {
+        "description": "What the live instances hold right now.",
+        "properties": {
+          "disk_gb": {
+            "title": "Disk Gb",
+            "type": "integer"
+          },
+          "instances": {
+            "title": "Instances",
+            "type": "integer"
+          },
+          "memory_mb": {
+            "title": "Memory Mb",
+            "type": "integer"
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          },
+          "vcpus": {
+            "title": "Vcpus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "instances",
+          "running",
+          "vcpus",
+          "memory_mb",
+          "disk_gb"
+        ],
+        "title": "AllocatedOut",
+        "type": "object"
+      },
+      "BillingAccessOut": {
+        "description": "What this user sees of the tenant's billing (platform billing viewers: always full).",
+        "properties": {
+          "cost_visibility": {
+            "enum": [
+              "full",
+              "usage",
+              "none"
+            ],
+            "title": "Cost Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cost_visibility"
+        ],
+        "title": "BillingAccessOut",
+        "type": "object"
+      },
       "BindingCreate": {
         "additionalProperties": false,
         "properties": {
@@ -2207,6 +2260,131 @@
         "title": "ClusterUpdate",
         "type": "object"
       },
+      "ClusterUsageOut": {
+        "description": "Last collection of a Kubernetes cluster linked to the tenant (not month-bound).\nCPU in cores, memory in bytes; usage is None without metrics-server.",
+        "properties": {
+          "cluster_id": {
+            "format": "uuid",
+            "title": "Cluster Id",
+            "type": "string"
+          },
+          "collected_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collected At"
+          },
+          "cpu_allocatable": {
+            "title": "Cpu Allocatable",
+            "type": "number"
+          },
+          "cpu_capacity": {
+            "title": "Cpu Capacity",
+            "type": "number"
+          },
+          "cpu_requests": {
+            "title": "Cpu Requests",
+            "type": "number"
+          },
+          "cpu_usage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Usage"
+          },
+          "health": {
+            "anyOf": [
+              {
+                "enum": [
+                  "healthy",
+                  "warning",
+                  "critical",
+                  "unreachable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health"
+          },
+          "mem_allocatable": {
+            "title": "Mem Allocatable",
+            "type": "number"
+          },
+          "mem_capacity": {
+            "title": "Mem Capacity",
+            "type": "number"
+          },
+          "mem_requests": {
+            "title": "Mem Requests",
+            "type": "number"
+          },
+          "mem_usage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mem Usage"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "namespaces": {
+            "title": "Namespaces",
+            "type": "integer"
+          },
+          "nodes": {
+            "title": "Nodes",
+            "type": "integer"
+          },
+          "nodes_ready": {
+            "title": "Nodes Ready",
+            "type": "integer"
+          },
+          "pods": {
+            "title": "Pods",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cluster_id",
+          "name",
+          "health",
+          "collected_at",
+          "nodes",
+          "nodes_ready",
+          "namespaces",
+          "pods",
+          "cpu_capacity",
+          "cpu_allocatable",
+          "cpu_requests",
+          "cpu_usage",
+          "mem_capacity",
+          "mem_allocatable",
+          "mem_requests",
+          "mem_usage"
+        ],
+        "title": "ClusterUsageOut",
+        "type": "object"
+      },
       "Confirm": {
         "additionalProperties": false,
         "properties": {
@@ -2508,6 +2686,32 @@
           "cost"
         ],
         "title": "DayCostOut",
+        "type": "object"
+      },
+      "DayUsageOut": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "memory_gib_hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Memory Gib Hours",
+            "type": "string"
+          },
+          "vcpu_hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Vcpu Hours",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "vcpu_hours",
+          "memory_gib_hours"
+        ],
+        "title": "DayUsageOut",
         "type": "object"
       },
       "DiskUsageOut": {
@@ -3361,6 +3565,98 @@
           "last_seen_at"
         ],
         "title": "InstanceOut",
+        "type": "object"
+      },
+      "InstanceUsageOut": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "disk_gb": {
+            "title": "Disk Gb",
+            "type": "integer"
+          },
+          "disk_gib_hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Disk Gib Hours",
+            "type": "string"
+          },
+          "hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Hours",
+            "type": "string"
+          },
+          "instance_id": {
+            "format": "uuid",
+            "title": "Instance Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "memory_gib_hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Memory Gib Hours",
+            "type": "string"
+          },
+          "memory_mb": {
+            "title": "Memory Mb",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "power_state": {
+            "title": "Power State",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "running_hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Running Hours",
+            "type": "string"
+          },
+          "vcpu_hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Vcpu Hours",
+            "type": "string"
+          },
+          "vcpus": {
+            "title": "Vcpus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "vcpu_hours",
+          "memory_gib_hours",
+          "disk_gib_hours",
+          "instance_id",
+          "name",
+          "project_id",
+          "kind",
+          "power_state",
+          "vcpus",
+          "memory_mb",
+          "disk_gb",
+          "deleted",
+          "hours",
+          "running_hours"
+        ],
+        "title": "InstanceUsageOut",
         "type": "object"
       },
       "IpamReportOut": {
@@ -6618,6 +6914,62 @@
         "title": "ProjectUpdate",
         "type": "object"
       },
+      "ProjectUsageOut": {
+        "properties": {
+          "disk_gib_hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Disk Gib Hours",
+            "type": "string"
+          },
+          "instances": {
+            "title": "Instances",
+            "type": "integer"
+          },
+          "memory_gib_hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Memory Gib Hours",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "vcpu_hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Vcpu Hours",
+            "type": "string"
+          }
+        },
+        "required": [
+          "vcpu_hours",
+          "memory_gib_hours",
+          "disk_gib_hours",
+          "project_id",
+          "name",
+          "instances"
+        ],
+        "title": "ProjectUsageOut",
+        "type": "object"
+      },
       "QuotaLineOut": {
         "properties": {
           "available": {
@@ -6858,6 +7210,33 @@
           "new_password"
         ],
         "title": "ResetPasswordRequest",
+        "type": "object"
+      },
+      "ResourceHoursOut": {
+        "description": "Consumption in the month: vCPU and RAM count while running; disk while it exists.",
+        "properties": {
+          "disk_gib_hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Disk Gib Hours",
+            "type": "string"
+          },
+          "memory_gib_hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Memory Gib Hours",
+            "type": "string"
+          },
+          "vcpu_hours": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Vcpu Hours",
+            "type": "string"
+          }
+        },
+        "required": [
+          "vcpu_hours",
+          "memory_gib_hours",
+          "disk_gib_hours"
+        ],
+        "title": "ResourceHoursOut",
         "type": "object"
       },
       "RoleOut": {
@@ -7201,6 +7580,15 @@
             "title": "Accrued",
             "type": "string"
           },
+          "cost_visibility": {
+            "enum": [
+              "full",
+              "usage",
+              "none"
+            ],
+            "title": "Cost Visibility",
+            "type": "string"
+          },
           "custom_price_table": {
             "title": "Custom Price Table",
             "type": "boolean"
@@ -7271,11 +7659,31 @@
           "price_table_id",
           "price_table",
           "custom_price_table",
+          "cost_visibility",
           "accrued",
           "run_rate_monthly",
           "forecast"
         ],
         "title": "TenantCostOut",
+        "type": "object"
+      },
+      "TenantCostVisibility": {
+        "additionalProperties": false,
+        "properties": {
+          "cost_visibility": {
+            "enum": [
+              "full",
+              "usage",
+              "none"
+            ],
+            "title": "Cost Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cost_visibility"
+        ],
+        "title": "TenantCostVisibility",
         "type": "object"
       },
       "TenantCreate": {
@@ -7665,6 +8073,69 @@
           "top"
         ],
         "title": "UsageOut",
+        "type": "object"
+      },
+      "UsageReportOut": {
+        "properties": {
+          "allocated": {
+            "$ref": "#/components/schemas/AllocatedOut"
+          },
+          "clusters": {
+            "items": {
+              "$ref": "#/components/schemas/ClusterUsageOut"
+            },
+            "title": "Clusters",
+            "type": "array"
+          },
+          "consumed": {
+            "$ref": "#/components/schemas/ResourceHoursOut"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/DayUsageOut"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "instances": {
+            "items": {
+              "$ref": "#/components/schemas/InstanceUsageOut"
+            },
+            "title": "Instances",
+            "type": "array"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectUsageOut"
+            },
+            "title": "Projects",
+            "type": "array"
+          },
+          "timezone": {
+            "title": "Timezone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "current",
+          "timezone",
+          "consumed",
+          "allocated",
+          "projects",
+          "instances",
+          "days",
+          "clusters"
+        ],
+        "title": "UsageReportOut",
         "type": "object"
       },
       "UserCreate": {
@@ -10484,6 +10955,60 @@
         ]
       }
     },
+    "/api/v1/admin/tenants/{tenant_id}/cost-visibility": {
+      "put": {
+        "description": "What the client's members see in Costs: full, usage (no prices) or none.",
+        "operationId": "set_tenant_cost_visibility_api_v1_admin_tenants__tenant_id__cost_visibility_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tenant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantCostVisibility"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantCostVisibility"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Tenant Cost Visibility",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/tenants/{tenant_id}/price-table": {
       "put": {
         "description": "From now on; what the tenant already accrued keeps the prices of the time.",
@@ -11600,9 +12125,41 @@
         ]
       }
     },
+    "/api/v1/billing/access": {
+      "get": {
+        "description": "What the console offers this user: costs, resource usage only, or nothing. The\npermission checks (billing:view) still apply on each report.",
+        "operationId": "tenant_billing_access_api_v1_billing_access_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingAccessOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tenant Billing Access",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
     "/api/v1/billing/prices": {
       "get": {
-        "description": "Today's prices for the tenant: any member (the creation form shows an estimate).",
+        "description": "Today's prices for the tenant: any member (the creation form shows an estimate),\nunless the client's costs are hidden from it.",
         "operationId": "tenant_prices_api_v1_billing_prices_get",
         "responses": {
           "200": {
@@ -11679,6 +12236,59 @@
           }
         },
         "summary": "Tenant Summary",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/api/v1/billing/usage": {
+      "get": {
+        "description": "Consumed and allocated resources of the tenant's VMs (same project rules as the\ncost summary) and the Kubernetes clusters linked to it; no prices.",
+        "operationId": "tenant_usage_api_v1_billing_usage_get",
+        "parameters": [
+          {
+            "description": "YYYY-MM",
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "YYYY-MM",
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tenant Usage",
         "tags": [
           "billing"
         ]

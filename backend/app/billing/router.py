@@ -14,10 +14,16 @@ from app.audit import service as audit
 from app.billing.models import HOURS_PER_MONTH, RESOURCES, PriceItem, PriceTable
 from app.billing.pricing import HOURS, Cost, Rates, table_rates, tenant_rates
 from app.billing.schemas import (
+    AllocatedOut,
+    BillingAccessOut,
+    ClusterUsageOut,
     CostOut,
     CostSummaryOut,
+    CostVisibility,
     DayCostOut,
+    DayUsageOut,
     InstanceCostOut,
+    InstanceUsageOut,
     PlatformCostOut,
     PriceChangeOut,
     PricesOut,
@@ -25,13 +31,24 @@ from app.billing.schemas import (
     PriceTableOut,
     PriceTableUpdate,
     ProjectCostOut,
+    ProjectUsageOut,
+    ResourceHoursOut,
     TenantCostOut,
+    TenantCostVisibility,
     TenantPriceTable,
+    UsageReportOut,
 )
-from app.billing.service import BillingReports, month_of
+from app.billing.service import BillingReports, Hours, month_of
 from app.core.config import Settings
-from app.core.errors import Conflict, NotFound
-from app.iam.authz import Scope, authorize, effective_permissions, projects_with_permission
+from app.core.errors import Conflict, Forbidden, NotFound
+from app.iam.authz import (
+    PLATFORM,
+    Scope,
+    authorize,
+    effective_permissions,
+    projects_with_permission,
+)
+from app.k8s.router import can_view_k8s, linked_clusters
 from app.tenancy.models import Tenant
 
 router = APIRouter(tags=["billing"])
@@ -67,9 +84,24 @@ async def _now(db: AsyncSession):
 # --- tenant ------------------------------------------------------------------------------
 
 
+async def _visibility(db: AsyncSession, ctx) -> CostVisibility:
+    """The tenant's setting; platform billing viewers are not bound by it."""
+    if "billing:view" in await effective_permissions(db, ctx.principal.user_id, PLATFORM):
+        return "full"
+    tenant = await db.get(Tenant, ctx.tenant_id)
+    return tenant.cost_visibility if tenant else "none"
+
+
+async def _require_visibility(db: AsyncSession, ctx, *allowed: CostVisibility) -> None:
+    if await _visibility(db, ctx) not in allowed:
+        raise Forbidden("Not available for this client")
+
+
 @router.get("/billing/prices")
 async def tenant_prices(ctx: CurrentTenant, db: DbSession, settings: AppSettings) -> PricesOut:
-    """Today's prices for the tenant: any member (the creation form shows an estimate)."""
+    """Today's prices for the tenant: any member (the creation form shows an estimate),
+    unless the client's costs are hidden from it."""
+    await _require_visibility(db, ctx, "full")
     return prices_out(await tenant_rates(db, ctx.tenant_id), settings)
 
 
@@ -85,10 +117,18 @@ async def _billing_projects(db: AsyncSession, ctx) -> set[uuid.UUID] | None:
     return projects
 
 
+@router.get("/billing/access")
+async def tenant_billing_access(ctx: CurrentTenant, db: DbSession) -> BillingAccessOut:
+    """What the console offers this user: costs, resource usage only, or nothing. The
+    permission checks (billing:view) still apply on each report."""
+    return BillingAccessOut(cost_visibility=await _visibility(db, ctx))
+
+
 @router.get("/billing/summary")
 async def tenant_summary(
     ctx: CurrentTenant, db: DbSession, settings: AppSettings, month: MonthParam = None
 ) -> CostSummaryOut:
+    await _require_visibility(db, ctx, "full")
     projects = await _billing_projects(db, ctx)
     now = await _now(db)
     m = month_of(month, settings.billing_timezone, now)
@@ -121,6 +161,70 @@ async def tenant_summary(
     )
 
 
+def hours_out(h: Hours) -> dict[str, Decimal]:
+    return {"vcpu_hours": q(h.vcpu), "memory_gib_hours": q(h.memory_gib),
+            "disk_gib_hours": q(h.disk_gib)}
+
+
+@router.get("/billing/usage")
+async def tenant_usage(
+    ctx: CurrentTenant, db: DbSession, settings: AppSettings, month: MonthParam = None
+) -> UsageReportOut:
+    """Consumed and allocated resources of the tenant's VMs (same project rules as the
+    cost summary) and the Kubernetes clusters linked to it; no prices."""
+    await _require_visibility(db, ctx, "full", "usage")
+    projects = await _billing_projects(db, ctx)
+    m = month_of(month, settings.billing_timezone, await _now(db))
+    r = await BillingReports(db, settings.billing_timezone).usage(ctx.tenant_id, projects, m)
+    clusters = await linked_clusters(db, ctx.tenant_id) if await can_view_k8s(db, ctx) else []
+    a = r.allocated
+    return UsageReportOut(
+        month=m.label, current=m.current, timezone=settings.billing_timezone,
+        consumed=ResourceHoursOut(**hours_out(r.total)),
+        allocated=AllocatedOut(instances=a.instances, running=a.running, vcpus=a.vcpus,
+                               memory_mb=a.memory_mb, disk_gb=a.disk_gb),
+        projects=sorted(
+            (ProjectUsageOut(
+                project_id=pid, name=r.project_names.get(pid) if pid else None,
+                instances=p.instances, **hours_out(p.hours),
+            ) for pid, p in r.projects.items()),
+            key=lambda p: (-p.vcpu_hours, -p.disk_gib_hours, p.name or ""),
+        ),
+        instances=[
+            InstanceUsageOut(
+                instance_id=i.id, name=i.name, project_id=i.project_id, kind=i.kind,
+                power_state=i.power_state, vcpus=i.vcpus, memory_mb=i.memory_mb,
+                disk_gb=i.root_disk_gb, deleted=i.deleted_at is not None,
+                hours=q(Decimal(line.seconds) / 3600),
+                running_hours=q(Decimal(line.running_seconds) / 3600),
+                **hours_out(line.hours),
+            )
+            for line in r.instances
+            for i in (line.instance,)
+        ],
+        days=[DayUsageOut(date=d, vcpu_hours=q(c), memory_gib_hours=q(g)) for d, c, g in r.days],
+        clusters=[_cluster_usage(cid, name, snap) for cid, name, snap in clusters],
+    )
+
+
+def _cluster_usage(cluster_id: uuid.UUID, name: str, snap) -> ClusterUsageOut:
+    s = snap.summary if snap else {}
+
+    def n(key: str) -> float:
+        return float(s.get(key) or 0)
+
+    return ClusterUsageOut(
+        cluster_id=cluster_id, name=name, health=snap.health if snap else None,
+        collected_at=snap.collected_at if snap else None,
+        nodes=int(n("nodes")), nodes_ready=int(n("nodes_ready")),
+        namespaces=int(n("namespaces")), pods=int(n("pods")),
+        cpu_capacity=n("cpu_capacity"), cpu_allocatable=n("cpu_allocatable"),
+        cpu_requests=n("cpu_requests"), cpu_usage=s.get("cpu_usage"),
+        mem_capacity=n("mem_capacity"), mem_allocatable=n("mem_allocatable"),
+        mem_requests=n("mem_requests"), mem_usage=s.get("mem_usage"),
+    )
+
+
 # --- platform ----------------------------------------------------------------------------
 
 
@@ -144,6 +248,7 @@ async def platform_summary(
                 tenant_id=t.id, name=t.name, slug=t.slug, status=t.status,
                 price_table_id=rates.table_id, price_table=rates.table_name,
                 custom_price_table=t.price_table_id is not None,
+                cost_visibility=t.cost_visibility,
                 accrued=q(line.accrued.total), run_rate_monthly=q(line.run_rate.total),
                 forecast=q(fc) if fc is not None else None,
             ) for t, rates, line, fc in r.tenants),
@@ -299,4 +404,22 @@ async def set_tenant_price_table(
         resource_type="tenant", resource_id=tenant.id,
         details={"price_table_id": str(body.price_table_id) if body.price_table_id else None},
     )
+    return body
+
+
+@admin_router.put("/tenants/{tenant_id}/cost-visibility")
+async def set_tenant_cost_visibility(
+    tenant_id: uuid.UUID, body: TenantCostVisibility, principal: BillingAdmin, db: DbSession
+) -> TenantCostVisibility:
+    """What the client's members see in Costs: full, usage (no prices) or none."""
+    tenant = await db.get(Tenant, tenant_id)
+    if tenant is None:
+        raise NotFound()
+    if tenant.cost_visibility != body.cost_visibility:
+        await audit.record(
+            db, "TENANT_COST_VISIBILITY_SET", actor_user_id=principal.user_id,
+            tenant_id=tenant.id, resource_type="tenant", resource_id=tenant.id,
+            details={"from": tenant.cost_visibility, "to": body.cost_visibility},
+        )
+        tenant.cost_visibility = body.cost_visibility
     return body

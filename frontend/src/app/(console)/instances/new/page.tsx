@@ -8,7 +8,7 @@ import { useMemo, useState } from "react";
 import { NoTenant } from "@/components/no-tenant";
 import { PageHeader } from "@/components/page";
 import { Alert, Button, Card, ErrorBox, Field, Input, Select } from "@/components/ui";
-import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { api, ApiError, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { money, num } from "@/lib/money";
 import { useProjects } from "@/lib/queries";
 import { useSession } from "@/lib/session";
@@ -43,6 +43,8 @@ export default function NewInstancePage() {
     queryFn: async () => unwrap(await api.GET("/api/v1/billing/prices")),
     enabled: tenantId !== null,
     staleTime: 60_000,
+    // 403 when the client's costs are hidden: no estimate, no retries
+    retry: (count, err) => !(err instanceof ApiError && err.status === 403) && count < 2,
   });
   const quotas = useQuery({
     queryKey: ["quotas", tenantId],
