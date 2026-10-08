@@ -19,3 +19,6 @@ mudança de decisão gera um novo ADR que marca o anterior como *Substituído*.
 | [0012](0012-regioes-e-zonas.md) | Regiões e zonas; imagem lógica com templates por servidor; placement na zona | Aceito |
 | [0013](0013-alertas-e-uso.md) | Uso de disco (guest agent) e rede; alertas, avisos por e-mail e webhook assinado | Aceito |
 | [0014](0014-ipam-legado.md) | IPs: cadastro MySQL legado como fonte, conferência com as placas das VMs, reserva na criação | Aceito |
+| [0015](0015-custos-e-precos.md) | Custos: preço por recurso alocado, acúmulo por hora no worker, relatórios por cliente | Aceito |
+| [0016](0016-clusters-kubernetes.md) | Clusters Kubernetes: cópia da tabela legada, vencimento pelo certificado, kubeconfig selado e auditado | Aceito |
+| [0017](0017-kubernetes-observabilidade.md) | Kubernetes: saúde, carga, namespaces e workloads pela API de cada cluster, só leitura garantida no código | Aceito |

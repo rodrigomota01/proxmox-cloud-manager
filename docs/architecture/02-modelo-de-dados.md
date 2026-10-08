@@ -23,8 +23,8 @@
 | IpAllocation | `ip_allocations` | IPAM simples da plataforma. |
 | Quota | `quotas` | Limites por tenant (e opcionalmente por projeto). |
 | QuotaReservation | — | Na implementação (Fase 2a) a própria linha da instância em `provisioning` é a reserva: criada na mesma transação, sob advisory lock por tenant; falha definitiva a retira do uso. Tabela separada só se surgirem recursos reservados sem instância. |
-| PriceTable / PriceItem | `price_tables`, `price_items` | Tabela de preço versionada; tenant pode ter tabela própria. |
-| UsageRecord | `usage_records` | Amostras horárias de alocação para custo (Fase 4). |
+| PriceTable / PriceItem | `price_tables`, `price_items` | Tabela de preço versionada (itens com `effective_from`); uma é a padrão; tenant pode ter tabela própria (`tenants.price_table_id`). [ADR-0015](../adr/0015-custos-e-precos.md) |
+| UsageRecord | `usage_records` | Uma linha por instância por hora UTC: segundos, segundos ligada e custo por recurso, acumulados pelo worker. RLS: tenant lê, só plataforma escreve. |
 | Job | `jobs`, `job_events` | Operações assíncronas e seu histórico. |
 | AuditLog | `audit_logs` | Trilha append-only. |
 | SshKey | `ssh_public_keys` | Chaves públicas do usuário (só públicas). |

@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import Field, PostgresDsn, RedisDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -62,6 +63,10 @@ class Settings(BaseSettings):
     # legacy IPAM (MySQL awf_ip_pool), e.g. mysql://user:pw@host:3306/awf_cloud; None = off
     ipam_mysql_url: SecretStr | None = None
     ipam_sync_interval_seconds: float = 120.0
+    # Kubernetes clusters (ADR-0017): read-only collection through each cluster's API
+    k8s_poll_interval_seconds: float = 60.0
+    k8s_poll_timeout_seconds: float = 30.0
+    k8s_poll_concurrency: int = 4
     # concurrent job runners per worker process (a slow shutdown on one server must not
     # hold back operations on another)
     job_concurrency: int = 4
@@ -71,6 +76,13 @@ class Settings(BaseSettings):
     default_quota_vcpus: int = 8
     default_quota_memory_mb: int = 16 * 1024
     default_quota_storage_gb: int = 200
+
+    # Cost (ADR-0015): one currency for the whole platform; months follow this timezone
+    billing_currency: str = Field(default="BRL", pattern=r"^[A-Z]{3}$")
+    billing_timezone: str = "America/Sao_Paulo"
+    billing_interval_seconds: float = 60.0
+    # a worker outage longer than this is not charged (guest states are unknown there)
+    billing_max_gap_seconds: float = 3600.0
 
     smtp_host: str | None = None  # unset -> e-mails are only logged (without the token)
     smtp_port: int = 1025
@@ -84,6 +96,12 @@ class Settings(BaseSettings):
     def _empty_is_unset(cls, value: object) -> object:
         # compose passes `${VAR:-}` as an empty string
         return None if value == "" else value
+
+    @field_validator("billing_timezone")
+    @classmethod
+    def _known_timezone(cls, value: str) -> str:
+        ZoneInfo(value)  # raises on an unknown zone: fail at startup, not in a report
+        return value
 
     @property
     def is_production(self) -> bool:

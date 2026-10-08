@@ -7,6 +7,8 @@ import { NoTenant } from "@/components/no-tenant";
 import { ActivityRow } from "@/components/activity";
 import { Card, Empty, ErrorBox, formatBytes } from "@/components/ui";
 import { AlertList } from "@/components/alerts";
+import { PlatformCostPreview, TenantCostPreview } from "@/components/cost";
+import { K8sAttentionPreview } from "@/components/k8s";
 import { ScopeToggle } from "@/components/scope-toggle";
 import { Stat, UsagePanel } from "@/components/usage-panel";
 import { pct } from "@/components/viz";
@@ -29,6 +31,8 @@ function PlatformOverview() {
       </div>
       <ErrorBox message={overview.isError ? errorMessage(overview.error) : null} />
       <ActiveAlerts scope={{ admin: true, tenantId: "" }} />
+      <K8sAttentionPreview />
+      <PlatformCostPreview />
       {infra && (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Stat label="Hypervisors online" value={`${infra.nodes_online} de ${infra.nodes_total}`} />
@@ -148,6 +152,7 @@ function TenantDashboard({ tenantId }: { tenantId: string }) {
       </div>
 
       <ActiveAlerts scope={{ admin: false, tenantId }} />
+      <TenantCostPreview tenantId={tenantId} />
       <TenantUsage tenantId={tenantId} />
 
       <Card

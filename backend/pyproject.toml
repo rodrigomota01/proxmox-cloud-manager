@@ -15,6 +15,7 @@ dependencies = [
   "pyjwt[crypto]>=2.15,<3.0",
   "httpx>=0.28,<1.0",
   "aiomysql>=0.3,<1.0",  # IPAM: the legacy awf_ip_pool lives in MySQL
+  "pyyaml>=6.0,<7.0",  # kubeconfigs of the legacy kubernetes_clusters table
 ]
 
 [project.optional-dependencies]

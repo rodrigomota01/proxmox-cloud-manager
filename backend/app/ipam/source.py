@@ -7,9 +7,8 @@ The database user needs SELECT and UPDATE on that table and nothing else.
 
 from dataclasses import dataclass
 from typing import Protocol
-from urllib.parse import unquote, urlsplit
 
-import aiomysql
+from app.infra.mysql import MysqlDb
 
 COLUMNS = (
     "id, assigned, assigned_to_macaddr, host_owner, hostname_lease, ip_addr, hypervisor, "
@@ -48,29 +47,7 @@ def _text(value: object) -> str | None:
     return text or None
 
 
-class MysqlIpamSource:
-    def __init__(self, url: str, *, timeout: float = 10.0) -> None:
-        parts = urlsplit(url)
-        if parts.scheme not in ("mysql", "mariadb") or not parts.hostname:
-            raise ValueError("CM_IPAM_MYSQL_URL must look like mysql://user:pw@host:3306/db")
-        self._conn = {
-            "host": parts.hostname, "port": parts.port or 3306,
-            "user": unquote(parts.username or ""), "password": unquote(parts.password or ""),
-            "db": parts.path.lstrip("/"), "connect_timeout": timeout, "autocommit": True,
-        }
-
-    def __repr__(self) -> str:  # never print the password
-        return f"MysqlIpamSource({self._conn['user']}@{self._conn['host']}/{self._conn['db']})"
-
-    async def _execute(self, sql: str, args: tuple[object, ...] = ()) -> tuple[list[tuple], int]:
-        conn = await aiomysql.connect(**self._conn)
-        try:
-            async with conn.cursor() as cur:
-                count = await cur.execute(sql, args)
-                return list(await cur.fetchall()), count
-        finally:
-            conn.close()
-
+class MysqlIpamSource(MysqlDb):
     async def fetch(self) -> list[PoolRow]:
         rows, _ = await self._execute(f"SELECT {COLUMNS} FROM awf_ip_pool")  # noqa: S608
         return [

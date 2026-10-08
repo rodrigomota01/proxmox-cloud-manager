@@ -108,6 +108,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/billing/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Platform Summary
+         * @description Cost per tenant (client) in the month; the detail of one tenant is its own
+         *     /billing/summary (platform admins may enter any tenant).
+         */
+        get: operations["platform_summary_api_v1_admin_billing_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/clusters": {
         parameters: {
             query?: never;
@@ -472,6 +493,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/kubernetes/clusters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Clusters
+         * @description Soonest certificate expiry first; clusters without a known date last.
+         */
+        get: operations["list_clusters_api_v1_admin_kubernetes_clusters_get"];
+        put?: never;
+        /**
+         * Create Cluster
+         * @description A cluster outside the legacy table. Collected like the others from the next pass.
+         */
+        post: operations["create_cluster_api_v1_admin_kubernetes_clusters_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/kubernetes/clusters/{cluster_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Cluster */
+        get: operations["get_cluster_api_v1_admin_kubernetes_clusters__cluster_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Cluster
+         * @description Only clusters registered here; nothing is done to the cluster itself.
+         */
+        delete: operations["delete_cluster_api_v1_admin_kubernetes_clusters__cluster_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/kubernetes/clusters/{cluster_id}/kubeconfig": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Kubeconfig
+         * @description The kubeconfig grants access to the cluster: every download is audited.
+         */
+        get: operations["download_kubeconfig_api_v1_admin_kubernetes_clusters__cluster_id__kubeconfig_get"];
+        /** Replace Kubeconfig */
+        put: operations["replace_kubeconfig_api_v1_admin_kubernetes_clusters__cluster_id__kubeconfig_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/nodes": {
         parameters: {
             query?: never;
@@ -596,6 +683,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/price-tables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Price Tables */
+        get: operations["list_price_tables_api_v1_admin_price_tables_get"];
+        put?: never;
+        /** Create Price Table */
+        post: operations["create_price_table_api_v1_admin_price_tables_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/price-tables/{table_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Price Table */
+        delete: operations["delete_price_table_api_v1_admin_price_tables__table_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Price Table */
+        patch: operations["update_price_table_api_v1_admin_price_tables__table_id__patch"];
+        trace?: never;
+    };
     "/api/v1/admin/regions": {
         parameters: {
             query?: never;
@@ -678,6 +801,26 @@ export interface paths {
          */
         get: operations["list_all_tenants_api_v1_admin_tenants_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/tenants/{tenant_id}/price-table": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Tenant Price Table
+         * @description From now on; what the tenant already accrued keeps the prices of the time.
+         */
+        put: operations["set_tenant_price_table_api_v1_admin_tenants__tenant_id__price_table_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1007,6 +1150,43 @@ export interface paths {
         put?: never;
         /** Refresh */
         post: operations["refresh_api_v1_auth_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tenant Prices
+         * @description Today's prices for the tenant: any member (the creation form shows an estimate).
+         */
+        get: operations["tenant_prices_api_v1_billing_prices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tenant Summary */
+        get: operations["tenant_summary_api_v1_billing_summary_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2362,6 +2542,43 @@ export interface components {
             /** Version */
             version?: string | null;
         };
+        /** CostOut */
+        CostOut: {
+            /** Disk */
+            disk: string;
+            /** Instance */
+            instance: string;
+            /** Memory */
+            memory: string;
+            /** Total */
+            total: string;
+            /** Vcpu */
+            vcpu: string;
+        };
+        /** CostSummaryOut */
+        CostSummaryOut: {
+            accrued: components["schemas"]["CostOut"];
+            /** Currency */
+            currency: string;
+            /** Current */
+            current: boolean;
+            /** Days */
+            days: components["schemas"]["DayCostOut"][];
+            /** Forecast */
+            forecast: string | null;
+            /** Instances */
+            instances: components["schemas"]["InstanceCostOut"][];
+            /** Month */
+            month: string;
+            prices: components["schemas"]["PricesOut"];
+            /** Projects */
+            projects: components["schemas"]["ProjectCostOut"][];
+            run_rate: components["schemas"]["CostOut"];
+            /** Run Rate Hourly */
+            run_rate_hourly: string;
+            /** Timezone */
+            timezone: string;
+        };
         /** CredentialsOut */
         CredentialsOut: {
             /**
@@ -2396,6 +2613,16 @@ export interface components {
             projects: number;
             /** Recent Jobs */
             recent_jobs: components["schemas"]["JobOut"][];
+        };
+        /** DayCostOut */
+        DayCostOut: {
+            /** Cost */
+            cost: string;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
         };
         /**
          * DiskUsageOut
@@ -2576,6 +2803,37 @@ export interface components {
         InstanceAccepted: {
             instance: components["schemas"]["InstanceOut"];
             job: components["schemas"]["JobOut"];
+        };
+        /** InstanceCostOut */
+        InstanceCostOut: {
+            accrued: components["schemas"]["CostOut"];
+            /** Deleted */
+            deleted: boolean;
+            /** Disk Gb */
+            disk_gb: number;
+            /** Hours */
+            hours: string;
+            /**
+             * Instance Id
+             * Format: uuid
+             */
+            instance_id: string;
+            /** Kind */
+            kind: string;
+            /** Memory Mb */
+            memory_mb: number;
+            /** Name */
+            name: string;
+            /** Power State */
+            power_state: string;
+            /** Project Id */
+            project_id: string | null;
+            /** Run Rate Monthly */
+            run_rate_monthly: string;
+            /** Running Hours */
+            running_hours: string;
+            /** Vcpus */
+            vcpus: number;
         };
         /** InstanceCreate */
         InstanceCreate: {
@@ -2818,6 +3076,389 @@ export interface components {
             status: string;
             /** Type */
             type: string;
+        };
+        /** K8sClusterCreate */
+        K8sClusterCreate: {
+            /** Kubeconfig */
+            kubeconfig: string;
+            /** Name */
+            name: string;
+        };
+        /** K8sClusterDetail */
+        K8sClusterDetail: {
+            /** Api Server */
+            api_server: string | null;
+            /** Cert Expires At */
+            cert_expires_at: string | null;
+            /** Certs Expire On */
+            certs_expire_on: string | null;
+            /** Dates Differ */
+            dates_differ: boolean;
+            /** Days Left */
+            days_left: number | null;
+            /** Expires On */
+            expires_on: string | null;
+            /** Has Kubeconfig */
+            has_kubeconfig: boolean;
+            /** Httproutes */
+            httproutes: components["schemas"]["K8sHttpRouteOut"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Ingresses */
+            ingresses: components["schemas"]["K8sIngressOut"][];
+            /** K8S Nodes */
+            k8s_nodes: components["schemas"]["K8sNodeOut"][];
+            /** Kubeconfig Error */
+            kubeconfig_error: string | null;
+            /** Name */
+            name: string;
+            /** Namespaces */
+            namespaces: components["schemas"]["K8sNamespaceOut"][];
+            /** Nodes */
+            nodes: components["schemas"]["K8sTableNodeOut"][];
+            /** Pods */
+            pods: components["schemas"]["K8sPodOut"][];
+            /** Pods Truncated */
+            pods_truncated: boolean;
+            /** Server Url */
+            server_url: string | null;
+            /** Services */
+            services: components["schemas"]["K8sServiceOut"][];
+            snapshot: components["schemas"]["K8sSummaryOut"] | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "table" | "manual";
+            /** Source Modified At */
+            source_modified_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "expired" | "critical" | "warning" | "ok" | "unknown";
+            /**
+             * Synced At
+             * Format: date-time
+             */
+            synced_at: string;
+            /** Workloads */
+            workloads: components["schemas"]["K8sWorkloadOut"][];
+        };
+        /** K8sClusterOut */
+        K8sClusterOut: {
+            /** Api Server */
+            api_server: string | null;
+            /** Cert Expires At */
+            cert_expires_at: string | null;
+            /** Certs Expire On */
+            certs_expire_on: string | null;
+            /** Dates Differ */
+            dates_differ: boolean;
+            /** Days Left */
+            days_left: number | null;
+            /** Expires On */
+            expires_on: string | null;
+            /** Has Kubeconfig */
+            has_kubeconfig: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kubeconfig Error */
+            kubeconfig_error: string | null;
+            /** Name */
+            name: string;
+            /** Nodes */
+            nodes: components["schemas"]["K8sTableNodeOut"][];
+            /** Server Url */
+            server_url: string | null;
+            snapshot: components["schemas"]["K8sSummaryOut"] | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "table" | "manual";
+            /** Source Modified At */
+            source_modified_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "expired" | "critical" | "warning" | "ok" | "unknown";
+            /**
+             * Synced At
+             * Format: date-time
+             */
+            synced_at: string;
+        };
+        /**
+         * K8sHttpRouteOut
+         * @description Gateway API route. Address and TLS come from the Gateway listeners it attaches to.
+         */
+        K8sHttpRouteOut: {
+            /** Address */
+            address: string[];
+            /** Hostnames */
+            hostnames: string[];
+            /** Name */
+            name: string | null;
+            /** Namespace */
+            namespace: string;
+            /** Parents */
+            parents: string[];
+            /** Problem */
+            problem: string | null;
+            /** Rules */
+            rules: components["schemas"]["K8sHttpRouteRuleOut"][];
+            /** Tls */
+            tls: boolean;
+        };
+        /** K8sHttpRouteRuleOut */
+        K8sHttpRouteRuleOut: {
+            /** Backends */
+            backends: string;
+            /** Path */
+            path: string;
+        };
+        /** K8sIngressOut */
+        K8sIngressOut: {
+            /** Address */
+            address: (string | null)[];
+            /** Ingress Class */
+            ingress_class: string | null;
+            /** Name */
+            name: string | null;
+            /** Namespace */
+            namespace: string;
+            /** Rules */
+            rules: components["schemas"]["K8sIngressRuleOut"][];
+        };
+        /** K8sIngressRuleOut */
+        K8sIngressRuleOut: {
+            /** Host */
+            host: string | null;
+            /** Path */
+            path: string;
+            /** Service */
+            service: string;
+            /** Tls */
+            tls: boolean;
+        };
+        /** K8sKubeconfigPut */
+        K8sKubeconfigPut: {
+            /** Kubeconfig */
+            kubeconfig: string;
+        };
+        /** K8sNamespaceOut */
+        K8sNamespaceOut: {
+            /** Cpu Requests */
+            cpu_requests: number;
+            /** Cpu Usage */
+            cpu_usage: number | null;
+            /** Created At */
+            created_at: string | null;
+            /** Httproutes */
+            httproutes: number;
+            /** Ingresses */
+            ingresses: number;
+            /** Mem Requests */
+            mem_requests: number;
+            /** Mem Usage */
+            mem_usage: number | null;
+            /** Name */
+            name: string;
+            /** Phase */
+            phase: string | null;
+            /** Pods */
+            pods: number;
+            /** Problems */
+            problems: number;
+            /** Running */
+            running: number;
+            /** Services */
+            services: number;
+            /** Workloads */
+            workloads: number;
+        };
+        /** K8sNodeOut */
+        K8sNodeOut: {
+            /** Cpu Allocatable */
+            cpu_allocatable: number;
+            /** Cpu Capacity */
+            cpu_capacity: number;
+            /** Cpu Requests */
+            cpu_requests: number;
+            /** Cpu Usage */
+            cpu_usage: number | null;
+            /** Created At */
+            created_at: string | null;
+            /** Ip */
+            ip: string | null;
+            /** Mem Allocatable */
+            mem_allocatable: number;
+            /** Mem Capacity */
+            mem_capacity: number;
+            /** Mem Requests */
+            mem_requests: number;
+            /** Mem Usage */
+            mem_usage: number | null;
+            /** Name */
+            name: string;
+            /** Os */
+            os: string | null;
+            /** Pods */
+            pods: number;
+            /** Pods Capacity */
+            pods_capacity: number;
+            /** Pressure */
+            pressure: string[];
+            /** Ready */
+            ready: boolean;
+            /** Roles */
+            roles: string[];
+            /** Unschedulable */
+            unschedulable: boolean;
+            /** Version */
+            version: string | null;
+        };
+        /** K8sPodOut */
+        K8sPodOut: {
+            /** Cpu Usage */
+            cpu_usage: number | null;
+            /** Ip */
+            ip: string | null;
+            /** Mem Usage */
+            mem_usage: number | null;
+            /** Name */
+            name: string;
+            /** Namespace */
+            namespace: string;
+            /** Node */
+            node: string | null;
+            /** Owner */
+            owner: string | null;
+            /** Problem */
+            problem: boolean;
+            /** Ready */
+            ready: string;
+            /** Restarts */
+            restarts: number;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+        };
+        /** K8sServiceOut */
+        K8sServiceOut: {
+            /** Cluster Ip */
+            cluster_ip: string | null;
+            /** External */
+            external: string[];
+            /** Name */
+            name: string | null;
+            /** Namespace */
+            namespace: string;
+            /** Ports */
+            ports: string[];
+            /** Type */
+            type: string | null;
+        };
+        /**
+         * K8sSummaryOut
+         * @description Last collection. Usage fields are null without metrics-server.
+         */
+        K8sSummaryOut: {
+            /**
+             * Collected At
+             * Format: date-time
+             */
+            collected_at: string;
+            /** Cpu Allocatable */
+            cpu_allocatable: number;
+            /** Cpu Capacity */
+            cpu_capacity: number;
+            /** Cpu Requests */
+            cpu_requests: number;
+            /** Cpu Usage */
+            cpu_usage: number | null;
+            /** Error */
+            error: string | null;
+            /** Gateway Api */
+            gateway_api: boolean;
+            /**
+             * Health
+             * @enum {string}
+             */
+            health: "healthy" | "warning" | "critical" | "unreachable";
+            /** Httproutes */
+            httproutes: number;
+            /** Ingresses */
+            ingresses: number;
+            /** Mem Allocatable */
+            mem_allocatable: number;
+            /** Mem Capacity */
+            mem_capacity: number;
+            /** Mem Requests */
+            mem_requests: number;
+            /** Mem Usage */
+            mem_usage: number | null;
+            /** Metrics */
+            metrics: boolean;
+            /** Namespaces */
+            namespaces: number;
+            /** Nodes */
+            nodes: number;
+            /** Nodes Ready */
+            nodes_ready: number;
+            /** Ok At */
+            ok_at: string | null;
+            /** Pods */
+            pods: number;
+            /** Pods Problem */
+            pods_problem: number;
+            /** Pods Running */
+            pods_running: number;
+            /** Reasons */
+            reasons: string[];
+            /** Services */
+            services: number;
+            /** Version */
+            version: string | null;
+            /** Workloads */
+            workloads: number;
+            /** Workloads Unready */
+            workloads_unready: number;
+        };
+        /** K8sTableNodeOut */
+        K8sTableNodeOut: {
+            /** Host */
+            host: number | null;
+            /** Id */
+            id: number;
+            /** Role */
+            role: string | null;
+        };
+        /** K8sWorkloadOut */
+        K8sWorkloadOut: {
+            /** Created At */
+            created_at: string | null;
+            /** Desired */
+            desired: number;
+            /** Images */
+            images: (string | null)[];
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string | null;
+            /** Namespace */
+            namespace: string;
+            /** Ready */
+            ready: number;
         };
         /** KeyCreate */
         KeyCreate: {
@@ -3110,15 +3751,143 @@ export interface components {
             /** Scope */
             scope: string;
         };
+        /** PlatformCostOut */
+        PlatformCostOut: {
+            accrued: components["schemas"]["CostOut"];
+            /** Currency */
+            currency: string;
+            /** Current */
+            current: boolean;
+            /** Days */
+            days: components["schemas"]["DayCostOut"][];
+            /** Forecast */
+            forecast: string | null;
+            /** Month */
+            month: string;
+            /** Run Rate Hourly */
+            run_rate_hourly: string;
+            /** Run Rate Monthly */
+            run_rate_monthly: string;
+            /** Tenants */
+            tenants: components["schemas"]["TenantCostOut"][];
+            /** Timezone */
+            timezone: string;
+        };
         /** PlatformRoles */
         PlatformRoles: {
             /** Roles */
             roles: string[];
         };
+        /** PriceChangeOut */
+        PriceChangeOut: {
+            /**
+             * Effective From
+             * Format: date-time
+             */
+            effective_from: string;
+            /** Monthly Price */
+            monthly_price: string;
+            /** Resource */
+            resource: string;
+        };
+        /**
+         * PriceSet
+         * @description Monthly price (730 h) per unit: vCPU and GiB of RAM while running; GiB of
+         *     allocated disk and the per-instance fee while the instance exists.
+         */
+        PriceSet: {
+            /** Disk Gb */
+            disk_gb: number | string;
+            /**
+             * Instance
+             * @default 0
+             */
+            instance?: number | string;
+            /** Memory Gb */
+            memory_gb: number | string;
+            /** Vcpu */
+            vcpu: number | string;
+        };
+        /** PriceTableCreate */
+        PriceTableCreate: {
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /**
+             * Is Default
+             * @default false
+             */
+            is_default?: boolean;
+            /** Name */
+            name: string;
+            prices: components["schemas"]["PriceSet"];
+        };
+        /** PriceTableOut */
+        PriceTableOut: {
+            /** Description */
+            description: string;
+            /** History */
+            history: components["schemas"]["PriceChangeOut"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Is Default */
+            is_default: boolean;
+            /** Name */
+            name: string;
+            /** Prices */
+            prices: {
+                [key: string]: string;
+            };
+            /** Tenants */
+            tenants: string[];
+        };
+        /**
+         * PriceTableUpdate
+         * @description Absent field: unchanged. New prices apply from now on; what was already accrued
+         *     keeps the old price. `is_default` can only be turned on (that moves the flag).
+         */
+        PriceTableUpdate: {
+            /** Description */
+            description?: string | null;
+            /** Is Default */
+            is_default?: boolean | null;
+            /** Name */
+            name?: string | null;
+            prices?: components["schemas"]["PriceSet"] | null;
+        };
+        /** PricesOut */
+        PricesOut: {
+            /** Currency */
+            currency: string;
+            /** Hours Per Month */
+            hours_per_month: number;
+            /** Price Table */
+            price_table: string | null;
+            /** Prices */
+            prices: {
+                [key: string]: string;
+            };
+        };
         /** ProfileUpdate */
         ProfileUpdate: {
             /** Display Name */
             display_name: string;
+        };
+        /** ProjectCostOut */
+        ProjectCostOut: {
+            /** Accrued */
+            accrued: string;
+            /** Name */
+            name: string | null;
+            /** Project Id */
+            project_id: string | null;
+            /** Run Rate Monthly */
+            run_rate_monthly: string;
         };
         /** ProjectCreate */
         ProjectCreate: {
@@ -3381,6 +4150,32 @@ export interface components {
             /** Zone Name */
             zone_name: string | null;
         };
+        /** TenantCostOut */
+        TenantCostOut: {
+            /** Accrued */
+            accrued: string;
+            /** Custom Price Table */
+            custom_price_table: boolean;
+            /** Forecast */
+            forecast: string | null;
+            /** Name */
+            name: string;
+            /** Price Table */
+            price_table: string | null;
+            /** Price Table Id */
+            price_table_id: string | null;
+            /** Run Rate Monthly */
+            run_rate_monthly: string;
+            /** Slug */
+            slug: string;
+            /** Status */
+            status: string;
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+        };
         /** TenantCreate */
         TenantCreate: {
             /** Admin Email */
@@ -3408,6 +4203,11 @@ export interface components {
             slug: string;
             /** Status */
             status: string;
+        };
+        /** TenantPriceTable */
+        TenantPriceTable: {
+            /** Price Table Id */
+            price_table_id: string | null;
         };
         /** TenantSummary */
         TenantSummary: {
@@ -3831,6 +4631,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlertSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    platform_summary_api_v1_admin_billing_summary_get: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM */
+                month?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformCostOut"];
                 };
             };
             /** @description Validation Error */
@@ -4611,6 +5443,185 @@ export interface operations {
             };
         };
     };
+    list_clusters_api_v1_admin_kubernetes_clusters_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["K8sClusterOut"][];
+                };
+            };
+        };
+    };
+    create_cluster_api_v1_admin_kubernetes_clusters_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["K8sClusterCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["K8sClusterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cluster_api_v1_admin_kubernetes_clusters__cluster_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["K8sClusterDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_cluster_api_v1_admin_kubernetes_clusters__cluster_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_kubeconfig_api_v1_admin_kubernetes_clusters__cluster_id__kubeconfig_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/yaml": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_kubeconfig_api_v1_admin_kubernetes_clusters__cluster_id__kubeconfig_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["K8sKubeconfigPut"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["K8sClusterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_nodes_api_v1_admin_nodes_get: {
         parameters: {
             query?: never;
@@ -4874,6 +5885,123 @@ export interface operations {
             };
         };
     };
+    list_price_tables_api_v1_admin_price_tables_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceTableOut"][];
+                };
+            };
+        };
+    };
+    create_price_table_api_v1_admin_price_tables_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceTableCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceTableOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_price_table_api_v1_admin_price_tables__table_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                table_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_price_table_api_v1_admin_price_tables__table_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                table_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceTableUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PriceTableOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     admin_list_regions_api_v1_admin_regions_get: {
         parameters: {
             query?: never;
@@ -5033,6 +6161,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenantOut"][];
+                };
+            };
+        };
+    };
+    set_tenant_price_table_api_v1_admin_tenants__tenant_id__price_table_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TenantPriceTable"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TenantPriceTable"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5775,6 +6938,67 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tenant_prices_api_v1_billing_prices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PricesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tenant_summary_api_v1_billing_summary_get: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM */
+                month?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostSummaryOut"];
                 };
             };
             /** @description Validation Error */

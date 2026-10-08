@@ -13,6 +13,10 @@ class Tenant(UUIDPk, Timestamps, Base):
     slug: Mapped[str] = mapped_column(Text, unique=True)
     name: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text, server_default="active")
+    # NULL = the default price table. Changed only through /admin (billing:manage).
+    price_table_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("price_tables.id", ondelete="SET NULL")
+    )
 
 
 class TenantMembership(UUIDPk, Base):
