@@ -1,11 +1,12 @@
 """ProxmoxProvider: CloudProvider over ProxmoxClient + mapper."""
 
 import asyncio
-from typing import ClassVar
+from typing import Any, ClassVar
 from urllib.parse import quote
 
 from app.providers.base import (
     FilesystemUsage,
+    GuestAddress,
     GuestAgentUnavailable,
     GuestNic,
     InstanceObservation,
@@ -82,8 +83,14 @@ class ProxmoxProvider:
         return mapper.nics(config, ref.data["type"])
 
     async def guest_filesystems(self, ref: ProviderRef) -> list[FilesystemUsage]:
+        return mapper.filesystems(await self._agent(ref, "get-fsinfo"))
+
+    async def guest_addresses(self, ref: ProviderRef) -> list[GuestAddress]:
+        return mapper.guest_addresses(await self._agent(ref, "network-get-interfaces"))
+
+    async def _agent(self, ref: ProviderRef, command: str) -> list[dict[str, Any]]:
         try:
-            data = await self.client.get(f"{self._path(ref)}/agent/get-fsinfo")
+            data = await self.client.get(f"{self._path(ref)}/agent/{command}")
         except ProviderAuthError:
             raise
         except ProviderError as exc:
@@ -91,7 +98,7 @@ class ProxmoxProvider:
             if "agent" in str(exc).lower():
                 raise GuestAgentUnavailable(str(exc)) from exc
             raise
-        return mapper.filesystems((data or {}).get("result") or [])
+        return (data or {}).get("result") or []
 
     async def node_metrics(self, node: str, timeframe: str) -> list[NodeMetricPoint]:
         rows = await self.client.get(

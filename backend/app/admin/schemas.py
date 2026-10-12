@@ -148,6 +148,8 @@ class NodeBase(BaseModel):
     cpu_usage: float
     memory_used_bytes: int
     uptime_seconds: int
+    root_disk_bytes: int  # the node's root filesystem; 0 = not reported
+    root_disk_used_bytes: int
     last_seen_at: datetime | None
 
 
@@ -215,6 +217,8 @@ class AdminInstanceOut(BaseModel):
     managed: bool
     pool: str | None  # provider pool as last observed
     read_only: bool  # outside the cluster's managed pool: visible, not operable
+    ipv4: str | None  # see app/compute/addresses.py
+    ipv4_source: str | None
     last_seen_at: datetime | None
 
 

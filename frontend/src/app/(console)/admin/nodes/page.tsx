@@ -14,9 +14,11 @@ import { Allocation, Meter, SortHeader, mib, ratioLabel, uptime, useSorted } fro
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 
 type Node = Schemas["NodeOut"];
-type SortKey = "name" | "cpu" | "memory" | "vcpu" | "ram" | "vms";
+type SortKey = "name" | "cpu" | "memory" | "disk" | "vcpu" | "ram" | "vms";
 
 const memRatio = (n: Node) => (n.memory_bytes ? n.memory_used_bytes / n.memory_bytes : 0);
+const diskRatio = (n: Node) => (n.root_disk_bytes ? n.root_disk_used_bytes / n.root_disk_bytes : 0);
+const ROOT_DISK_HINT = "Sistema de arquivos raiz do hypervisor (SO e logs). O disco das VMs fica na aba Storage.";
 const vcpuRatio = (n: Node) => (n.cpu_count ? n.vcpus_allocated / n.cpu_count : 0);
 const ramRatio = (n: Node) => (n.memory_bytes ? (n.memory_allocated_mb * 1024 ** 2) / n.memory_bytes : 0);
 
@@ -126,6 +128,7 @@ export default function NodesPage() {
       name: (n) => n.name,
       cpu: (n) => n.cpu_usage,
       memory: memRatio,
+      disk: diskRatio,
       vcpu: vcpuRatio,
       ram: ramRatio,
       vms: (n) => n.instances_running,
@@ -201,6 +204,7 @@ export default function NodesPage() {
                       <th className={tbl.th}>Status</th>
                       <SortHeader label="CPU em uso" k="cpu" sort={sort} toggle={toggle} />
                       <SortHeader label="Memória em uso" k="memory" sort={sort} toggle={toggle} />
+                      <SortHeader label="Disco raiz" k="disk" sort={sort} toggle={toggle} />
                       <SortHeader label="vCPUs configuradas" k="vcpu" sort={sort} toggle={toggle} />
                       <SortHeader label="RAM configurada" k="ram" sort={sort} toggle={toggle} />
                       <SortHeader label="VMs" k="vms" sort={sort} toggle={toggle} align="right" />
@@ -236,6 +240,17 @@ export default function NodesPage() {
                                 value={memRatio(n)}
                                 label={`${formatBytes(n.memory_used_bytes)} / ${formatBytes(n.memory_bytes)}`}
                                 title={`Memória de ${n.name}`}
+                              />
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td className={tbl.td}>
+                            {online && n.root_disk_bytes ? (
+                              <Meter
+                                value={diskRatio(n)}
+                                label={`${formatBytes(n.root_disk_used_bytes)} / ${formatBytes(n.root_disk_bytes)}`}
+                                title={ROOT_DISK_HINT}
                               />
                             ) : (
                               "—"

@@ -7,6 +7,7 @@ from typing import ClassVar
 
 from app.providers.base import (
     FilesystemUsage,
+    GuestAddress,
     GuestAgentUnavailable,
     GuestNic,
     InstanceKind,
@@ -60,9 +61,12 @@ class FakeProvider:
     # vmid -> what its guest agent reports; absent = no agent
     filesystems: dict[str, list[FilesystemUsage]] = field(default_factory=dict)
     nics: dict[str, list[GuestNic]] = field(default_factory=dict)  # vmid -> NICs
+    addresses: dict[str, list[GuestAddress]] = field(default_factory=dict)  # agent, by vmid
 
     def add_node(self, name: str, *, online: bool = True) -> None:
-        self.nodes.append(NodeInfo(name, online, 8, 32 * 1024**3, 0.1, 4 * 1024**3, 3600))
+        self.nodes.append(NodeInfo(
+            name, online, 8, 32 * 1024**3, 0.1, 4 * 1024**3, 3600, 100 * 1024**3, 25 * 1024**3
+        ))
 
     def add_instance(
         self, vmid: int, name: str, *, node: str = "pve1", kind: str = "vm",
@@ -213,6 +217,12 @@ class FakeProvider:
         if ref.key not in self.filesystems:
             raise GuestAgentUnavailable("QEMU guest agent is not running")
         return self.filesystems[ref.key]
+
+    async def guest_addresses(self, ref: ProviderRef) -> list[GuestAddress]:
+        self._check()
+        if ref.key not in self.filesystems:  # same agent: reachable for both or neither
+            raise GuestAgentUnavailable("QEMU guest agent is not running")
+        return self.addresses.get(ref.key, [])
 
     async def get_instance(self, ref: ProviderRef) -> InstanceObservation:
         self._check()

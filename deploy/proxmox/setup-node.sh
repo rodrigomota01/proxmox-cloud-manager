@@ -6,6 +6,9 @@
 #
 #   POOL       pool the platform owns (default cm-lab). Guests outside it stay invisible.
 #   STORAGE    storage where new disks go (Datastore.Audit + AllocateSpace there only)
+#   STORAGE_AUDIT  1 (default) = read-only view of EVERY storage (Datastore.Audit on
+#              /storage): size and usage of all of them in the platform; disks are still
+#              created only in STORAGE. 0 removes that view.
 #   BRIDGE     bridge the templates' NICs use (SDN.Use there only)
 #   TEMPLATES  template VMIDs the platform may clone (read + clone only, never change)
 #   AUDIT_ALL  1 = read-only view of EVERY guest (VM.Audit on /vms): full inventory, tags
@@ -20,6 +23,7 @@ set -euo pipefail
 
 POOL=${POOL:-cm-lab}
 AUDIT_ALL=${AUDIT_ALL:-0}
+STORAGE_AUDIT=${STORAGE_AUDIT:-1}
 STORAGE=${STORAGE:?set STORAGE (pvesm status)}
 BRIDGE=${BRIDGE:?set BRIDGE (bridge of the templates net0, e.g. vmbr0)}
 TEMPLATES=${TEMPLATES:-}
@@ -92,6 +96,7 @@ role CloudManager "$ROLE_PRIVS"
 role CMNode "$(privs Sys.Audit)"
 role CMTemplate "$(privs VM.Audit VM.Clone)"
 role CMStorage "$(privs Datastore.Audit Datastore.AllocateSpace)"
+role CMStorageAudit "$(privs Datastore.Audit)"
 role CMNetwork "$(privs SDN.Use)"
 role CMAudit "$(privs VM.Audit VM.GuestAgent.Audit)"
 
@@ -117,7 +122,15 @@ for who in --users --tokens; do
 done
 acl "/pool/$POOL" CloudManager
 acl /nodes CMNode
-acl "/storage/$STORAGE" CMStorage
+acl "/storage/$STORAGE" CMStorage  # more specific than /storage: wins there
+if [[ $STORAGE_AUDIT == 1 ]]; then
+  acl /storage CMStorageAudit
+else
+  for who in --users --tokens; do  # turning the option off removes the view again
+    target=$PVE_USER; [[ $who == --tokens ]] && target=$TOKEN
+    pveum acl delete /storage "$who" "$target" --roles CMStorageAudit 2>/dev/null || true
+  done
+fi
 if [[ ",$known," == *",SDN.Use,"* ]]; then
   acl "/sdn/zones/localnetwork/$BRIDGE" CMNetwork
 else  # PVE < 7: bridges need no permission (no SDN privileges yet)

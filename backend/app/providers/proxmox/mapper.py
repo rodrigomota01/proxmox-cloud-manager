@@ -1,9 +1,11 @@
 """PVE dicts -> domain types. The only module that knows PVE field names."""
 
+import ipaddress
 from typing import Any
 
 from app.providers.base import (
     FilesystemUsage,
+    GuestAddress,
     GuestNic,
     InstanceKind,
     InstanceObservation,
@@ -50,6 +52,8 @@ def node(item: dict[str, Any]) -> NodeInfo:
         cpu_usage=float(item.get("cpu") or 0.0),
         memory_used_bytes=_int(item.get("mem")),
         uptime_seconds=_int(item.get("uptime")),
+        root_disk_bytes=_int(item.get("maxdisk")),
+        root_disk_used_bytes=_int(item.get("disk")),
     )
 
 
@@ -96,6 +100,24 @@ def filesystems(result: list[dict[str, Any]]) -> list[FilesystemUsage]:
         out.append(FilesystemUsage(str(fs.get("mountpoint") or fs.get("name") or "?"),
                                    str(fs.get("type") or ""), used, total))
     return sorted(out, key=lambda f: f.mountpoint)
+
+
+def guest_addresses(result: list[dict[str, Any]]) -> list[GuestAddress]:
+    """From GET .../agent/network-get-interfaces, in the guest's interface order."""
+    out: list[GuestAddress] = []
+    for iface in result:
+        mac = str(iface.get("hardware-address") or "").lower() or None
+        for a in iface.get("ip-addresses") or []:
+            if a.get("ip-address-type") != "ipv4":
+                continue
+            try:
+                ip = ipaddress.ip_interface(f"{a.get('ip-address')}/{_int(a.get('prefix')) or 32}")
+            except ValueError:
+                continue
+            if ip.ip.is_loopback or ip.ip.is_link_local:
+                continue
+            out.append(GuestAddress(mac, ip.with_prefixlen))
+    return out
 
 
 def metric_point(item: dict[str, Any]) -> MetricPoint | None:

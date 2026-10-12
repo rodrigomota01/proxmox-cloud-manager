@@ -1,12 +1,13 @@
-"""Disk usage inside running VMs, read through the QEMU guest agent.
+"""Disk usage and addresses inside running VMs, read through the QEMU guest agent.
 
 The host cannot see inside a VM's disk image, so /cluster/resources reports nothing
 useful for it. Every CM_GUEST_DISK_INTERVAL_SECONDS the worker asks each running VM's
-agent for its filesystems (GET .../agent/get-fsinfo, read-only). Containers are already
-covered by the inventory sync.
+agent for its filesystems and IPv4 addresses (GET .../agent/get-fsinfo and
+network-get-interfaces, read-only). Containers are already covered by the inventory sync.
 
 Outcome per VM (instances.guest_agent):
-- ok           -> filesystems, totals and disk_usage (the fullest filesystem) refreshed
+- ok           -> filesystems, totals, disk_usage (the fullest filesystem) and
+                  guest_addresses refreshed
 - unavailable  -> agent not installed/running; last known values are kept
 - forbidden    -> the token may not read this guest's agent (see setup-node.sh)
 """
@@ -26,6 +27,7 @@ from app.inventory.models import ProviderCluster, ProviderCredential
 from app.providers.base import (
     CloudProvider,
     FilesystemUsage,
+    GuestAddress,
     GuestAgentUnavailable,
     ProviderAuthError,
     ProviderError,
@@ -98,32 +100,41 @@ async def _poll_cluster(
             apply(vm, result, now)
 
 
-async def read_all(
-    provider: CloudProvider, refs: list[ProviderRef]
-) -> list[list[FilesystemUsage] | str]:
-    """Filesystems per guest, or the agent status when they could not be read."""
+AgentRead = tuple[list[FilesystemUsage], list[GuestAddress] | None]
+
+
+async def read_all(provider: CloudProvider, refs: list[ProviderRef]) -> list[AgentRead | str]:
+    """Filesystems and addresses per guest, or the agent status when unreadable."""
     slots = asyncio.Semaphore(AGENT_CONCURRENCY)
 
-    async def one(ref: ProviderRef) -> list[FilesystemUsage] | str:
+    async def one(ref: ProviderRef) -> AgentRead | str:
         async with slots:
             try:
-                return await provider.guest_filesystems(ref)
+                filesystems = await provider.guest_filesystems(ref)
             except GuestAgentUnavailable:
                 return "unavailable"
             except ProviderAuthError:
                 return "forbidden"
             except ProviderError:
                 return "unavailable"
+            try:
+                addresses: list[GuestAddress] | None = await provider.guest_addresses(ref)
+            except ProviderError:
+                addresses = None  # disk was read; keep the last known addresses
+            return filesystems, addresses
 
     return await asyncio.gather(*(one(r) for r in refs))
 
 
-def apply(vm: Instance, result: list[FilesystemUsage] | str, now: datetime) -> None:
+def apply(vm: Instance, read: AgentRead | str, now: datetime) -> None:
     vm.disk_checked_at = now
-    if isinstance(result, str):
-        vm.guest_agent = result
+    if isinstance(read, str):
+        vm.guest_agent = read
         return
+    result, addresses = read
     vm.guest_agent = "ok"
+    if addresses is not None:
+        vm.guest_addresses = [{"mac": a.mac, "address": a.address} for a in addresses]
     vm.filesystems = [
         {"mountpoint": f.mountpoint, "type": f.type, "used_bytes": f.used_bytes,
          "total_bytes": f.total_bytes}

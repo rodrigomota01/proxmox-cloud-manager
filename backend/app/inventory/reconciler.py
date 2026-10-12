@@ -93,6 +93,8 @@ async def reconcile(
         node.cpu_count, node.memory_bytes = obs.cpu_count, obs.memory_bytes
         node.cpu_usage, node.memory_used_bytes = obs.cpu_usage, obs.memory_used_bytes
         node.uptime_seconds, node.last_seen_at = obs.uptime_seconds, now
+        node.root_disk_bytes = obs.root_disk_bytes
+        node.root_disk_used_bytes = obs.root_disk_used_bytes
     seen_nodes = {n.name for n in inv.nodes}
     for name, node in existing_nodes.items():
         if name not in seen_nodes:

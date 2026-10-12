@@ -92,6 +92,8 @@ class Instance(UUIDPk, Timestamps, Base):
     guest_agent: Mapped[str | None] = mapped_column(Text)  # ok|unavailable|forbidden
     # NICs from the provider config (MAC, bridge, VLAN, cloud-init IP): IPAM matching
     nics: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    # IPv4 the guest agent reports ({mac, address}); read with the disk, same permission
+    guest_addresses: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     missing_count: Mapped[int] = mapped_column(Integer, server_default="0")
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

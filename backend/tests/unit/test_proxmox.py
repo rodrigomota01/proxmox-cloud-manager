@@ -61,7 +61,8 @@ def test_mapper_real_pve8_fixture():
 def test_mapper_nodes_storage_lxc_and_templates():
     inv = mapper.inventory([
         {"type": "node", "node": "tagima", "status": "online", "maxcpu": 16,
-         "maxmem": 68719476736, "cpu": 0.12, "mem": 1073741824, "uptime": 99},
+         "maxmem": 68719476736, "cpu": 0.12, "mem": 1073741824, "uptime": 99,
+         "maxdisk": 100, "disk": 30},
         {"type": "lxc", "vmid": 300, "node": "tagima", "name": "ct", "status": "running",
          "maxcpu": 1, "maxmem": 536870912, "maxdisk": 8589934592, "tags": "web;prod"},
         {"type": "qemu", "vmid": 9998, "node": "tagima", "name": "debian13-base",
@@ -72,6 +73,7 @@ def test_mapper_nodes_storage_lxc_and_templates():
         {"type": "sdn", "sdn": "localnetwork", "node": "tagima"},
     ])
     assert inv.nodes[0].online and inv.nodes[0].cpu_count == 16
+    assert (inv.nodes[0].root_disk_bytes, inv.nodes[0].root_disk_used_bytes) == (100, 30)
     [ct] = inv.instances  # template excluded
     assert ct.kind is InstanceKind.CONTAINER and ct.tags == ("web", "prod")
     assert ct.power_state is PowerState.RUNNING
@@ -275,6 +277,28 @@ async def test_guest_filesystems_reads_agent_and_maps_missing_agent():
     route.respond(403)
     with pytest.raises(ProviderAuthError):
         await ProxmoxProvider(_client()).guest_filesystems(ref)
+
+
+@respx.mock
+async def test_guest_addresses_from_agent_skip_loopback_link_local_and_ipv6():
+    ref = mapper.instance_ref(10001, "tagima", "qemu")
+    respx.get(f"{API}/nodes/tagima/qemu/10001/agent/network-get-interfaces").respond(
+        json={"data": {"result": [
+            {"name": "lo", "hardware-address": "00:00:00:00:00:00", "ip-addresses": [
+                {"ip-address-type": "ipv4", "ip-address": "127.0.0.1", "prefix": 8}]},
+            {"name": "ens18", "hardware-address": "BC:24:11:AA:00:01", "ip-addresses": [
+                {"ip-address-type": "ipv4", "ip-address": "10.0.0.5", "prefix": 24},
+                {"ip-address-type": "ipv6", "ip-address": "fe80::1", "prefix": 64},
+                {"ip-address-type": "ipv4", "ip-address": "169.254.1.1", "prefix": 16}]},
+            {"name": "docker0", "hardware-address": "02:42:00:00:00:01", "ip-addresses": [
+                {"ip-address-type": "ipv4", "ip-address": "172.17.0.1", "prefix": 16}]},
+            {"name": "eth9"},  # no addresses at all
+        ]}}
+    )
+    addrs = await ProxmoxProvider(_client()).guest_addresses(ref)
+    assert [(a.mac, a.address) for a in addrs] == [
+        ("bc:24:11:aa:00:01", "10.0.0.5/24"), ("02:42:00:00:00:01", "172.17.0.1/16"),
+    ]
 
 
 def test_nics_from_vm_and_container_config():

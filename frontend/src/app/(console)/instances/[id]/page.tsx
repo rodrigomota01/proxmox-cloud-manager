@@ -10,6 +10,7 @@ import { PowerActions } from "@/components/power-actions";
 import { DeleteInstance } from "@/components/delete-instance";
 import { InstanceMetrics } from "@/components/metrics-panel";
 import { DiskUsage } from "@/components/disk-usage";
+import { IpAddress } from "@/components/ip-address";
 import { Meter, mib, rate, uptime } from "@/components/viz";
 import { ActivityRow } from "@/components/activity";
 import { Badge, Card, Empty, ErrorBox, PowerBadge, StateBadge, formatDate } from "@/components/ui";
@@ -97,13 +98,7 @@ export default function InstanceDetailPage() {
                 ["Disco raiz", `${i.root_disk_gb} GiB`],
                 [
                   "IP",
-                  i.ipv4 ? (
-                    <span className="font-mono">
-                      {i.ipv4} <span className="text-slate-500">via {i.gateway}</span>
-                    </span>
-                  ) : (
-                    "—"
-                  ),
+                  <IpAddress key="ip" ip={i.ipv4} source={i.ipv4_source} gateway={i.gateway} detailed />,
                 ],
                 [
                   "Tags",

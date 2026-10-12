@@ -1986,6 +1986,10 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Ipv4 */
+            ipv4: string | null;
+            /** Ipv4 Source */
+            ipv4_source: string | null;
             /** Kind */
             kind: string;
             /** Last Seen At */
@@ -3104,6 +3108,8 @@ export interface components {
             image_id: string | null;
             /** Ipv4 */
             ipv4: string | null;
+            /** Ipv4 Source */
+            ipv4_source: string | null;
             /** Kind */
             kind: string;
             /** Last Seen At */
@@ -3934,6 +3940,10 @@ export interface components {
             name: string;
             /** Region Name */
             region_name: string | null;
+            /** Root Disk Bytes */
+            root_disk_bytes: number;
+            /** Root Disk Used Bytes */
+            root_disk_used_bytes: number;
             /** Status */
             status: string;
             /** Uptime Seconds */
