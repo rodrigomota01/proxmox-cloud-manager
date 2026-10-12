@@ -330,6 +330,28 @@
             "title": "Id",
             "type": "string"
           },
+          "ipv4": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ipv4"
+          },
+          "ipv4_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ipv4 Source"
+          },
           "kind": {
             "title": "Kind",
             "type": "string"
@@ -452,6 +474,8 @@
           "managed",
           "pool",
           "read_only",
+          "ipv4",
+          "ipv4_source",
           "last_seen_at"
         ],
         "title": "AdminInstanceOut",
@@ -3430,6 +3454,17 @@
             ],
             "title": "Ipv4"
           },
+          "ipv4_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ipv4 Source"
+          },
           "kind": {
             "title": "Kind",
             "type": "string"
@@ -3561,6 +3596,7 @@
           "disk",
           "ipv4",
           "gateway",
+          "ipv4_source",
           "created_at",
           "last_seen_at"
         ],
@@ -6141,6 +6177,14 @@
             ],
             "title": "Region Name"
           },
+          "root_disk_bytes": {
+            "title": "Root Disk Bytes",
+            "type": "integer"
+          },
+          "root_disk_used_bytes": {
+            "title": "Root Disk Used Bytes",
+            "type": "integer"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -6175,6 +6219,8 @@
           "cpu_usage",
           "memory_used_bytes",
           "uptime_seconds",
+          "root_disk_bytes",
+          "root_disk_used_bytes",
           "last_seen_at",
           "cluster_name",
           "zone_name",

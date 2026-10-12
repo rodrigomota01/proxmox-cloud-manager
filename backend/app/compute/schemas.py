@@ -124,8 +124,11 @@ class InstanceOut(BaseModel):
     net_in_bps: float  # bytes/s between the last two syncs
     net_out_bps: float
     disk: DiskUsageOut
-    ipv4: str | None  # with prefix, as configured (e.g. 203.0.113.10/28)
+    ipv4: str | None  # with prefix when known (e.g. 203.0.113.10/28)
     gateway: str | None
+    # where ipv4 came from: platform (set at creation) | agent (reported by the guest) |
+    # config (static IP in the provider config) | ipam (IPAM row with the NIC's MAC)
+    ipv4_source: str | None
     created_at: datetime
     last_seen_at: datetime | None
 

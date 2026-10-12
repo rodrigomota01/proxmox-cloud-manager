@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AppSettings, CurrentTenant, DbSession, RedisClient
+from app.compute.addresses import ipam_by_mac, primary_ipv4
 from app.compute.models import Instance, operable
 from app.compute.schemas import (
     Accepted,
@@ -70,8 +71,9 @@ def disk_out(i: Instance) -> DiskUsageOut:
     )
 
 
-def instance_out(i: Instance, where: Places) -> InstanceOut:
+def instance_out(i: Instance, where: Places, ipam: dict[str, str] | None = None) -> InstanceOut:
     zone_id, zone_name, region_name, settings = where.get(i.cluster_id, (None, None, None, {}))
+    ip = primary_ipv4(i, ipam or {})
     if i.project_id is None:  # DB constraint: managed instances always have a project
         raise RuntimeError(f"managed instance {i.id} without project")
     return InstanceOut(
@@ -83,7 +85,8 @@ def instance_out(i: Instance, where: Places) -> InstanceOut:
         cpu_usage=i.cpu_usage, memory_used_mb=i.memory_used_mb,
         uptime_seconds=i.uptime_seconds,
         net_in_bps=i.net_in_bps, net_out_bps=i.net_out_bps, disk=disk_out(i),
-        ipv4=i.network.get("address"), gateway=i.network.get("gateway"),
+        ipv4=ip.address if ip else None, gateway=ip.gateway if ip else None,
+        ipv4_source=ip.source if ip else None,
         created_at=i.created_at, last_seen_at=i.last_seen_at,
     )
 
@@ -98,13 +101,14 @@ async def list_instances(
     items, cursor = await ComputeService(db, ctx).list_instances(
         page, project_id=project_id, kind=kind, power_state=power_state
     )
-    where = await places(db)
-    return Page(items=[instance_out(i, where) for i in items], next_cursor=cursor)
+    where, ipam = await places(db), await ipam_by_mac(db, items)
+    return Page(items=[instance_out(i, where, ipam) for i in items], next_cursor=cursor)
 
 
 @router.get("/instances/{instance_id}", tags=["instances"])
 async def get_instance(instance_id: uuid.UUID, ctx: CurrentTenant, db: DbSession) -> InstanceOut:
-    return instance_out(await ComputeService(db, ctx).get(instance_id), await places(db))
+    instance = await ComputeService(db, ctx).get(instance_id)
+    return instance_out(instance, await places(db), await ipam_by_mac(db, [instance]))
 
 
 @router.get("/instances/{instance_id}/metrics", tags=["instances"])

@@ -74,6 +74,9 @@ class Node(UUIDPk, Base):
     cpu_usage: Mapped[float] = mapped_column(Float, server_default="0")
     memory_used_bytes: Mapped[int] = mapped_column(BigInteger, server_default="0")
     uptime_seconds: Mapped[int] = mapped_column(BigInteger, server_default="0")
+    # the node's own root filesystem (OS, logs); guest disks live in storage_pools
+    root_disk_bytes: Mapped[int] = mapped_column(BigInteger, server_default="0")
+    root_disk_used_bytes: Mapped[int] = mapped_column(BigInteger, server_default="0")
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

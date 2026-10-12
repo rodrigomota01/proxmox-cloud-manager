@@ -27,6 +27,16 @@ pool. Rodar de novo sem a opção remove essa visão.
 AUDIT_ALL=1 STORAGE=<storage> BRIDGE=<bridge> TEMPLATES="<vmid>" bash setup-node.sh
 ```
 
+No PVE 8, o disco usado e o IP informado pelo guest agent continuam ilegíveis fora do
+pool ("agente sem permissão"): o único privilégio que lê o agente é `VM.Monitor`, que
+também executa comandos na VM, e o script não o concede fora do pool. No PVE 9,
+`AUDIT_ALL=1` concede `VM.GuestAgent.Audit` (só leitura). Sem o agente, o IP mostrado
+vem do cloud-init ou do IPAM (pelo MAC).
+
+**Todos os storages (`STORAGE_AUDIT=1`, padrão)**: `Datastore.Audit` em `/storage`, só
+leitura de tamanho e uso de todos os storages. Discos novos continuam só em `STORAGE`.
+`STORAGE_AUDIT=0` remove essa visão.
+
 ### Na plataforma: adicionar o servidor
 
 *Hypervisors → Adicionar hypervisor*: nome (rótulo dos admins), URL da API, Token ID e
@@ -157,4 +167,5 @@ curl -s -X POST localhost/api/v1/admin/clusters/<id>/test -H "Authorization: Bea
 ```
 
 Storage só aparece no inventário com `Datastore.Audit` no storage
-(`pveum acl modify /storage/<nome> ...`); com a ACL só no pool, a lista vem vazia.
+(`pveum acl modify /storage/<nome> ...`, ou em `/storage` para todos, como faz
+`STORAGE_AUDIT=1`); com a ACL só no pool, a lista vem vazia.

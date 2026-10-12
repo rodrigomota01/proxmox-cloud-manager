@@ -13,7 +13,7 @@ from app.inventory.guest_disk import poll_guest_disks
 from app.inventory.models import ProviderCluster, ProviderCredential
 from app.jobs import handlers  # noqa: F401 - registers job handlers
 from app.jobs.queue import run_one
-from app.providers.base import FilesystemUsage, PowerState
+from app.providers.base import FilesystemUsage, GuestAddress, PowerState
 from app.providers.registry import ProviderRegistry
 from app.worker.main import reconcile_all
 from tests.integration.factories import (
@@ -339,6 +339,7 @@ async def test_nodes_show_allocation_and_metrics(client, ctx, fake):
     assert node["name"] == "tagima" and node["cluster_name"] == "lab"
     assert (node["instances_total"], node["instances_running"]) == (2, 1)
     assert (node["vcpus_allocated"], node["memory_allocated_mb"]) == (4, 4096)
+    assert (node["root_disk_bytes"], node["root_disk_used_bytes"]) == (100 * 1024**3, 25 * 1024**3)
     assert (await client.get(f"/api/v1/admin/nodes/{node['id']}", headers=root)).json() == node
 
     url = f"/api/v1/admin/nodes/{node['id']}/metrics"
@@ -391,6 +392,7 @@ async def test_disk_usage_containers_and_guest_agent(client, ctx, app, registry,
         FilesystemUsage("/", "ext4", 18 * gib, 20 * gib),
         FilesystemUsage("/data", "xfs", 10 * gib, 100 * gib),
     ]
+    fake.addresses["10001"] = [GuestAddress("bc:24:11:00:11:01", "10.0.0.5/24")]
     await reconcile_all(app.state.sessionmaker, registry)
     await poll_guest_disks(app.state.sessionmaker, registry)
 
@@ -404,3 +406,12 @@ async def test_disk_usage_containers_and_guest_agent(client, ctx, app, registry,
     assert [f["mountpoint"] for f in vm.filesystems] == ["/", "/data"]
     assert ct.disk_usage == 0.25 and ct.guest_agent is None  # from the host, no agent needed
     assert bare.guest_agent == "unavailable" and bare.disk_usage is None
+    assert vm.guest_addresses == [{"mac": "bc:24:11:00:11:01", "address": "10.0.0.5/24"}]
+    assert bare.guest_addresses is None
+
+    by_vmid = {
+        i["vmid"]: i
+        for i in (await client.get("/api/v1/admin/instances", headers=root)).json()
+    }
+    assert (by_vmid[10001]["ipv4"], by_vmid[10001]["ipv4_source"]) == ("10.0.0.5/24", "agent")
+    assert by_vmid[10003]["ipv4"] is None

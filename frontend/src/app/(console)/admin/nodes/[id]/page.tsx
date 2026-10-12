@@ -69,6 +69,18 @@ export default function NodeDetailPage() {
       ),
     ],
     [
+      "Disco raiz",
+      online && n.root_disk_bytes ? (
+        <Meter
+          value={n.root_disk_used_bytes / n.root_disk_bytes}
+          label={`${formatBytes(n.root_disk_used_bytes)} / ${formatBytes(n.root_disk_bytes)}`}
+          title="Sistema de arquivos raiz do hypervisor (SO e logs). O disco das VMs fica nos storages."
+        />
+      ) : (
+        "—"
+      ),
+    ],
+    [
       "vCPUs configuradas",
       <Allocation
         key="v"

@@ -83,6 +83,8 @@ class NodeInfo:
     cpu_usage: float  # 0..1
     memory_used_bytes: int
     uptime_seconds: int
+    root_disk_bytes: int = 0  # the node's own root filesystem, not its storages
+    root_disk_used_bytes: int = 0
 
 
 @dataclass(frozen=True)
@@ -140,6 +142,14 @@ class FilesystemUsage:
     type: str
     used_bytes: int
     total_bytes: int
+
+
+@dataclass(frozen=True)
+class GuestAddress:
+    """An address as the guest itself reports it (QEMU guest agent)."""
+
+    mac: str | None  # lowercase; tells the VM's NICs from bridges/tunnels inside it
+    address: str  # with prefix: 10.0.0.5/24
 
 
 @dataclass(frozen=True)
@@ -265,6 +275,11 @@ class CloudProvider(Protocol):
 
     async def guest_filesystems(self, ref: ProviderRef) -> list[FilesystemUsage]:
         """Filesystems inside a running VM. GuestAgentUnavailable without an agent."""
+        ...
+
+    async def guest_addresses(self, ref: ProviderRef) -> list[GuestAddress]:
+        """IPv4 addresses the guest agent of a running VM reports (no loopback or
+        link-local). Same permission and errors as guest_filesystems."""
         ...
     async def describe_template(self, ref: ProviderRef) -> TemplateDetails: ...
     async def slot_available(self, ref: ProviderRef) -> bool:

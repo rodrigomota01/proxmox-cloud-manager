@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Icon } from "@/components/icons";
+import { IpAddress } from "@/components/ip-address";
 import { NoTenant } from "@/components/no-tenant";
 import { PageHeader, ResourceIcon, SearchInput, Toolbar } from "@/components/page";
 import { PowerActions } from "@/components/power-actions";
@@ -180,7 +181,9 @@ export default function InstancesPage() {
                         )}
                       </td>
                       <td className={`${tbl.td} text-right tabular-nums`}>{i.root_disk_gb} GiB</td>
-                      <td className={`${tbl.td} font-mono text-xs`}>{i.ipv4?.split("/")[0] ?? "—"}</td>
+                      <td className={`${tbl.td} text-xs`}>
+                        <IpAddress ip={i.ipv4} source={i.ipv4_source} />
+                      </td>
                       <td className={`${tbl.td} text-right tabular-nums text-slate-600 dark:text-slate-400`}>
                         {running ? uptime(i.uptime_seconds) : "—"}
                       </td>

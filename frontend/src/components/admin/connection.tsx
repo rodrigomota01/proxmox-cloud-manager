@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { ClusterStatus } from "@/components/cluster-status";
+import { IpAddress } from "@/components/ip-address";
 import { DescriptionList, ResourceIcon, Toolbar } from "@/components/page";
 import {
   Alert,
@@ -624,6 +625,7 @@ function InstanceTable({
             <th className={tbl.th}>VMID</th>
             <th className={tbl.th}>Nome</th>
             <th className={tbl.th}>Tags</th>
+            <th className={tbl.th}>IP</th>
             <th className={tbl.th}>Pool</th>
             <th className={tbl.th}>Estado</th>
             <th className={tbl.th}>Recursos</th>
@@ -658,6 +660,9 @@ function InstanceTable({
                 <span className="flex flex-wrap gap-1">
                   {i.tags.length ? i.tags.map((t) => <Badge key={t}>{t}</Badge>) : <span className="text-slate-400">—</span>}
                 </span>
+              </td>
+              <td className={`${tbl.td} text-xs`}>
+                <IpAddress ip={i.ipv4} source={i.ipv4_source} />
               </td>
               <td className={tbl.td}>
                 {i.pool ?? <span className="text-slate-400">—</span>}

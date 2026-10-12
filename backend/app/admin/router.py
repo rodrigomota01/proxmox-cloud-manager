@@ -43,6 +43,7 @@ from app.api.deps import (
     require_platform,
 )
 from app.audit import service as audit
+from app.compute.addresses import ipam_by_mac, primary_ipv4
 from app.compute.models import Instance, operable
 from app.compute.router import top_instance_out
 from app.compute.schemas import Accepted, JobOut, QuotaLineOut
@@ -118,7 +119,10 @@ async def cluster_settings(db: DbSession) -> dict[uuid.UUID, dict]:
     return dict((await db.execute(select(ProviderCluster.id, ProviderCluster.settings))).all())
 
 
-def admin_instance_out(i: Instance, settings: dict[uuid.UUID, dict]) -> AdminInstanceOut:
+def admin_instance_out(
+    i: Instance, settings: dict[uuid.UUID, dict], ipam: dict[str, str]
+) -> AdminInstanceOut:
+    ip = primary_ipv4(i, ipam)
     return AdminInstanceOut(
         id=i.id, cluster_id=i.cluster_id, tenant_id=i.tenant_id, project_id=i.project_id,
         kind=i.kind, name=i.name, provider_name=i.provider_name, state=i.state,
@@ -126,6 +130,7 @@ def admin_instance_out(i: Instance, settings: dict[uuid.UUID, dict]) -> AdminIns
         root_disk_gb=i.root_disk_gb, vmid=int(i.provider_ref["vmid"]),
         node=str(i.provider_ref["node"]), tags=i.tags, managed=i.managed,
         pool=i.provider_pool, read_only=not operable(i, settings.get(i.cluster_id, {})),
+        ipv4=ip.address if ip else None, ipv4_source=ip.source if ip else None,
         last_seen_at=i.last_seen_at,
     )
 
@@ -362,8 +367,9 @@ async def list_instances(
         stmt = stmt.where(Instance.cluster_id == cluster_id)
     if tag:
         stmt = stmt.where(any_(Instance.tags) == tag.strip().lower())
-    settings = await cluster_settings(db)
-    return [admin_instance_out(i, settings) for i in (await db.execute(stmt)).scalars()]
+    instances = list((await db.execute(stmt)).scalars())
+    settings, ipam = await cluster_settings(db), await ipam_by_mac(db, instances)
+    return [admin_instance_out(i, settings, ipam) for i in instances]
 
 
 @router.post("/instances/adopt")
@@ -371,8 +377,8 @@ async def adopt_instances(
     body: BulkAdoptRequest, _: ClusterManager, svc: Admin, db: DbSession
 ) -> list[AdminInstanceOut]:
     instances = await svc.adopt_many(body.instance_ids, body.tenant_id, body.project_id)
-    settings = await cluster_settings(db)
-    return [admin_instance_out(i, settings) for i in instances]
+    settings, ipam = await cluster_settings(db), await ipam_by_mac(db, instances)
+    return [admin_instance_out(i, settings, ipam) for i in instances]
 
 
 @router.post("/instances/{instance_id}/adopt")
@@ -380,7 +386,9 @@ async def adopt_instance(
     instance_id: uuid.UUID, body: AdoptRequest, _: ClusterManager, svc: Admin, db: DbSession,
 ) -> AdminInstanceOut:
     instance = await svc.adopt(instance_id, body)
-    return admin_instance_out(instance, await cluster_settings(db))
+    return admin_instance_out(
+        instance, await cluster_settings(db), await ipam_by_mac(db, [instance])
+    )
 
 
 # --- tenants ---------------------------------------------------------------------------
