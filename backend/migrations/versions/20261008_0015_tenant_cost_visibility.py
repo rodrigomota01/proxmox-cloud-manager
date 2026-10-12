@@ -1,6 +1,6 @@
 """What a tenant's members see of its billing: costs (full), resource usage only, or nothing.
 
-Set by a platform admin (billing:manage); platform billing viewers always see everything.
+Set by a platform admin (billing:manage); platform billing:manage always sees everything.
 
 Revision ID: 0015
 Revises: 0014

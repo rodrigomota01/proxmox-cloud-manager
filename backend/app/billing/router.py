@@ -85,8 +85,9 @@ async def _now(db: AsyncSession):
 
 
 async def _visibility(db: AsyncSession, ctx) -> CostVisibility:
-    """The tenant's setting; platform billing viewers are not bound by it."""
-    if "billing:view" in await effective_permissions(db, ctx.principal.user_id, PLATFORM):
+    """The tenant's setting. Only those who manage billing for the platform (and set this
+    very option) are not bound by it; a platform-wide READ_ONLY is, like any member."""
+    if "billing:manage" in await effective_permissions(db, ctx.principal.user_id, PLATFORM):
         return "full"
     tenant = await db.get(Tenant, ctx.tenant_id)
     return tenant.cost_visibility if tenant else "none"
