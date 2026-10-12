@@ -52,7 +52,8 @@ externo ainda; a arquitetura precisa deixar a integração possível depois.
   vCPU·h, GiB·h de RAM e de disco das VMs e a capacidade/consumo dos clusters Kubernetes
   vinculados ao cliente). `none`: nada (403 nas três rotas, menu oculto). É um limite a
   mais sobre `billing:view`, não um substituto: as regras por projeto continuam valendo.
-  Quem tem `billing:view` na plataforma não é afetado.
+  Só quem tem `billing:manage` na plataforma (admins) não é afetado; um READ_ONLY de
+  plataforma, que tem `billing:view`, segue a configuração do cliente.
 
 ## Alternativas
 - **Calcular sob demanda a partir da auditoria/jobs** (ligou às X, desligou às Y):

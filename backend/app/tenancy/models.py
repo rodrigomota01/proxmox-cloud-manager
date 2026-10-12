@@ -16,7 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, Timestamps, UUIDPk
 
-# What the tenant's members see of its billing (platform billing viewers see everything):
+# What the tenant's members see of its billing (platform billing:manage sees everything):
 # full = costs and usage; usage = consumed/allocated resources, no prices; none = nothing.
 COST_VISIBILITY = ("full", "usage", "none")
 

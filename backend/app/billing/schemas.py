@@ -81,7 +81,7 @@ class TenantCostVisibility(Input):
 
 
 class BillingAccessOut(BaseModel):
-    """What this user sees of the tenant's billing (platform billing viewers: always full)."""
+    """What this user sees of the tenant's billing (platform billing:manage: always full)."""
 
     cost_visibility: CostVisibility
 

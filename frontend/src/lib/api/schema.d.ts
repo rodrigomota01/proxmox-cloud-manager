@@ -2416,7 +2416,7 @@ export interface components {
         };
         /**
          * BillingAccessOut
-         * @description What this user sees of the tenant's billing (platform billing viewers: always full).
+         * @description What this user sees of the tenant's billing (platform billing:manage: always full).
          */
         BillingAccessOut: {
             /**

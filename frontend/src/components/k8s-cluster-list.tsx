@@ -81,6 +81,11 @@ const HEALTH_FILTER = [
   { value: "none", label: "Não coletados" },
 ];
 
+/** Container-width breakpoints of the table: WIDE cells show from the width up, NARROW ones
+ * (the folded version of the same data) only below it. */
+const WIDE = { client: "hidden @[84rem]:table-cell", counts: "hidden @5xl:table-cell", usage: "hidden @6xl:table-cell" };
+const NARROW = { client: "@[84rem]:hidden", counts: "@5xl:hidden", usage: "@6xl:hidden" };
+
 /** Admin: every cluster, with registration, kubeconfig and the client link. Tenant: the
  * clusters linked to the client, read-only and without any kubeconfig action. */
 export function K8sClusterList({ mode }: { mode: K8sMode }) {
@@ -196,17 +201,21 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
                 ))}
               </Select>
             </Toolbar>
-            <div className={tbl.wrap}>
-              <table className={`${tbl.table} min-w-[68rem]`}>
+            {/* Columns fold by the card's width (container queries), not the viewport's: below
+                @6xl CPU and memory share a "Uso" column, below @5xl nodes and pods move under
+                the health, and the client moves under the cluster name below @[84rem]. */}
+            <div className={`${tbl.wrap} @container`}>
+              <table className={tbl.table}>
                 <thead className={tbl.thead}>
                   <tr>
                     <th className={tbl.th}>Cluster</th>
-                    {admin && <th className={tbl.th}>Cliente</th>}
+                    {admin && <th className={`${tbl.th} ${WIDE.client}`}>Cliente</th>}
                     <th className={tbl.th}>Saúde</th>
-                    <th className={tbl.th}>Nós</th>
-                    <th className={tbl.th}>Pods</th>
-                    <th className={tbl.th}>CPU</th>
-                    <th className={tbl.th}>Memória</th>
+                    <th className={`${tbl.th} ${WIDE.counts}`}>Nós</th>
+                    <th className={`${tbl.th} ${WIDE.counts}`}>Pods</th>
+                    <th className={`${tbl.th} ${NARROW.usage}`}>Uso</th>
+                    <th className={`${tbl.th} ${WIDE.usage}`}>CPU</th>
+                    <th className={`${tbl.th} ${WIDE.usage}`}>Memória</th>
                     <th className={tbl.th}>Certificado</th>
                     {admin && (
                       <th className={tbl.th}>
@@ -232,7 +241,15 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
                                   <Badge>manual</Badge>
                                 </span>
                               )}
-                              <div className="font-mono text-xs text-slate-500">{c.server_url ?? c.api_server ?? "—"}</div>
+                              {admin && c.tenant_name && (
+                                <div className={`text-xs text-slate-600 dark:text-slate-400 ${NARROW.client}`}>{c.tenant_name}</div>
+                              )}
+                              <div
+                                className="max-w-[14rem] truncate font-mono text-xs text-slate-500"
+                                title={c.server_url ?? c.api_server ?? undefined}
+                              >
+                                {c.server_url ?? c.api_server ?? "—"}
+                              </div>
                               {s?.version && (
                                 <div className="text-xs text-slate-500">
                                   {s.version}
@@ -243,37 +260,53 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
                           </div>
                         </td>
                         {admin && (
-                          <td className={tbl.td}>
+                          <td className={`${tbl.td} whitespace-nowrap ${WIDE.client}`}>
                             {c.tenant_name ?? <span className="text-slate-400">—</span>}
                           </td>
                         )}
-                        <td className={tbl.td}>
+                        <td className={`${tbl.td} whitespace-nowrap`}>
                           <HealthBadge s={s} />
                           {s && s.reasons.length > 0 && (
-                            <div className="mt-0.5 max-w-[16rem] text-xs text-slate-600 dark:text-slate-400">{s.reasons[0]}</div>
+                            <div className="mt-0.5 max-w-[16rem] whitespace-normal text-xs text-slate-600 dark:text-slate-400">{s.reasons[0]}</div>
+                          )}
+                          {s && (
+                            <div className={`text-xs tabular-nums text-slate-600 dark:text-slate-400 ${NARROW.counts}`}>
+                              {s.nodes_ready}/{s.nodes} nós · {s.pods} pods
+                              {s.pods_problem > 0 && <span className="text-rose-600 dark:text-rose-400"> ({s.pods_problem} com problema)</span>}
+                            </div>
                           )}
                           {s && <div className="text-xs text-slate-500">lido {ago(s.ok_at)}</div>}
                         </td>
-                        <td className={`${tbl.td} tabular-nums`}>{s ? `${s.nodes_ready}/${s.nodes}` : "—"}</td>
-                        <td className={`${tbl.td} tabular-nums`}>
+                        <td className={`${tbl.td} tabular-nums ${WIDE.counts}`}>{s ? `${s.nodes_ready}/${s.nodes}` : "—"}</td>
+                        <td className={`${tbl.td} tabular-nums ${WIDE.counts}`}>
                           {s ? s.pods : "—"}
                           {s && s.pods_problem > 0 && <div className="text-xs text-rose-600 dark:text-rose-400">{s.pods_problem} com problema</div>}
                         </td>
-                        <td className={tbl.td}>
+                        <td className={`${tbl.td} ${NARROW.usage}`}>
                           {s && s.nodes > 0 ? (
-                            <UsageMeter usage={s.cpu_usage} requests={s.cpu_requests} allocatable={s.cpu_allocatable} format={cores} what="CPU" />
+                            <div className="space-y-2">
+                              <UsageMeter usage={s.cpu_usage} requests={s.cpu_requests} allocatable={s.cpu_allocatable} format={cores} what="CPU" stacked />
+                              <UsageMeter usage={s.mem_usage} requests={s.mem_requests} allocatable={s.mem_allocatable} format={bytes} what="Memória" stacked />
+                            </div>
                           ) : (
                             "—"
                           )}
                         </td>
-                        <td className={tbl.td}>
+                        <td className={`${tbl.td} ${WIDE.usage}`}>
                           {s && s.nodes > 0 ? (
-                            <UsageMeter usage={s.mem_usage} requests={s.mem_requests} allocatable={s.mem_allocatable} format={bytes} what="Memória" />
+                            <UsageMeter usage={s.cpu_usage} requests={s.cpu_requests} allocatable={s.cpu_allocatable} format={cores} what="CPU" stacked />
                           ) : (
                             "—"
                           )}
                         </td>
-                        <td className={tbl.td}>
+                        <td className={`${tbl.td} ${WIDE.usage}`}>
+                          {s && s.nodes > 0 ? (
+                            <UsageMeter usage={s.mem_usage} requests={s.mem_requests} allocatable={s.mem_allocatable} format={bytes} what="Memória" stacked />
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className={`${tbl.td} whitespace-nowrap`}>
                           <ExpiryBadge c={c} />
                           <div className="text-xs tabular-nums text-slate-500">
                             {day(c.expires_on)}
@@ -286,7 +319,7 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
                         {admin && (
                           <td className={`${tbl.td} text-right`}>
                             <div className="flex items-center justify-end gap-1">
-                              <DownloadKubeconfig c={c} />
+                              <DownloadKubeconfig c={c} labelClassName="hidden @7xl:inline" />
                               <Menu
                                 ariaLabel={`Ações de ${c.name}`}
                                 items={[
