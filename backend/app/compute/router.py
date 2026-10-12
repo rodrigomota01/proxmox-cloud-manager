@@ -30,6 +30,7 @@ from app.compute.schemas import (
     TopInstanceOut,
     TopInstancesOut,
     UsageOut,
+    VolumeOut,
 )
 from app.compute.service import ComputeService
 from app.compute.usage import TopEntry
@@ -85,6 +86,7 @@ def instance_out(i: Instance, where: Places, ipam: dict[str, str] | None = None)
         cpu_usage=i.cpu_usage, memory_used_mb=i.memory_used_mb,
         uptime_seconds=i.uptime_seconds,
         net_in_bps=i.net_in_bps, net_out_bps=i.net_out_bps, disk=disk_out(i),
+        volumes=[VolumeOut(**{k: d.get(k) for k in VolumeOut.model_fields}) for d in i.disks or []],
         ipv4=ip.address if ip else None, gateway=ip.gateway if ip else None,
         ipv4_source=ip.source if ip else None,
         created_at=i.created_at, last_seen_at=i.last_seen_at,

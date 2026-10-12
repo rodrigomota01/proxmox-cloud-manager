@@ -9,6 +9,7 @@ from app.providers.base import (
     FilesystemUsage,
     GuestAddress,
     GuestAgentUnavailable,
+    GuestConfig,
     GuestNic,
     InstanceKind,
     InstanceObservation,
@@ -19,6 +20,7 @@ from app.providers.base import (
     NodeMetricPoint,
     OperationHandle,
     OperationResult,
+    PhysicalDisk,
     PowerAction,
     PowerState,
     ProgressCb,
@@ -30,6 +32,8 @@ from app.providers.base import (
     StorageObservation,
     TemplateDetails,
     TemplateObservation,
+    VirtualDisk,
+    VolumeUsage,
 )
 
 _AFTER = {
@@ -62,6 +66,9 @@ class FakeProvider:
     filesystems: dict[str, list[FilesystemUsage]] = field(default_factory=dict)
     nics: dict[str, list[GuestNic]] = field(default_factory=dict)  # vmid -> NICs
     addresses: dict[str, list[GuestAddress]] = field(default_factory=dict)  # agent, by vmid
+    disks: dict[str, list[VirtualDisk]] = field(default_factory=dict)  # config, by vmid
+    volumes: dict[tuple[str, str], list[VolumeUsage]] = field(default_factory=dict)  # node, st
+    node_disk_list: dict[str, list[PhysicalDisk]] = field(default_factory=dict)  # by node
 
     def add_node(self, name: str, *, online: bool = True) -> None:
         self.nodes.append(NodeInfo(
@@ -211,6 +218,18 @@ class FakeProvider:
     async def guest_nics(self, ref: ProviderRef) -> list[GuestNic]:
         self._check()
         return self.nics.get(ref.key, [])
+
+    async def guest_config(self, ref: ProviderRef) -> GuestConfig:
+        self._check()
+        return GuestConfig(self.nics.get(ref.key, []), self.disks.get(ref.key, []))
+
+    async def storage_volumes(self, node: str, storage: str) -> list[VolumeUsage]:
+        self._check()
+        return self.volumes.get((node, storage), [])
+
+    async def node_disks(self, node: str) -> list[PhysicalDisk]:
+        self._check()
+        return self.node_disk_list.get(node, [])
 
     async def guest_filesystems(self, ref: ProviderRef) -> list[FilesystemUsage]:
         self._check()

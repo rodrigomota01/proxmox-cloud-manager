@@ -33,9 +33,10 @@ from app.db.session import create_engine, create_sessionmaker, set_platform_scop
 from app.infra.secrets import SecretsError, build_secrets_backend
 from app.inventory.guest_disk import poll_guest_disks
 from app.inventory.models import ProviderCluster, ProviderCredential
+from app.inventory.node_disks import poll_node_disks
 from app.inventory.reconciler import reconcile
 from app.ipam.service import source_for
-from app.ipam.sync import poll_guest_nics, sync_ipam
+from app.ipam.sync import poll_guest_config, sync_ipam
 from app.jobs import handlers  # noqa: F401 - registers job handlers
 from app.jobs.queue import CHANNEL, run_one
 from app.k8s.collect import poll_clusters
@@ -139,7 +140,7 @@ async def refresh_ipam(
     """NICs of every guest (for IP matching), then the IPAM copy and the Kubernetes
     clusters when configured. A MySQL outage only delays the copies; it never stops
     the reconcile loop."""
-    await poll_guest_nics(sessionmaker, registry)
+    await poll_guest_config(sessionmaker, registry)
     source = source_for(settings)
     if source is None:
         return
@@ -233,6 +234,7 @@ async def reconcile_loop(
             if loop.time() >= next_disk_poll:
                 next_disk_poll = loop.time() + settings.guest_disk_interval_seconds
                 await poll_guest_disks(sessionmaker, registry)
+                await poll_node_disks(sessionmaker, registry)
             if loop.time() >= next_ipam:
                 next_ipam = loop.time() + settings.ipam_sync_interval_seconds
                 await refresh_ipam(settings, sessionmaker, registry)

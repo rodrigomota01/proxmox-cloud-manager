@@ -3,13 +3,16 @@
 - ipam_addresses mirrors the MySQL rows (by their id); rows that vanished are removed.
   Each address is tied to a server here through `pve_node_owner` = node name.
 - instances.nics comes from each guest's provider config (MAC, bridge, VLAN, cloud-init
-  IP): that is what tells "marked in use" from "really in use".
+  IP): that is what tells "marked in use" from "really in use". The same read gives
+  instances.disks (every virtual disk), completed with the space each image takes in
+  its storage where the token may list it (the managed pool).
 """
 
 import asyncio
 import ipaddress
 import logging
 import uuid
+from collections.abc import Sequence
 from dataclasses import asdict
 from datetime import UTC, datetime
 
@@ -19,10 +22,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.compute.models import Instance
 from app.db.session import set_platform_scope
 from app.infra.secrets import SecretsError
-from app.inventory.models import Node, ProviderCluster, ProviderCredential
+from app.inventory.models import Node, ProviderCluster, ProviderCredential, StoragePool
 from app.ipam.models import IpamAddress
 from app.ipam.source import IpamSource, PoolRow
-from app.providers.base import ProviderError, ProviderRef
+from app.providers.base import CloudProvider, GuestConfig, ProviderError, ProviderRef
 from app.providers.registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
@@ -78,7 +81,7 @@ async def sync_ipam(
         return await sync_addresses(db, rows)
 
 
-async def poll_guest_nics(
+async def poll_guest_config(
     sessionmaker: async_sessionmaker[AsyncSession], registry: ProviderRegistry
 ) -> None:
     async with sessionmaker() as db, db.begin():
@@ -95,7 +98,7 @@ async def poll_guest_nics(
             async with asyncio.timeout(120):
                 await _poll_cluster(sessionmaker, registry, cluster_id)
         except Exception:  # one server must not stop the others
-            logger.exception("nic poll failed", extra={"cluster_id": str(cluster_id)})
+            logger.exception("guest config poll failed", extra={"cluster_id": str(cluster_id)})
 
 
 async def _poll_cluster(
@@ -119,22 +122,53 @@ async def _poll_cluster(
                 .with_for_update()
             )
         ).scalars().all()
+        pools = (await db.execute(
+            select(StoragePool).where(StoragePool.cluster_id == cluster_id, StoragePool.active)
+        )).scalars().all()
         slots = asyncio.Semaphore(NIC_CONCURRENCY)
         try:
             async with registry.open(db, cluster) as provider:
 
-                async def one(i: Instance) -> list[dict] | None:
+                async def one(i: Instance) -> GuestConfig | None:
                     async with slots:
                         try:
-                            nics = await provider.guest_nics(ProviderRef(i.provider_ref))
+                            return await provider.guest_config(ProviderRef(i.provider_ref))
                         except ProviderError:
-                            return None  # keep the last known NICs
-                        return [asdict(n) for n in nics]
+                            return None  # keep the last known NICs and disks
 
                 results = await asyncio.gather(*(one(i) for i in guests))
+                used = await _volume_usage(provider, pools)
         except (ProviderError, SecretsError) as exc:
-            logger.warning("nic poll skipped", extra={"cluster": cluster.name, "error": str(exc)})
+            logger.warning(
+                "guest config poll skipped", extra={"cluster": cluster.name, "error": str(exc)}
+            )
             return
-        for instance, nics in zip(guests, results, strict=True):
-            if nics is not None and nics != instance.nics:
+        for instance, config in zip(guests, results, strict=True):
+            if config is None:
+                continue
+            nics = [asdict(n) for n in config.nics]
+            if nics != instance.nics:
                 instance.nics = nics
+            disks = [{**asdict(d), "used_bytes": used.get(d.volume)} for d in config.disks]
+            if disks != instance.disks:
+                instance.disks = disks
+
+
+async def _volume_usage(provider: CloudProvider, pools: Sequence[StoragePool]) -> dict[str, int]:
+    """Space taken by each disk image, from the storages that hold guest disks. A shared
+    storage is the same on every node: listed once."""
+    seen: set[str] = set()
+    used: dict[str, int] = {}
+    for pool in pools:
+        if not {"images", "rootdir"} & set(pool.content):
+            continue
+        key = pool.name if pool.shared else f"{pool.node}/{pool.name}"
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            volumes = await provider.storage_volumes(pool.node, pool.name)
+        except ProviderError:
+            continue  # unreachable or not allowed: sizes still come from the config
+        used.update({v.volume: v.used_bytes for v in volumes if v.used_bytes is not None})
+    return used

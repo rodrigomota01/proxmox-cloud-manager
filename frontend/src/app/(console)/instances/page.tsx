@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Icon } from "@/components/icons";
+import { volumesSummary } from "@/components/disks";
 import { IpAddress } from "@/components/ip-address";
 import { NoTenant } from "@/components/no-tenant";
 import { PageHeader, ResourceIcon, SearchInput, Toolbar } from "@/components/page";
@@ -180,7 +181,7 @@ export default function InstancesPage() {
                           <span className="text-slate-400">{mib(i.memory_mb)}</span>
                         )}
                       </td>
-                      <td className={`${tbl.td} text-right tabular-nums`}>{i.root_disk_gb} GiB</td>
+                      <td className={`${tbl.td} text-right tabular-nums`}>{volumesSummary(i.volumes, i.root_disk_gb)}</td>
                       <td className={`${tbl.td} text-xs`}>
                         <IpAddress ip={i.ipv4} source={i.ipv4_source} />
                       </td>

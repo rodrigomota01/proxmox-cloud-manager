@@ -2024,6 +2024,8 @@ export interface components {
             vcpus: number;
             /** Vmid */
             vmid: number;
+            /** Volumes */
+            volumes: components["schemas"]["AdminVolumeOut"][];
         };
         /** AdminJobDetail */
         AdminJobDetail: {
@@ -2240,6 +2242,21 @@ export interface components {
             last_login_at: string | null;
             /** Locked */
             locked: boolean;
+        };
+        /** AdminVolumeOut */
+        AdminVolumeOut: {
+            /** Format */
+            format: string | null;
+            /** Name */
+            name: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Storage */
+            storage: string;
+            /** Used Bytes */
+            used_bytes: number | null;
+            /** Volume */
+            volume: string;
         };
         /** AdminZoneOut */
         AdminZoneOut: {
@@ -3145,6 +3162,8 @@ export interface components {
             uptime_seconds: number;
             /** Vcpus */
             vcpus: number;
+            /** Volumes */
+            volumes: components["schemas"]["VolumeOut"][];
             /** Zone Id */
             zone_id: string | null;
             /** Zone Name */
@@ -3915,6 +3934,10 @@ export interface components {
             cpu_count: number;
             /** Cpu Usage */
             cpu_usage: number;
+            /** Disks */
+            disks: components["schemas"]["PhysicalDiskOut"][];
+            /** Disks Checked At */
+            disks_checked_at: string | null;
             /** Guests Net In Bps */
             guests_net_in_bps: number;
             /** Guests Net Out Bps */
@@ -4006,6 +4029,25 @@ export interface components {
             permissions: string[];
             /** Scope */
             scope: string;
+        };
+        /** PhysicalDiskOut */
+        PhysicalDiskOut: {
+            /** Device */
+            device: string;
+            /** Health */
+            health: string | null;
+            /** Model */
+            model: string | null;
+            /** Serial */
+            serial: string | null;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Type */
+            type: string | null;
+            /** Used */
+            used: string | null;
+            /** Wearout */
+            wearout: number | null;
         };
         /** PlatformCostOut */
         PlatformCostOut: {
@@ -4689,6 +4731,18 @@ export interface components {
              * @default 10000
              */
             start?: number;
+        };
+        /**
+         * VolumeOut
+         * @description One virtual disk of the instance (tenant view: no storage or volume names).
+         */
+        VolumeOut: {
+            /** Name */
+            name: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Used Bytes */
+            used_bytes: number | null;
         };
         /** ZoneCreate */
         ZoneCreate: {

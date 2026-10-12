@@ -100,6 +100,14 @@ class DiskUsageOut(BaseModel):
     checked_at: datetime | None
 
 
+class VolumeOut(BaseModel):
+    """One virtual disk of the instance (tenant view: no storage or volume names)."""
+
+    name: str  # scsi0, virtio1, rootfs, mp0...
+    size_bytes: int  # provisioned
+    used_bytes: int | None  # space it takes in the storage; None = not readable
+
+
 class InstanceOut(BaseModel):
     """Tenant view. No provider identifiers (vmid/node/cluster) — ADR-0010."""
 
@@ -124,6 +132,7 @@ class InstanceOut(BaseModel):
     net_in_bps: float  # bytes/s between the last two syncs
     net_out_bps: float
     disk: DiskUsageOut
+    volumes: list[VolumeOut]  # every virtual disk, from the provider config
     ipv4: str | None  # with prefix when known (e.g. 203.0.113.10/28)
     gateway: str | None
     # where ipv4 came from: platform (set at creation) | agent (reported by the guest) |

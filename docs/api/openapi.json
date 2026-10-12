@@ -453,6 +453,13 @@
           "vmid": {
             "title": "Vmid",
             "type": "integer"
+          },
+          "volumes": {
+            "items": {
+              "$ref": "#/components/schemas/AdminVolumeOut"
+            },
+            "title": "Volumes",
+            "type": "array"
           }
         },
         "required": [
@@ -476,6 +483,7 @@
           "read_only",
           "ipv4",
           "ipv4_source",
+          "volumes",
           "last_seen_at"
         ],
         "title": "AdminInstanceOut",
@@ -1120,6 +1128,58 @@
           "created_at"
         ],
         "title": "AdminUserOut",
+        "type": "object"
+      },
+      "AdminVolumeOut": {
+        "properties": {
+          "format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "storage": {
+            "title": "Storage",
+            "type": "string"
+          },
+          "used_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Bytes"
+          },
+          "volume": {
+            "title": "Volume",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "storage",
+          "volume",
+          "format",
+          "size_bytes",
+          "used_bytes"
+        ],
+        "title": "AdminVolumeOut",
         "type": "object"
       },
       "AdminZoneOut": {
@@ -3548,6 +3608,13 @@
             "title": "Vcpus",
             "type": "integer"
           },
+          "volumes": {
+            "items": {
+              "$ref": "#/components/schemas/VolumeOut"
+            },
+            "title": "Volumes",
+            "type": "array"
+          },
           "zone_id": {
             "anyOf": [
               {
@@ -3594,6 +3661,7 @@
           "net_in_bps",
           "net_out_bps",
           "disk",
+          "volumes",
           "ipv4",
           "gateway",
           "ipv4_source",
@@ -6117,6 +6185,25 @@
             "title": "Cpu Usage",
             "type": "number"
           },
+          "disks": {
+            "items": {
+              "$ref": "#/components/schemas/PhysicalDiskOut"
+            },
+            "title": "Disks",
+            "type": "array"
+          },
+          "disks_checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disks Checked At"
+          },
           "guests_net_in_bps": {
             "title": "Guests Net In Bps",
             "type": "number"
@@ -6230,7 +6317,9 @@
           "vcpus_allocated",
           "memory_allocated_mb",
           "guests_net_in_bps",
-          "guests_net_out_bps"
+          "guests_net_out_bps",
+          "disks",
+          "disks_checked_at"
         ],
         "title": "NodeOut",
         "type": "object"
@@ -6435,6 +6524,96 @@
           "permissions"
         ],
         "title": "PermissionsOut",
+        "type": "object"
+      },
+      "PhysicalDiskOut": {
+        "properties": {
+          "device": {
+            "title": "Device",
+            "type": "string"
+          },
+          "health": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "used": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used"
+          },
+          "wearout": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wearout"
+          }
+        },
+        "required": [
+          "device",
+          "model",
+          "serial",
+          "type",
+          "size_bytes",
+          "used",
+          "health",
+          "wearout"
+        ],
+        "title": "PhysicalDiskOut",
         "type": "object"
       },
       "PlatformCostOut": {
@@ -8334,6 +8513,37 @@
           }
         },
         "title": "VmidRange",
+        "type": "object"
+      },
+      "VolumeOut": {
+        "description": "One virtual disk of the instance (tenant view: no storage or volume names).",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "used_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Bytes"
+          }
+        },
+        "required": [
+          "name",
+          "size_bytes",
+          "used_bytes"
+        ],
+        "title": "VolumeOut",
         "type": "object"
       },
       "ZoneCreate": {

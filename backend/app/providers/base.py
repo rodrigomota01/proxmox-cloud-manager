@@ -165,6 +165,47 @@ class GuestNic:
 
 
 @dataclass(frozen=True)
+class VirtualDisk:
+    """One disk in a guest's configuration (CD-ROMs and cloud-init drives left out)."""
+
+    name: str  # scsi0, virtio1, efidisk0, rootfs, mp0...
+    storage: str
+    volume: str  # provider volume id: storage-vz:10001/vm-10001-disk-0.qcow2
+    size_bytes: int
+    format: str | None = None  # qcow2, raw, subvol...
+
+
+@dataclass(frozen=True)
+class GuestConfig:
+    """What one read of a guest's configuration tells (read-only, needs VM.Audit)."""
+
+    nics: list[GuestNic]
+    disks: list[VirtualDisk]
+
+
+@dataclass(frozen=True)
+class VolumeUsage:
+    """A disk image as its storage sees it. `used` is the space it really takes (thin
+    qcow2/LVM-thin grow as the guest writes), never more than size for raw images."""
+
+    volume: str
+    size_bytes: int
+    used_bytes: int | None
+
+
+@dataclass(frozen=True)
+class PhysicalDisk:
+    device: str  # /dev/nvme0n1
+    model: str | None
+    serial: str | None
+    type: str | None  # nvme, ssd, hdd, usb
+    size_bytes: int
+    used: str | None  # what holds it: LVM, ZFS, linux_raid_member, partitions...
+    health: str | None  # SMART: PASSED / OK / FAILED...; None = not reported
+    wearout: int | None  # SSD life left, 0..100 (100 = as new)
+
+
+@dataclass(frozen=True)
 class StorageObservation:
     node: str
     name: str
@@ -271,6 +312,19 @@ class CloudProvider(Protocol):
     async def node_metrics(self, node: str, timeframe: str) -> list[NodeMetricPoint]: ...
     async def guest_nics(self, ref: ProviderRef) -> list[GuestNic]:
         """NICs from the guest's configuration (read-only, needs VM.Audit)."""
+        ...
+
+    async def guest_config(self, ref: ProviderRef) -> GuestConfig:
+        """NICs and disks from one read of the guest's configuration (VM.Audit)."""
+        ...
+
+    async def storage_volumes(self, node: str, storage: str) -> list[VolumeUsage]:
+        """Guest disk images in a storage. Proxmox lists only the images of guests the
+        token may change (the managed pool); the others are left out, not refused."""
+        ...
+
+    async def node_disks(self, node: str) -> list[PhysicalDisk]:
+        """Physical disks of a node with SMART health (Sys.Audit)."""
         ...
 
     async def guest_filesystems(self, ref: ProviderRef) -> list[FilesystemUsage]:

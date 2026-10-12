@@ -94,6 +94,9 @@ class Instance(UUIDPk, Timestamps, Base):
     nics: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     # IPv4 the guest agent reports ({mac, address}); read with the disk, same permission
     guest_addresses: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    # every disk in the provider config ({name, storage, volume, size_bytes, format,
+    # used_bytes}); used_bytes = space taken in the storage, None where it cannot be read
+    disks: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     missing_count: Mapped[int] = mapped_column(Integer, server_default="0")
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
