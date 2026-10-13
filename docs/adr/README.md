@@ -22,4 +22,4 @@ mudança de decisão gera um novo ADR que marca o anterior como *Substituído*.
 | [0015](0015-custos-e-precos.md) | Custos: preço por recurso alocado, acúmulo por hora no worker, relatórios por cliente | Aceito |
 | [0016](0016-clusters-kubernetes.md) | Clusters Kubernetes: cópia da tabela legada, vencimento pelo certificado, kubeconfig selado e auditado | Aceito |
 | [0017](0017-kubernetes-observabilidade.md) | Kubernetes: saúde, carga, namespaces e workloads pela API de cada cluster, só leitura garantida no código | Aceito |
-| [0018](0018-criacao-de-clusters-kubernetes.md) | Criação de clusters Kubernetes: kubeadm em VMs da plataforma, instalação pelo guest agent, Cilium/MetalLB/cert-manager/local-path | Proposto |
+| [0018](0018-criacao-de-clusters-kubernetes.md) | Criação de clusters Kubernetes: kubeadm em VMs da plataforma, instalação pelo guest agent, Cilium/MetalLB/cert-manager/local-path | Aceito |

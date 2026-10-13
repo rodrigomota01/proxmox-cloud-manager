@@ -152,6 +152,10 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | GET | `/billing/summary?month=YYYY-MM` | `billing:view` (tenant: tudo; projeto: só os seus), visibilidade `full` — acumulado, custo atual, previsão, por recurso/projeto/instância/dia (ADR-0015) ✅ |
 | GET | `/billing/usage?month=YYYY-MM` | `billing:view` (mesma regra), visibilidade `full` ou `usage` — sem preços: vCPU·h, GiB·h de RAM e disco por projeto/VM/dia, o alocado agora e os clusters Kubernetes vinculados (com `k8s:view`) ✅ |
 | GET | `/kubernetes/clusters`, `/kubernetes/clusters/{id}` | `k8s:view` (tenant ou qualquer projeto dele) — clusters vinculados ao tenant: saúde, carga e workloads, sem kubeconfig ✅ |
+| GET | `/kubernetes/images` | `k8s:view` — imagens de nó Kubernetes (cada uma com versão fixa) e zonas onde rodam (ADR-0018) ✅ |
+| POST | `/kubernetes/clusters` | `k8s:create` no projeto — cria as VMs e instala o Kubernetes (kubeadm, Cilium, MetalLB, cert-manager, local-path); quota de todos os nós de uma vez; 202 + job `k8s.create` ✅ |
+| DELETE | `/kubernetes/clusters/{id}` | `k8s:delete` no projeto do cluster — `{confirm: nome}`; destrói as VMs e libera os IPs; 202 + job `k8s.delete` ✅ |
+| GET | `/kubernetes/clusters/{id}/kubeconfig` | `k8s:admin` no projeto — kubeconfig de admin de um cluster criado pela plataforma, auditado, `no-store` ✅ |
 
 ### Jobs, eventos, auditoria
 
@@ -201,6 +205,8 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | PUT | `/admin/kubernetes/clusters/{id}/kubeconfig` | `cluster:manage` — troca o kubeconfig de um manual ✅ |
 | GET | `/admin/kubernetes/clusters/{id}/kubeconfig` | `cluster:manage` — download auditado, `no-store` ✅ |
 | PUT | `/admin/kubernetes/clusters/{id}/tenant` | `cluster:manage` — vincula o cluster a um tenant (`null` desvincula), auditado ✅ |
+| POST | `/admin/kubernetes/clusters/provision` | `cluster:manage` — cria um cluster nas VMs da plataforma para um cliente (`tenant_id`); bridge/VLAN só aqui (ADR-0018) ✅ |
+| POST | `/admin/kubernetes/clusters/{id}/destroy` | `cluster:manage` — `{confirm: nome}`; destrói um cluster criado pela plataforma com as VMs ✅ |
 | GET | `/admin/jobs` · `/admin/jobs/{id}` | `cluster:manage` (inclui dados dos eventos: UPID, node) |
 | GET | `/admin/audit-logs` | `platform:admin` ou `audit:view` (platform) |
 

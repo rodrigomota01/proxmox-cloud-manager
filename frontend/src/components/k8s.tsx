@@ -2,9 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useState } from "react";
 
 import { Icon } from "@/components/icons";
-import { Button, Card, Dialog, ErrorBox, Field, Select, Status, type StatusTone, formatBytes } from "@/components/ui";
+import { Button, Card, Dialog, ErrorBox, Field, Input, Select, Status, type StatusTone, formatBytes } from "@/components/ui";
 import { Meter } from "@/components/viz";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { useSession } from "@/lib/session";
@@ -149,14 +150,14 @@ export function K8sAttentionPreview() {
 }
 
 /** Audited download, after a confirmation: the kubeconfig is cluster-admin. */
-export function DownloadKubeconfig({ c }: { c: K8sCluster }) {
+export function DownloadKubeconfig({ c, tenant = false }: { c: K8sCluster; tenant?: boolean }) {
   const download = useMutation({
     mutationFn: async () => {
+      const opts = { params: { path: { cluster_id: c.id } }, parseAs: "text" as const };
       const text = unwrap(
-        await api.GET("/api/v1/admin/kubernetes/clusters/{cluster_id}/kubeconfig", {
-          params: { path: { cluster_id: c.id } },
-          parseAs: "text",
-        }),
+        tenant
+          ? await api.GET("/api/v1/kubernetes/clusters/{cluster_id}/kubeconfig", opts)
+          : await api.GET("/api/v1/admin/kubernetes/clusters/{cluster_id}/kubeconfig", opts),
       ) as unknown as string;
       const url = URL.createObjectURL(new Blob([text], { type: "application/yaml" }));
       const a = document.createElement("a");
@@ -166,7 +167,8 @@ export function DownloadKubeconfig({ c }: { c: K8sCluster }) {
       URL.revokeObjectURL(url);
     },
   });
-  if (!c.has_kubeconfig) {
+  // tenants never see has_kubeconfig; a cluster the platform created has one once active
+  if (tenant ? c.managed?.state !== "active" : !c.has_kubeconfig) {
     return (
       <span className="text-xs text-slate-500" title={c.kubeconfig_error ?? undefined}>
         {c.kubeconfig_error ? "kubeconfig inválido" : "sem kubeconfig"}
@@ -253,5 +255,96 @@ export function LinkTenantDialog({ cluster, onClose }: { cluster: K8sCluster | n
         </form>
       )}
     </Dialog>
+  );
+}
+
+
+/** Steps of k8s.create, as recorded in state_message while provisioning. */
+export const K8S_STEPS: [string, string][] = [
+  ["queued", "Na fila"],
+  ["lb_ip", "Reservando o IP do load balancer"],
+  ["vms", "Criando as VMs"],
+  ["agent", "Aguardando as VMs ligarem"],
+  ["prepare", "Preparando os nós"],
+  ["init", "Iniciando o control plane (kubeadm)"],
+  ["join", "Adicionando os workers"],
+  ["addons", "Instalando Cilium, MetalLB, cert-manager e local-path"],
+  ["kubeconfig", "Guardando o kubeconfig"],
+];
+const STEP_LABEL = Object.fromEntries(K8S_STEPS);
+
+/** Lifecycle of a cluster the platform created; nothing for an active one. */
+export function ManagedState({ c }: { c: K8sCluster }) {
+  const m = c.managed;
+  if (!m || m.state === "active") return null;
+  if (m.state === "error") return <Status tone="error">Falhou</Status>;
+  if (m.state === "deleting") return <Status tone="progress">Excluindo</Status>;
+  return (
+    <Status tone="progress">
+      {m.state === "provisioning" ? STEP_LABEL[m.state_message ?? "queued"] ?? "Criando" : "Atualizando"}
+    </Status>
+  );
+}
+
+/** Destroys a cluster the platform created, with its VMs, after typing its name. */
+export function DestroyClusterButton({ c, admin, onDone }: { c: K8sCluster; admin: boolean; onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [confirmName, setConfirmName] = useState("");
+  const destroy = useMutation({
+    mutationFn: async () =>
+      admin
+        ? unwrap(
+            await api.POST("/api/v1/admin/kubernetes/clusters/{cluster_id}/destroy", {
+              params: { path: { cluster_id: c.id } },
+              body: { confirm: confirmName },
+            }),
+          )
+        : unwrap(
+            await api.DELETE("/api/v1/kubernetes/clusters/{cluster_id}", {
+              params: { path: { cluster_id: c.id } },
+              body: { confirm: confirmName },
+            }),
+          ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: admin ? ["admin", "k8s-clusters"] : ["k8s-clusters"] });
+      setOpen(false);
+      onDone();
+    },
+  });
+  const state = c.managed?.state;
+  if (!c.managed || (state !== "active" && state !== "error")) return null;
+  return (
+    <>
+      <Button variant="danger" onClick={() => setOpen(true)}>
+        Excluir
+      </Button>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Excluir cluster">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            destroy.mutate();
+          }}
+          className="space-y-4"
+        >
+          <p className="text-sm">
+            O cluster <strong>{c.name}</strong> e todas as VMs dele serão destruídos, com os dados dos volumes{" "}
+            <code>local-path</code>, e os IPs voltam a ficar livres. Isso não pode ser desfeito.
+          </p>
+          <Field label={`Digite "${c.name}" para confirmar`}>
+            <Input value={confirmName} onChange={(e) => setConfirmName(e.target.value)} autoComplete="off" />
+          </Field>
+          <ErrorBox message={destroy.isError ? errorMessage(destroy.error) : null} />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" variant="danger" disabled={confirmName !== c.name || destroy.isPending}>
+              Excluir cluster e VMs
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+    </>
   );
 }

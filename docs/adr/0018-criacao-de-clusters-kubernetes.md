@@ -1,6 +1,6 @@
 # ADR-0018 — Criação de clusters Kubernetes: kubeadm em VMs da plataforma, instalação pelo guest agent
 
-**Status:** Proposto · **Data:** 2026-10-12
+**Status:** Aceito · **Data:** 2026-10-12
 
 ## Contexto
 Hoje a plataforma só **observa** clusters Kubernetes. Eles vêm da tabela legada ou são
@@ -134,9 +134,10 @@ O código atual impõe estas restrições:
      quando houver certificado) num namespace da plataforma. O usuário publica
      aplicações criando `HTTPRoute`s apontando para ele.
 7. **Labels e taints** dos pools; espera todos os nós ficarem `Ready`.
-8. **Credenciais.** Lê o `admin.conf` e sela como hoje. Cria uma ServiceAccount
-   **somente leitura** (`view`) para a coleta do ADR-0017, que passa a usá-la em vez
-   do admin.
+8. **Credenciais.** Lê o `admin.conf` e sela como hoje. Na fase 1 a coleta do
+   ADR-0017 usa esse kubeconfig, com a mesma garantia de só leitura de hoje (a lista
+   de rotas permitidas no código). A ServiceAccount somente leitura (`view`) para a
+   coleta fica para a fase 2.
 
 Se uma etapa falha, o job pode ser retomado do ponto em que parou, como o
 `instance.create`. Se a falha for definitiva, o cluster vai para `error` com o motivo e
@@ -195,6 +196,15 @@ há cobrança específica por cluster nesta fase.
 2. 3 control planes com kube-vip; vários pools de worker; escalar e excluir pools.
 3. Cluster criado pelo admin sem cliente e transferência para um cliente.
 4. Upgrade de versão (ADR próprio).
+
+## Implementação da fase 1 (2026-10-13)
+- Scripts em `backend/app/k8s/scripts/` e versões em `backend/app/k8s/bundle.py`
+  (Gateway API 1.6.1, Cilium 1.20.2, MetalLB 0.16.1, cert-manager 1.21.2, local-path
+  0.0.37). O job avança por fases com `Reschedule` (reagenda sem gastar tentativa) e
+  retoma comandos pelo pid gravado no evento.
+- Template `debian13-k8s-1.37` (Kubernetes 1.37.1) gerado no suhr com `prepare-node.sh`.
+- Endereços: IPAM (um por nó + o do load balancer, todos na mesma rede) ou digitados;
+  bridge/VLAN só pela rota de admin.
 
 ## Pontos definidos depois da proposta (2026-10-12)
 - **Versão do Kubernetes:** fixa por imagem.

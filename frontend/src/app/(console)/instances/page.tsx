@@ -10,7 +10,7 @@ import { IpAddress } from "@/components/ip-address";
 import { NoTenant } from "@/components/no-tenant";
 import { PageHeader, ResourceIcon, SearchInput, Toolbar } from "@/components/page";
 import { PowerActions } from "@/components/power-actions";
-import { Button, Card, Empty, ErrorBox, PowerBadge, Select, StateBadge, tbl } from "@/components/ui";
+import { Badge, Button, Card, Empty, ErrorBox, PowerBadge, Select, StateBadge, tbl } from "@/components/ui";
 import { Meter, SortHeader, mib, uptime, useSorted } from "@/components/viz";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { useProjectNames, useProjects } from "@/lib/queries";
@@ -151,6 +151,11 @@ export default function InstancesPage() {
                           <Link href={`/instances/${i.id}`} className={tbl.link}>
                             {i.name}
                           </Link>
+                          {i.k8s_cluster_id && (
+                            <Link href={`/kubernetes/${i.k8s_cluster_id}`} title="Nó de um cluster Kubernetes: operado pelo cluster">
+                              <Badge tone="indigo">nó k8s</Badge>
+                            </Link>
+                          )}
                         </div>
                         <div className="mt-0.5 pl-7 text-xs text-slate-500">
                           {projectNames.get(i.project_id) ?? "—"} · {i.vcpus} vCPU
