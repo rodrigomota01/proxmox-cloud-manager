@@ -7,6 +7,7 @@ from typing import Any
 from app.providers.base import (
     FilesystemUsage,
     GuestAddress,
+    GuestExecStatus,
     GuestNic,
     InstanceKind,
     InstanceObservation,
@@ -122,6 +123,18 @@ def guest_addresses(result: list[dict[str, Any]]) -> list[GuestAddress]:
                 continue
             out.append(GuestAddress(mac, ip.with_prefixlen))
     return out
+
+
+def exec_status(item: dict[str, Any]) -> GuestExecStatus:
+    """From GET .../agent/exec-status."""
+    exited = bool(_int(item.get("exited")))
+    return GuestExecStatus(
+        exited=exited,
+        exitcode=_int(item.get("exitcode")) if exited else None,
+        out=str(item.get("out-data") or ""),
+        err=str(item.get("err-data") or ""),
+        truncated=bool(_int(item.get("out-truncated")) or _int(item.get("err-truncated"))),
+    )
 
 
 def metric_point(item: dict[str, Any]) -> MetricPoint | None:

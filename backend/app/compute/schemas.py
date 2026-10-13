@@ -123,6 +123,7 @@ class InstanceOut(BaseModel):
     tags: list[str]
     image_id: uuid.UUID | None
     read_only: bool  # outside the managed pool: visible, not operable
+    k8s_cluster_id: uuid.UUID | None  # a node of this Kubernetes cluster (ADR-0018)
     zone_id: uuid.UUID | None  # from the server it runs on (ADR-0012)
     zone_name: str | None
     region_name: str | None

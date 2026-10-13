@@ -2,6 +2,7 @@
 
 import asyncio
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import ClassVar
 
@@ -10,6 +11,7 @@ from app.providers.base import (
     GuestAddress,
     GuestAgentUnavailable,
     GuestConfig,
+    GuestExecStatus,
     GuestNic,
     InstanceKind,
     InstanceObservation,
@@ -69,6 +71,12 @@ class FakeProvider:
     disks: dict[str, list[VirtualDisk]] = field(default_factory=dict)  # config, by vmid
     volumes: dict[tuple[str, str], list[VolumeUsage]] = field(default_factory=dict)  # node, st
     node_disk_list: dict[str, list[PhysicalDisk]] = field(default_factory=dict)  # by node
+    # guest agent exec (ADR-0018): exec_handler(vmid, command, stdin) -> (code, out, err);
+    # agent_down = vmids whose agent does not answer; execs = every command run
+    exec_handler: "Callable[[str, list[str], str | None], tuple[int, str, str]] | None" = None
+    agent_down: set[str] = field(default_factory=set)
+    execs: list[tuple[str, list[str], str | None]] = field(default_factory=list)
+    _exec_results: dict[int, GuestExecStatus] = field(default_factory=dict)
 
     def add_node(self, name: str, *, online: bool = True) -> None:
         self.nodes.append(NodeInfo(
@@ -226,6 +234,28 @@ class FakeProvider:
     async def storage_volumes(self, node: str, storage: str) -> list[VolumeUsage]:
         self._check()
         return self.volumes.get((node, storage), [])
+
+    async def guest_ping(self, ref: ProviderRef) -> None:
+        self._check()
+        obs = self.instances.get(ref.key)
+        if ref.key in self.agent_down or obs is None or obs.power_state is not PowerState.RUNNING:
+            raise GuestAgentUnavailable("QEMU guest agent is not running")
+
+    async def guest_exec_start(
+        self, ref: ProviderRef, command: list[str], stdin: str | None = None
+    ) -> int:
+        await self.guest_ping(ref)
+        self.execs.append((ref.key, list(command), stdin))
+        code, out, err = (self.exec_handler or (lambda *_: (0, "", "")))(ref.key, command, stdin)
+        pid = len(self.execs)
+        self._exec_results[pid] = GuestExecStatus(True, code, out, err)
+        return pid
+
+    async def guest_exec_status(self, ref: ProviderRef, pid: int) -> GuestExecStatus:
+        await self.guest_ping(ref)
+        if pid not in self._exec_results:
+            raise GuestAgentUnavailable(f"Agent error: PID {pid} does not exist")
+        return self._exec_results[pid]
 
     async def node_disks(self, node: str) -> list[PhysicalDisk]:
         self._check()

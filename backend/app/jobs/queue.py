@@ -36,6 +36,16 @@ class RetryLater(Exception):
     webhook receiver down): retried with the same backoff as provider outages."""
 
 
+class Reschedule(Exception):
+    """Raised by long handlers that advance in steps (e.g. creating a Kubernetes cluster):
+    run again after `delay` seconds without spending an attempt. Each run stays far below
+    the lease; the handler resumes from its recorded events and bounds the total time."""
+
+    def __init__(self, delay: float = 0, reason: str = "") -> None:
+        super().__init__(reason)
+        self.delay = delay
+
+
 class JobFailed(Exception):
     """Raised by handlers for a final, user-visible failure."""
 
@@ -214,6 +224,11 @@ async def run_one(
             raise JobFailed("UNKNOWN_JOB_TYPE", f"no handler for {job.type}")
         await ctx.event("started", attempt=job.attempts)
         result = await fn(ctx)
+    except Reschedule as exc:
+        await _finish(
+            sessionmaker, job.id, status="pending", attempts=job.attempts - 1,
+            run_after=now + timedelta(seconds=exc.delay),
+        )
     except (ProviderUnavailable, RetryLater) as exc:
         if job.attempts < job.max_attempts:
             delay = timedelta(seconds=min(5 * 2 ** (job.attempts - 1), 120))

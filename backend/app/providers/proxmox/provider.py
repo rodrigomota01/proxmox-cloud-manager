@@ -9,6 +9,7 @@ from app.providers.base import (
     GuestAddress,
     GuestAgentUnavailable,
     GuestConfig,
+    GuestExecStatus,
     GuestNic,
     InstanceObservation,
     InstanceSpec,
@@ -104,16 +105,39 @@ class ProxmoxProvider:
         return mapper.guest_addresses(await self._agent(ref, "network-get-interfaces"))
 
     async def _agent(self, ref: ProviderRef, command: str) -> list[dict[str, Any]]:
+        data = await self._agent_call("GET", ref, command)
+        return (data or {}).get("result") or []
+
+    async def _agent_call(
+        self, method: str, ref: ProviderRef, command: str, data: dict[str, Any] | None = None
+    ) -> Any:
+        path = f"{self._path(ref)}/agent/{command}"
         try:
-            data = await self.client.get(f"{self._path(ref)}/agent/{command}")
+            if method == "GET":
+                return await self.client.get(path, data)
+            return await self.client.post(path, data)
         except ProviderAuthError:
             raise
         except ProviderError as exc:
-            # 500 "QEMU guest agent is not running" / "No QEMU guest agent configured"
+            # 500 "QEMU guest agent is not running" / "No QEMU guest agent configured" /
+            # "Agent error: PID 12 does not exist"
             if "agent" in str(exc).lower():
                 raise GuestAgentUnavailable(str(exc)) from exc
             raise
-        return (data or {}).get("result") or []
+
+    async def guest_ping(self, ref: ProviderRef) -> None:
+        await self._agent_call("POST", ref, "ping")
+
+    async def guest_exec_start(
+        self, ref: ProviderRef, command: list[str], stdin: str | None = None
+    ) -> int:
+        data: dict[str, Any] = {"command": command}
+        if stdin is not None:
+            data["input-data"] = stdin
+        return int((await self._agent_call("POST", ref, "exec", data))["pid"])
+
+    async def guest_exec_status(self, ref: ProviderRef, pid: int) -> GuestExecStatus:
+        return mapper.exec_status(await self._agent_call("GET", ref, "exec-status", {"pid": pid}))
 
     async def node_metrics(self, node: str, timeframe: str) -> list[NodeMetricPoint]:
         rows = await self.client.get(

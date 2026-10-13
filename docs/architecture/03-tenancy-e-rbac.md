@@ -124,6 +124,8 @@ Legenda: ✅ concede · — não concede
 | `quota:manage` | ✅ | ✅ | — | — | — | — | — |
 | `billing:view` (no projeto: só os custos dele; limitado pela visibilidade do cliente) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `k8s:view` (clusters vinculados ao tenant, sem kubeconfig) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `k8s:create` `k8s:delete` (clusters criados pela plataforma, ADR-0018) | ✅ | ✅ | ✅ | ✅ | — | — | — |
+| `k8s:admin` (kubeconfig de admin dos clusters criados pela plataforma) | ✅ | ✅ | ✅ | ✅ | — | — | — |
 | `billing:manage` (preços) | ✅ | ✅ | — | — | — | — | — |
 | `audit:view` | ✅ | ✅ | ✅³ | — | — | — | — |
 | `tenant:create` `tenant:delete` | ✅ | ✅ | — | — | — | — | — |

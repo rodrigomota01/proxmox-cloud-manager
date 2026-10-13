@@ -153,6 +153,17 @@ class GuestAddress:
 
 
 @dataclass(frozen=True)
+class GuestExecStatus:
+    """A command run inside a guest by its agent (ADR-0018)."""
+
+    exited: bool
+    exitcode: int | None = None
+    out: str = ""
+    err: str = ""
+    truncated: bool = False  # the agent keeps only the start of a large output
+
+
+@dataclass(frozen=True)
 class GuestNic:
     """One network card as configured in the provider (not what the guest reports)."""
 
@@ -329,6 +340,22 @@ class CloudProvider(Protocol):
 
     async def guest_filesystems(self, ref: ProviderRef) -> list[FilesystemUsage]:
         """Filesystems inside a running VM. GuestAgentUnavailable without an agent."""
+        ...
+
+    async def guest_ping(self, ref: ProviderRef) -> None:
+        """Whether the guest agent answers. GuestAgentUnavailable when it does not."""
+        ...
+
+    async def guest_exec_start(
+        self, ref: ProviderRef, command: list[str], stdin: str | None = None
+    ) -> int:
+        """Starts a command inside a running guest (as root) and returns its pid.
+        Secrets go through `stdin`, never in `command`. Only inside the managed pool:
+        needs VM.Monitor (PVE 8) or VM.GuestAgent.Unrestricted (PVE 9)."""
+        ...
+
+    async def guest_exec_status(self, ref: ProviderRef, pid: int) -> GuestExecStatus:
+        """GuestAgentUnavailable also when the pid is gone (the guest rebooted)."""
         ...
 
     async def guest_addresses(self, ref: ProviderRef) -> list[GuestAddress]:

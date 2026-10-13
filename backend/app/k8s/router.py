@@ -1,8 +1,11 @@
-"""Kubernetes clusters, read-only view.
+"""Kubernetes clusters.
 
-/admin/kubernetes/* — every cluster (platform admins): registration, kubeconfig, and the
-link to a tenant. /kubernetes/* — the clusters linked to the current tenant, for its
-members (k8s:view), read through the k8s_tenant_* views: no kubeconfig, ever.
+/admin/kubernetes/* — every cluster (platform admins): registration, kubeconfig, the
+link to a tenant, and creating/destroying clusters on the platform's VMs (ADR-0018).
+/kubernetes/* — the clusters linked to the current tenant, for its members (k8s:view),
+read through the k8s_tenant_* views (no credential column). Members with k8s:create /
+k8s:delete / k8s:admin also create and delete clusters on the platform's VMs and
+download the kubeconfig of those (audited); never of a legacy or manual cluster.
 """
 
 import base64
@@ -13,24 +16,42 @@ from datetime import UTC, date, datetime
 from typing import Annotated
 
 import yaml
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, Header, Request, Response, status
 from sqlalchemy import column, select, table
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import CurrentTenant, DbSession, Principal, require_platform
+from app.api.deps import (
+    AppSettings,
+    CurrentTenant,
+    DbSession,
+    Principal,
+    TenantContext,
+    require_platform,
+)
 from app.audit import service as audit
+from app.compute.schemas import Accepted
 from app.core.errors import Conflict, NotFound, ValidationError
 from app.core.ids import uuid7
 from app.iam.authz import Scope, authorize, effective_permissions, projects_with_permission
+from app.images.models import Image
+from app.images.router import zones_by_image
 from app.infra.secrets import Sealed, SecretsBackend, SecretsError, unseal
-from app.k8s.models import K8sCluster, K8sSnapshot
+from app.jobs.presenter import job_out
+from app.k8s.models import K8sCluster, K8sNodePool, K8sSnapshot
+from app.k8s.provision import K8sProvisioner
 from app.k8s.schemas import (
+    K8sAdminProvision,
     K8sClusterCreate,
+    K8sClusterDelete,
     K8sClusterDetail,
     K8sClusterOut,
     K8sClusterTenantPut,
+    K8sImageOut,
     K8sKubeconfigPut,
+    K8sManagedOut,
+    K8sPoolOut,
+    K8sProvision,
     K8sSummaryOut,
     K8sTableNodeOut,
 )
@@ -65,8 +86,25 @@ def summary_out(s: K8sSnapshot | None) -> K8sSummaryOut | None:
     )
 
 
+def managed_out(c: K8sCluster, pools: list[K8sNodePool]) -> K8sManagedOut | None:
+    if c.source != "managed" or c.state is None or c.project_id is None:
+        return None
+    order = {"control-plane": 0, "worker": 1}
+    return K8sManagedOut(
+        state=c.state, state_message=c.state_message, project_id=c.project_id,  # type: ignore[arg-type]
+        kubernetes_version=c.kubernetes_version or "",
+        api_endpoint=c.spec.get("api_endpoint"), lb_ip=(c.spec.get("lb") or {}).get("ip"),
+        components=c.spec.get("components", {}),
+        pools=[K8sPoolOut(id=p.id, name=p.name, role=p.role, count=p.count, vcpus=p.vcpus,  # type: ignore[arg-type]
+                          memory_mb=p.memory_mb, disk_gb=p.disk_gb)
+               for p in sorted(pools, key=lambda p: (order[p.role], p.name))],
+        created_at=c.created_at,
+    )
+
+
 def cluster_out(
-    c: K8sCluster, snap: K8sSnapshot | None, today: date, tenant_name: str | None = None
+    c: K8sCluster, snap: K8sSnapshot | None, today: date, tenant_name: str | None = None,
+    pools: list[K8sNodePool] | None = None,
 ) -> K8sClusterOut:
     exp = expires_on(c)
     days = (exp - today).days if exp else None
@@ -81,8 +119,18 @@ def cluster_out(
         has_kubeconfig=c.kubeconfig_ciphertext is not None,
         kubeconfig_error=c.kubeconfig_error, source_modified_at=c.source_modified_at,
         synced_at=c.synced_at, tenant_id=c.tenant_id, tenant_name=tenant_name,
-        snapshot=summary_out(snap),
+        snapshot=summary_out(snap), managed=managed_out(c, pools or []),
     )
+
+
+async def _pools(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, list[K8sNodePool]]:
+    out: dict[uuid.UUID, list[K8sNodePool]] = {}
+    if ids:
+        for p in (await db.execute(
+            select(K8sNodePool).where(K8sNodePool.k8s_cluster_id.in_(ids))
+        )).scalars():
+            out.setdefault(p.k8s_cluster_id, []).append(p)
+    return out
 
 
 def _today() -> date:
@@ -132,10 +180,12 @@ async def list_clusters(_: K8sAdmin, db: DbSession) -> list[K8sClusterOut]:
     """Soonest certificate expiry first; clusters without a known date last."""
     snaps = {s.cluster_id: s for s in (await db.execute(select(K8sSnapshot))).scalars()}
     names = {tid: name for tid, name in await db.execute(select(Tenant.id, Tenant.name))}
+    rows = list((await db.execute(select(K8sCluster))).scalars())
+    pools = await _pools(db, [c.id for c in rows])
     today = _today()
     clusters = [
-        cluster_out(c, snaps.get(c.id), today, names.get(c.tenant_id))
-        for c in (await db.execute(select(K8sCluster))).scalars()
+        cluster_out(c, snaps.get(c.id), today, names.get(c.tenant_id), pools.get(c.id))
+        for c in rows
     ]
     return sorted(clusters, key=lambda c: (c.days_left is None, c.days_left or 0, c.name))
 
@@ -162,7 +212,8 @@ def detail_out(out: K8sClusterOut, snap: K8sSnapshot | None) -> K8sClusterDetail
 async def get_cluster(cluster_id: uuid.UUID, _: K8sAdmin, db: DbSession) -> K8sClusterDetail:
     cluster = await _load(db, cluster_id)
     snap = await db.get(K8sSnapshot, cluster_id)
-    out = cluster_out(cluster, snap, _today(), await _tenant_name(db, cluster.tenant_id))
+    pools = (await _pools(db, [cluster.id])).get(cluster.id)
+    out = cluster_out(cluster, snap, _today(), await _tenant_name(db, cluster.tenant_id), pools)
     return detail_out(out, snap)
 
 
@@ -173,6 +224,8 @@ async def link_tenant(
     """Links the cluster to a client (or unlinks it with null): its members then see
     health, load and workloads, never the kubeconfig."""
     cluster = await _load(db, cluster_id)
+    if cluster.source == "managed":
+        raise Conflict("A cluster the platform created belongs to the client that owns its VMs")
     name = None
     if body.tenant_id is not None:
         name = await _tenant_name(db, body.tenant_id)
@@ -234,6 +287,8 @@ async def replace_kubeconfig(
 async def delete_cluster(cluster_id: uuid.UUID, principal: K8sAdmin, db: DbSession) -> None:
     """Only clusters registered here; nothing is done to the cluster itself."""
     cluster = await _load(db, cluster_id)
+    if cluster.source == "managed":
+        raise Conflict("A cluster the platform created is removed with its VMs: use destroy")
     if cluster.source != "manual":
         raise Conflict("This cluster comes from kubernetes_clusters and cannot be removed here")
     await audit.record(
@@ -264,14 +319,7 @@ async def download_kubeconfig(
         db, "K8S_KUBECONFIG_DOWNLOAD", actor_user_id=principal.user_id,
         resource_type="k8s_cluster", resource_id=cluster.id, details={"name": cluster.name},
     )
-    filename = re.sub(r"[^A-Za-z0-9._-]", "_", cluster.name) + ".kubeconfig"
-    return Response(
-        content=text, media_type="application/yaml",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            "Cache-Control": "no-store",
-        },
-    )
+    return _kubeconfig_response(cluster.name, text)
 
 
 # --- tenant ------------------------------------------------------------------------------
@@ -279,11 +327,15 @@ async def download_kubeconfig(
 # Read-only views (migration 0014): the linked clusters of the tenants in app.tenant_ids,
 # without any credential column. The tables themselves stay platform-only.
 _CLUSTER_COLS = ("id", "name", "source", "api_server", "server_url", "certs_expire_on",
-                 "cert_expires_at", "synced_at", "tenant_id")
+                 "cert_expires_at", "synced_at", "tenant_id", "state", "state_message",
+                 "project_id", "kubernetes_version", "spec", "created_at")
+_POOL_COLS = ("id", "k8s_cluster_id", "name", "role", "count", "vcpus", "memory_mb", "disk_gb",
+              "created_at")
 _SNAPSHOT_COLS = ("cluster_id", "health", "reasons", "error", "version", "summary", "data",
                   "collected_at", "ok_at")
 tenant_clusters = table("k8s_tenant_clusters", *(column(c) for c in _CLUSTER_COLS))
 tenant_snapshots = table("k8s_tenant_snapshots", *(column(c) for c in _SNAPSHOT_COLS))
+tenant_pools = table("k8s_tenant_node_pools", *(column(c) for c in _POOL_COLS))
 
 
 async def can_view_k8s(db: AsyncSession, ctx) -> bool:
@@ -304,6 +356,17 @@ def _transient(row) -> K8sCluster:
     """The view row as an unsaved K8sCluster, so cluster_out applies: no kubeconfig, no
     legacy-table nodes (host ids are platform detail)."""
     return K8sCluster(**{c: getattr(row, c) for c in _CLUSTER_COLS}, nodes=[])
+
+
+async def _tenant_pools(
+    db: AsyncSession, ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[K8sNodePool]]:
+    out: dict[uuid.UUID, list[K8sNodePool]] = {}
+    if ids:
+        rows = await db.execute(select(tenant_pools).where(tenant_pools.c.k8s_cluster_id.in_(ids)))
+        for r in rows:
+            out.setdefault(r.k8s_cluster_id, []).append(K8sNodePool(**r._mapping))
+    return out
 
 
 async def _tenant_snapshots(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, K8sSnapshot]:
@@ -333,8 +396,10 @@ async def tenant_list_clusters(ctx: CurrentTenant, db: DbSession) -> list[K8sClu
         select(tenant_clusters).where(tenant_clusters.c.tenant_id == ctx.tenant_id)
     )).all()
     snaps = await _tenant_snapshots(db, [r.id for r in rows])
+    pools = await _tenant_pools(db, [r.id for r in rows])
     today = _today()
-    clusters = [cluster_out(_transient(r), snaps.get(r.id), today) for r in rows]
+    clusters = [cluster_out(_transient(r), snaps.get(r.id), today, pools=pools.get(r.id))
+                for r in rows]
     return sorted(clusters, key=lambda c: (c.days_left is None, c.days_left or 0, c.name))
 
 
@@ -351,4 +416,110 @@ async def tenant_get_cluster(
     if row is None:
         raise NotFound()
     snap = (await _tenant_snapshots(db, [row.id])).get(row.id)
-    return detail_out(cluster_out(_transient(row), snap, _today()), snap)
+    pools = (await _tenant_pools(db, [row.id])).get(row.id)
+    return detail_out(cluster_out(_transient(row), snap, _today(), pools=pools), snap)
+
+
+# --- clusters created by the platform (ADR-0018) ------------------------------------------
+
+IdempotencyKey = Annotated[str | None, Header(alias="Idempotency-Key", max_length=128)]
+
+
+def _kubeconfig_response(name: str, text: str) -> Response:
+    filename = re.sub(r"[^A-Za-z0-9._-]", "_", name) + ".kubeconfig"
+    return Response(
+        content=text, media_type="application/yaml",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+async def _accepted(db: AsyncSession, job, response: Response) -> Accepted:
+    await db.refresh(job)
+    response.headers["Location"] = f"/api/v1/jobs/{job.id}"
+    return Accepted(job=await job_out(db, job))
+
+
+@tenant_router.get("/images")
+async def tenant_k8s_images(ctx: CurrentTenant, db: DbSession) -> list[K8sImageOut]:
+    """Kubernetes node images: choosing one is choosing the Kubernetes version."""
+    await _require_k8s_view(db, ctx)
+    images = list((await db.execute(
+        select(Image).where(
+            Image.active, Image.kubernetes_version.is_not(None),
+            (Image.tenant_id.is_(None)) | (Image.tenant_id == ctx.tenant_id),
+        ).order_by(Image.kubernetes_version.desc(), Image.name)
+    )).scalars())
+    zones = await zones_by_image(db, [i.id for i in images])
+    return [
+        K8sImageOut(id=i.id, name=i.name, kubernetes_version=i.kubernetes_version or "",
+                    min_disk_gb=i.min_disk_gb, zone_ids=sorted(zones.get(i.id, set()), key=str))
+        for i in images
+    ]
+
+
+@tenant_router.post("/clusters", status_code=status.HTTP_202_ACCEPTED)
+async def tenant_create_cluster(
+    body: K8sProvision, response: Response, ctx: CurrentTenant, db: DbSession,
+    settings: AppSettings, idempotency_key: IdempotencyKey = None,
+) -> Accepted:
+    """Creates the node VMs and installs Kubernetes on them (minutes). Follow the job."""
+    _, job = await K8sProvisioner(db, ctx, settings).create(body, idempotency_key)
+    return await _accepted(db, job, response)
+
+
+@tenant_router.delete("/clusters/{cluster_id}", status_code=status.HTTP_202_ACCEPTED)
+async def tenant_delete_cluster(
+    cluster_id: uuid.UUID, body: K8sClusterDelete, response: Response, ctx: CurrentTenant,
+    db: DbSession, settings: AppSettings, idempotency_key: IdempotencyKey = None,
+) -> Accepted:
+    """Destroys the cluster's VMs and frees its addresses. Clusters created here only."""
+    job = await K8sProvisioner(db, ctx, settings).delete(cluster_id, body.confirm, idempotency_key)
+    return await _accepted(db, job, response)
+
+
+@tenant_router.get(
+    "/clusters/{cluster_id}/kubeconfig",
+    response_class=Response,
+    responses={200: {"content": {"application/yaml": {"schema": {"type": "string"}}}}},
+)
+async def tenant_download_kubeconfig(
+    cluster_id: uuid.UUID, request: Request, ctx: CurrentTenant, db: DbSession,
+    settings: AppSettings,
+) -> Response:
+    """Admin kubeconfig of a cluster the platform created for this client (k8s:admin).
+    Every download is audited."""
+    name, text = await K8sProvisioner(db, ctx, settings).kubeconfig(cluster_id, _secrets(request))
+    return _kubeconfig_response(name, text)
+
+
+@router.post("/clusters/provision", status_code=status.HTTP_202_ACCEPTED)
+async def admin_provision_cluster(
+    body: K8sAdminProvision, response: Response, principal: K8sAdmin, db: DbSession,
+    settings: AppSettings, idempotency_key: IdempotencyKey = None,
+) -> Accepted:
+    """Creates a cluster on the platform's VMs for a client (its quota and project)."""
+    if await _tenant_name(db, body.tenant_id) is None:
+        raise ValidationError(errors=[{"field": "tenant_id", "message": "unknown tenant"}])
+    ctx = TenantContext(principal, body.tenant_id, via_platform=True)
+    provision = K8sProvision(**body.model_dump(exclude={"tenant_id"}))
+    _, job = await K8sProvisioner(db, ctx, settings, admin=True).create(provision, idempotency_key)
+    return await _accepted(db, job, response)
+
+
+@router.post("/clusters/{cluster_id}/destroy", status_code=status.HTTP_202_ACCEPTED)
+async def admin_destroy_cluster(
+    cluster_id: uuid.UUID, body: K8sClusterDelete, response: Response, principal: K8sAdmin,
+    db: DbSession, settings: AppSettings, idempotency_key: IdempotencyKey = None,
+) -> Accepted:
+    """Destroys a cluster the platform created, with its VMs."""
+    cluster = await _load(db, cluster_id)
+    if cluster.tenant_id is None:
+        raise Conflict("This cluster was not created by the platform")
+    ctx = TenantContext(principal, cluster.tenant_id, via_platform=True)
+    job = await K8sProvisioner(db, ctx, settings, admin=True).delete(
+        cluster_id, body.confirm, idempotency_key
+    )
+    return await _accepted(db, job, response)

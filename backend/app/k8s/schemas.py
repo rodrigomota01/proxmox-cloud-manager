@@ -2,11 +2,17 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+
+from app.compute.schemas import IPv4Config
 
 ExpiryStatus = Literal["expired", "critical", "warning", "ok", "unknown"]
 Health = Literal["healthy", "warning", "critical", "unreachable"]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+# becomes part of VM and node names: a DNS label with room for "-<pool>-<n>"
+ClusterName = Annotated[str, StringConstraints(pattern=r"^[a-z]([a-z0-9-]{1,28}[a-z0-9])$")]
+PoolName = Annotated[str, StringConstraints(pattern=r"^[a-z]([a-z0-9-]{0,14}[a-z0-9])?$")]
+State = Literal["provisioning", "active", "updating", "error", "deleting"]
 
 
 class Input(BaseModel):
@@ -68,7 +74,7 @@ class K8sSummaryOut(BaseModel):
 class K8sClusterOut(BaseModel):
     id: uuid.UUID
     name: str
-    source: Literal["table", "manual"]
+    source: Literal["table", "manual", "managed"]
     api_server: str | None
     server_url: str | None
     certs_expire_on: date | None  # as recorded in the table
@@ -85,6 +91,7 @@ class K8sClusterOut(BaseModel):
     tenant_id: uuid.UUID | None = None
     tenant_name: str | None = None
     snapshot: K8sSummaryOut | None  # None: not collected yet
+    managed: "K8sManagedOut | None" = None  # source='managed' only (ADR-0018)
 
 
 class K8sNodeOut(BaseModel):
@@ -202,3 +209,105 @@ class K8sClusterDetail(K8sClusterOut):
     services: list[K8sServiceOut]
     ingresses: list[K8sIngressOut]
     httproutes: list[K8sHttpRouteOut]
+
+
+# --- clusters created by the platform (ADR-0018) ------------------------------------------
+
+
+class K8sNodeSize(Input):
+    vcpus: Annotated[int, Field(ge=1, le=32)]
+    memory_mb: Annotated[int, Field(ge=1024, le=262_144, multiple_of=256)]
+    disk_gb: Annotated[int, Field(ge=10, le=2048)]
+
+
+class K8sWorkerPool(K8sNodeSize):
+    name: PoolName
+    count: Annotated[int, Field(ge=1, le=20)]
+
+
+class K8sIpamNetwork(Input):
+    """Addresses from the IPAM (GET /zones/{id}/addresses): one per node, in pool order
+    (control plane first), plus the load balancer's. All in the same network."""
+
+    mode: Literal["ipam"]
+    node_address_ids: Annotated[list[uuid.UUID], Field(min_length=2, max_length=41)]
+    lb_address_id: uuid.UUID
+    dns: Annotated[list[str], Field(max_length=3)] = []
+
+
+class K8sStaticNetwork(Input):
+    """Addresses typed by hand: the nodes' (prefix and gateway from `node_ipv4`, same
+    subnet) and the load balancer's. `bridge`/`vlan`: platform admins only."""
+
+    mode: Literal["static"]
+    node_ipv4: Annotated[list[IPv4Config], Field(min_length=2, max_length=41)]
+    lb_ip: str
+    bridge: Annotated[str | None, Field(max_length=32)] = None
+    vlan: Annotated[int | None, Field(ge=1, le=4094)] = None
+
+
+class K8sProvision(Input):
+    name: ClusterName
+    project_id: uuid.UUID
+    zone_id: uuid.UUID
+    image_id: uuid.UUID  # a Kubernetes image (GET /kubernetes/images): fixes the version
+    control_plane: K8sNodeSize
+    workers: Annotated[list[K8sWorkerPool], Field(min_length=1, max_length=5)]
+    network: Annotated[K8sIpamNetwork | K8sStaticNetwork, Field(discriminator="mode")]
+    ssh_key_ids: Annotated[list[uuid.UUID], Field(max_length=10)] = []
+
+    @model_validator(mode="after")
+    def _shape(self) -> "K8sProvision":
+        if self.control_plane.vcpus < 2 or self.control_plane.memory_mb < 2048:
+            raise ValueError("the control plane needs at least 2 vCPUs and 2048 MB (kubeadm)")
+        names = [p.name for p in self.workers]
+        if len(set(names)) != len(names) or "cp" in names:
+            raise ValueError("worker pool names must be unique and not 'cp'")
+        nodes = 1 + sum(p.count for p in self.workers)
+        given = (len(self.network.node_address_ids) if isinstance(self.network, K8sIpamNetwork)
+                 else len(self.network.node_ipv4))
+        if given != nodes:
+            raise ValueError(f"{nodes} nodes need {nodes} node addresses, got {given}")
+        return self
+
+
+class K8sAdminProvision(K8sProvision):
+    tenant_id: uuid.UUID
+
+
+class K8sClusterDelete(Input):
+    confirm: str  # must equal the cluster name
+
+
+class K8sPoolOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    role: Literal["control-plane", "worker"]
+    count: int
+    vcpus: int
+    memory_mb: int
+    disk_gb: int
+
+
+class K8sManagedOut(BaseModel):
+    state: State
+    state_message: str | None  # current step while provisioning, the error when failed
+    project_id: uuid.UUID
+    kubernetes_version: str
+    api_endpoint: str | None
+    lb_ip: str | None  # the shared Gateway's public address
+    components: dict[str, str]  # name -> version
+    pools: list[K8sPoolOut]
+    created_at: datetime
+
+
+class K8sImageOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    kubernetes_version: str
+    min_disk_gb: int
+    zone_ids: list[uuid.UUID]
+
+
+K8sClusterOut.model_rebuild()
+K8sClusterDetail.model_rebuild()

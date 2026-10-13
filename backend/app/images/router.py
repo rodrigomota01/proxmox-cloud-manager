@@ -42,6 +42,9 @@ def get_registry(request: Request) -> ProviderRegistry:
 Registry = Annotated[ProviderRegistry, Depends(get_registry)]
 
 
+K8sVersion = Annotated[str, StringConstraints(pattern=r"^\d+\.\d+\.\d+$")]
+
+
 class ImageOut(BaseModel):
     """Tenant view: no servers, templates or provider identifiers."""
 
@@ -74,6 +77,7 @@ class AdminImageOut(BaseModel):
     visibility: str
     tenant_id: uuid.UUID | None
     active: bool
+    kubernetes_version: str | None  # set: only for Kubernetes cluster nodes
     created_at: datetime
     templates: list[TemplateRefOut]
 
@@ -100,6 +104,8 @@ class ImageCreate(TemplateAdd):
     default_user: User = "debian"
     visibility: Literal["public", "tenant"] = "public"
     tenant_id: uuid.UUID | None = None
+    # a Kubernetes node image (ADR-0018): the version its template carries, e.g. "1.37.1"
+    kubernetes_version: K8sVersion | None = None
 
     @model_validator(mode="after")
     def _owner(self) -> "ImageCreate":
@@ -115,6 +121,7 @@ class ImageUpdate(BaseModel):
     description: Annotated[str | None, Field(max_length=1000)] = None
     default_user: User | None = None
     active: bool | None = None
+    kubernetes_version: K8sVersion | None = None
 
 
 # --- helpers ---------------------------------------------------------------------------
@@ -159,7 +166,8 @@ async def admin_out(db: AsyncSession, images: list[Image]) -> list[AdminImageOut
         AdminImageOut(
             id=i.id, name=i.name, description=i.description, os_family=i.os_family,
             default_user=i.default_user, min_disk_gb=i.min_disk_gb, visibility=i.visibility,
-            tenant_id=i.tenant_id, active=i.active, created_at=i.created_at,
+            tenant_id=i.tenant_id, active=i.active, kubernetes_version=i.kubernetes_version,
+            created_at=i.created_at,
             templates=templates.get(i.id, []),
         )
         for i in images
@@ -232,7 +240,8 @@ async def list_images(
     # RLS: public images + this tenant's; active only
     images = list((await db.execute(
         select(Image)
-        .where(Image.active, (Image.tenant_id.is_(None)) | (Image.tenant_id == ctx.tenant_id))
+        .where(Image.active, (Image.tenant_id.is_(None)) | (Image.tenant_id == ctx.tenant_id),
+               Image.kubernetes_version.is_(None))  # node images: GET /kubernetes/images
         .order_by(Image.name)
     )).scalars())
     zones = await zones_by_image(db, [i.id for i in images])
@@ -294,6 +303,7 @@ async def create_image(
         name=body.name, description=body.description, os_family=body.os_family,
         default_user=body.default_user, min_disk_gb=details.disk_gb,
         visibility=body.visibility, tenant_id=body.tenant_id,
+        kubernetes_version=body.kubernetes_version,
     )
     db.add(image)
     await db.flush()

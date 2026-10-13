@@ -265,6 +265,17 @@
             "title": "Id",
             "type": "string"
           },
+          "kubernetes_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kubernetes Version"
+          },
           "min_disk_gb": {
             "title": "Min Disk Gb",
             "type": "integer"
@@ -311,6 +322,7 @@
           "visibility",
           "tenant_id",
           "active",
+          "kubernetes_version",
           "created_at",
           "templates"
         ],
@@ -3031,6 +3043,18 @@
             "title": "Description",
             "type": "string"
           },
+          "kubernetes_version": {
+            "anyOf": [
+              {
+                "pattern": "^\\d+\\.\\d+\\.\\d+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kubernetes Version"
+          },
           "name": {
             "maxLength": 100,
             "minLength": 1,
@@ -3172,6 +3196,18 @@
               }
             ],
             "title": "Description"
+          },
+          "kubernetes_version": {
+            "anyOf": [
+              {
+                "pattern": "^\\d+\\.\\d+\\.\\d+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kubernetes Version"
           },
           "name": {
             "anyOf": [
@@ -3525,6 +3561,18 @@
             ],
             "title": "Ipv4 Source"
           },
+          "k8s_cluster_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "K8S Cluster Id"
+          },
           "kind": {
             "title": "Kind",
             "type": "string"
@@ -3652,6 +3700,7 @@
           "tags",
           "image_id",
           "read_only",
+          "k8s_cluster_id",
           "zone_id",
           "zone_name",
           "region_name",
@@ -4212,6 +4261,88 @@
         "title": "JobOut",
         "type": "object"
       },
+      "K8sAdminProvision": {
+        "additionalProperties": false,
+        "properties": {
+          "control_plane": {
+            "$ref": "#/components/schemas/K8sNodeSize"
+          },
+          "image_id": {
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[a-z]([a-z0-9-]{1,28}[a-z0-9])$",
+            "title": "Name",
+            "type": "string"
+          },
+          "network": {
+            "discriminator": {
+              "mapping": {
+                "ipam": "#/components/schemas/K8sIpamNetwork",
+                "static": "#/components/schemas/K8sStaticNetwork"
+              },
+              "propertyName": "mode"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/K8sIpamNetwork"
+              },
+              {
+                "$ref": "#/components/schemas/K8sStaticNetwork"
+              }
+            ],
+            "title": "Network"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "ssh_key_ids": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Ssh Key Ids",
+            "type": "array"
+          },
+          "tenant_id": {
+            "format": "uuid",
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "workers": {
+            "items": {
+              "$ref": "#/components/schemas/K8sWorkerPool"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Workers",
+            "type": "array"
+          },
+          "zone_id": {
+            "format": "uuid",
+            "title": "Zone Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "project_id",
+          "zone_id",
+          "image_id",
+          "control_plane",
+          "workers",
+          "network",
+          "tenant_id"
+        ],
+        "title": "K8sAdminProvision",
+        "type": "object"
+      },
       "K8sClusterCreate": {
         "additionalProperties": false,
         "properties": {
@@ -4233,6 +4364,20 @@
           "kubeconfig"
         ],
         "title": "K8sClusterCreate",
+        "type": "object"
+      },
+      "K8sClusterDelete": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm": {
+            "title": "Confirm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "title": "K8sClusterDelete",
         "type": "object"
       },
       "K8sClusterDetail": {
@@ -4340,6 +4485,16 @@
             ],
             "title": "Kubeconfig Error"
           },
+          "managed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/K8sManagedOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -4400,7 +4555,8 @@
           "source": {
             "enum": [
               "table",
-              "manual"
+              "manual",
+              "managed"
             ],
             "title": "Source",
             "type": "string"
@@ -4578,6 +4734,16 @@
             ],
             "title": "Kubeconfig Error"
           },
+          "managed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/K8sManagedOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -4613,7 +4779,8 @@
           "source": {
             "enum": [
               "table",
-              "manual"
+              "manual",
+              "managed"
             ],
             "title": "Source",
             "type": "string"
@@ -4807,6 +4974,44 @@
         "title": "K8sHttpRouteRuleOut",
         "type": "object"
       },
+      "K8sImageOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kubernetes_version": {
+            "title": "Kubernetes Version",
+            "type": "string"
+          },
+          "min_disk_gb": {
+            "title": "Min Disk Gb",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "zone_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Zone Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "kubernetes_version",
+          "min_disk_gb",
+          "zone_ids"
+        ],
+        "title": "K8sImageOut",
+        "type": "object"
+      },
       "K8sIngressOut": {
         "properties": {
           "address": {
@@ -4902,6 +5107,48 @@
         "title": "K8sIngressRuleOut",
         "type": "object"
       },
+      "K8sIpamNetwork": {
+        "additionalProperties": false,
+        "description": "Addresses from the IPAM (GET /zones/{id}/addresses): one per node, in pool order\n(control plane first), plus the load balancer's. All in the same network.",
+        "properties": {
+          "dns": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Dns",
+            "type": "array"
+          },
+          "lb_address_id": {
+            "format": "uuid",
+            "title": "Lb Address Id",
+            "type": "string"
+          },
+          "mode": {
+            "const": "ipam",
+            "title": "Mode",
+            "type": "string"
+          },
+          "node_address_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 41,
+            "minItems": 2,
+            "title": "Node Address Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "mode",
+          "node_address_ids",
+          "lb_address_id"
+        ],
+        "title": "K8sIpamNetwork",
+        "type": "object"
+      },
       "K8sKubeconfigPut": {
         "additionalProperties": false,
         "properties": {
@@ -4916,6 +5163,95 @@
           "kubeconfig"
         ],
         "title": "K8sKubeconfigPut",
+        "type": "object"
+      },
+      "K8sManagedOut": {
+        "properties": {
+          "api_endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Endpoint"
+          },
+          "components": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Components",
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "kubernetes_version": {
+            "title": "Kubernetes Version",
+            "type": "string"
+          },
+          "lb_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lb Ip"
+          },
+          "pools": {
+            "items": {
+              "$ref": "#/components/schemas/K8sPoolOut"
+            },
+            "title": "Pools",
+            "type": "array"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "provisioning",
+              "active",
+              "updating",
+              "error",
+              "deleting"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "state_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Message"
+          }
+        },
+        "required": [
+          "state",
+          "state_message",
+          "project_id",
+          "kubernetes_version",
+          "api_endpoint",
+          "lb_ip",
+          "components",
+          "pools",
+          "created_at"
+        ],
+        "title": "K8sManagedOut",
         "type": "object"
       },
       "K8sNamespaceOut": {
@@ -5175,6 +5511,37 @@
         "title": "K8sNodeOut",
         "type": "object"
       },
+      "K8sNodeSize": {
+        "additionalProperties": false,
+        "properties": {
+          "disk_gb": {
+            "maximum": 2048.0,
+            "minimum": 10.0,
+            "title": "Disk Gb",
+            "type": "integer"
+          },
+          "memory_mb": {
+            "maximum": 262144.0,
+            "minimum": 1024.0,
+            "multipleOf": 256.0,
+            "title": "Memory Mb",
+            "type": "integer"
+          },
+          "vcpus": {
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Vcpus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "vcpus",
+          "memory_mb",
+          "disk_gb"
+        ],
+        "title": "K8sNodeSize",
+        "type": "object"
+      },
       "K8sPodOut": {
         "properties": {
           "cpu_usage": {
@@ -5285,6 +5652,130 @@
         "title": "K8sPodOut",
         "type": "object"
       },
+      "K8sPoolOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "disk_gb": {
+            "title": "Disk Gb",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "memory_mb": {
+            "title": "Memory Mb",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "control-plane",
+              "worker"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "vcpus": {
+            "title": "Vcpus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "role",
+          "count",
+          "vcpus",
+          "memory_mb",
+          "disk_gb"
+        ],
+        "title": "K8sPoolOut",
+        "type": "object"
+      },
+      "K8sProvision": {
+        "additionalProperties": false,
+        "properties": {
+          "control_plane": {
+            "$ref": "#/components/schemas/K8sNodeSize"
+          },
+          "image_id": {
+            "format": "uuid",
+            "title": "Image Id",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^[a-z]([a-z0-9-]{1,28}[a-z0-9])$",
+            "title": "Name",
+            "type": "string"
+          },
+          "network": {
+            "discriminator": {
+              "mapping": {
+                "ipam": "#/components/schemas/K8sIpamNetwork",
+                "static": "#/components/schemas/K8sStaticNetwork"
+              },
+              "propertyName": "mode"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/K8sIpamNetwork"
+              },
+              {
+                "$ref": "#/components/schemas/K8sStaticNetwork"
+              }
+            ],
+            "title": "Network"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "ssh_key_ids": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Ssh Key Ids",
+            "type": "array"
+          },
+          "workers": {
+            "items": {
+              "$ref": "#/components/schemas/K8sWorkerPool"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Workers",
+            "type": "array"
+          },
+          "zone_id": {
+            "format": "uuid",
+            "title": "Zone Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "project_id",
+          "zone_id",
+          "image_id",
+          "control_plane",
+          "workers",
+          "network"
+        ],
+        "title": "K8sProvision",
+        "type": "object"
+      },
       "K8sServiceOut": {
         "properties": {
           "cluster_ip": {
@@ -5348,6 +5839,62 @@
           "ports"
         ],
         "title": "K8sServiceOut",
+        "type": "object"
+      },
+      "K8sStaticNetwork": {
+        "additionalProperties": false,
+        "description": "Addresses typed by hand: the nodes' (prefix and gateway from `node_ipv4`, same\nsubnet) and the load balancer's. `bridge`/`vlan`: platform admins only.",
+        "properties": {
+          "bridge": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bridge"
+          },
+          "lb_ip": {
+            "title": "Lb Ip",
+            "type": "string"
+          },
+          "mode": {
+            "const": "static",
+            "title": "Mode",
+            "type": "string"
+          },
+          "node_ipv4": {
+            "items": {
+              "$ref": "#/components/schemas/IPv4Config"
+            },
+            "maxItems": 41,
+            "minItems": 2,
+            "title": "Node Ipv4",
+            "type": "array"
+          },
+          "vlan": {
+            "anyOf": [
+              {
+                "maximum": 4094.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vlan"
+          }
+        },
+        "required": [
+          "mode",
+          "node_ipv4",
+          "lb_ip"
+        ],
+        "title": "K8sStaticNetwork",
         "type": "object"
       },
       "K8sSummaryOut": {
@@ -5575,6 +6122,50 @@
           "role"
         ],
         "title": "K8sTableNodeOut",
+        "type": "object"
+      },
+      "K8sWorkerPool": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "disk_gb": {
+            "maximum": 2048.0,
+            "minimum": 10.0,
+            "title": "Disk Gb",
+            "type": "integer"
+          },
+          "memory_mb": {
+            "maximum": 262144.0,
+            "minimum": 1024.0,
+            "multipleOf": 256.0,
+            "title": "Memory Mb",
+            "type": "integer"
+          },
+          "name": {
+            "pattern": "^[a-z]([a-z0-9-]{0,14}[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          },
+          "vcpus": {
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Vcpus",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "vcpus",
+          "memory_mb",
+          "disk_gb",
+          "name",
+          "count"
+        ],
+        "title": "K8sWorkerPool",
         "type": "object"
       },
       "K8sWorkloadOut": {
@@ -10241,6 +10832,67 @@
         ]
       }
     },
+    "/api/v1/admin/kubernetes/clusters/provision": {
+      "post": {
+        "description": "Creates a cluster on the platform's VMs for a client (its quota and project).",
+        "operationId": "admin_provision_cluster_api_v1_admin_kubernetes_clusters_provision_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/K8sAdminProvision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Provision Cluster",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/admin/kubernetes/clusters/{cluster_id}": {
       "delete": {
         "description": "Only clusters registered here; nothing is done to the cluster itself.",
@@ -10314,6 +10966,77 @@
           }
         },
         "summary": "Get Cluster",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/kubernetes/clusters/{cluster_id}/destroy": {
+      "post": {
+        "description": "Destroys a cluster the platform created, with its VMs.",
+        "operationId": "admin_destroy_cluster_api_v1_admin_kubernetes_clusters__cluster_id__destroy_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/K8sClusterDelete"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admin Destroy Cluster",
         "tags": [
           "admin"
         ]
@@ -13288,9 +14011,137 @@
         "tags": [
           "kubernetes"
         ]
+      },
+      "post": {
+        "description": "Creates the node VMs and installs Kubernetes on them (minutes). Follow the job.",
+        "operationId": "tenant_create_cluster_api_v1_kubernetes_clusters_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/K8sProvision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tenant Create Cluster",
+        "tags": [
+          "kubernetes"
+        ]
       }
     },
     "/api/v1/kubernetes/clusters/{cluster_id}": {
+      "delete": {
+        "description": "Destroys the cluster's VMs and frees its addresses. Clusters created here only.",
+        "operationId": "tenant_delete_cluster_api_v1_kubernetes_clusters__cluster_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/K8sClusterDelete"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tenant Delete Cluster",
+        "tags": [
+          "kubernetes"
+        ]
+      },
       "get": {
         "operationId": "tenant_get_cluster_api_v1_kubernetes_clusters__cluster_id__get",
         "parameters": [
@@ -13328,6 +14179,86 @@
           }
         },
         "summary": "Tenant Get Cluster",
+        "tags": [
+          "kubernetes"
+        ]
+      }
+    },
+    "/api/v1/kubernetes/clusters/{cluster_id}/kubeconfig": {
+      "get": {
+        "description": "Admin kubeconfig of a cluster the platform created for this client (k8s:admin).\nEvery download is audited.",
+        "operationId": "tenant_download_kubeconfig_api_v1_kubernetes_clusters__cluster_id__kubeconfig_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/yaml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tenant Download Kubeconfig",
+        "tags": [
+          "kubernetes"
+        ]
+      }
+    },
+    "/api/v1/kubernetes/images": {
+      "get": {
+        "description": "Kubernetes node images: choosing one is choosing the Kubernetes version.",
+        "operationId": "tenant_k8s_images_api_v1_kubernetes_images_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/K8sImageOut"
+                  },
+                  "title": "Response Tenant K8S Images Api V1 Kubernetes Images Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tenant K8S Images",
         "tags": [
           "kubernetes"
         ]

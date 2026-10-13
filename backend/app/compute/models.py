@@ -97,6 +97,14 @@ class Instance(UUIDPk, Timestamps, Base):
     # every disk in the provider config ({name, storage, volume, size_bytes, format,
     # used_bytes}); used_bytes = space taken in the storage, None where it cannot be read
     disks: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    # a node of a Kubernetes cluster the platform created (ADR-0018): operated through
+    # the cluster, never one by one
+    k8s_cluster_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("k8s_clusters.id", ondelete="SET NULL"), index=True
+    )
+    k8s_pool_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("k8s_node_pools.id", ondelete="SET NULL")
+    )
     missing_count: Mapped[int] = mapped_column(Integer, server_default="0")
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

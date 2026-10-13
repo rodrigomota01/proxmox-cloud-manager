@@ -371,3 +371,38 @@ async def test_storage_volumes_and_node_disks():
     assert (nvme.device, nvme.health, nvme.wearout, nvme.used) == (
         "/dev/nvme0n1", "PASSED", 97, "linux_raid_member")
     assert (sda.health, sda.wearout) == (None, None)
+
+
+@respx.mock
+async def test_guest_exec_passes_stdin_and_maps_status():
+    ref = mapper.instance_ref(10001, "tagima", "qemu")
+    base = f"{API}/nodes/tagima/qemu/10001/agent"
+    start = respx.post(f"{base}/exec").respond(json={"data": {"pid": 42}})
+    p = ProxmoxProvider(_client())
+    assert await p.guest_exec_start(ref, ["bash", "-c", "read x"], stdin="secret\n") == 42
+    sent = start.calls.last.request.content.decode()
+    assert "input-data=secret" in sent and "command=bash" in sent
+
+    status = respx.get(f"{base}/exec-status")
+    status.respond(json={"data": {"exited": 0}})
+    assert (await p.guest_exec_status(ref, 42)).exited is False
+    status.respond(json={"data": {"exited": 1, "exitcode": 2, "out-data": "o", "err-data": "e",
+                                  "out-truncated": 1}})
+    st = await p.guest_exec_status(ref, 42)
+    assert (st.exited, st.exitcode, st.out, st.err, st.truncated) == (True, 2, "o", "e", True)
+    status.mock(return_value=httpx.Response(
+        500, extensions={"reason_phrase": b"Agent error: PID 42 does not exist"}
+    ))
+    with pytest.raises(GuestAgentUnavailable):
+        await p.guest_exec_status(ref, 42)
+
+
+def test_bundle_command_runs_platform_scripts_with_env():
+    from app.k8s.bundle import command, script
+
+    argv = command("join-node", {"NODE_NAME": "lab-app-1"})
+    assert argv[:2] == ["env", "NODE_NAME=lab-app-1"]
+    assert argv[2:4] == ["bash", "-c"] and argv[4] == script("join-node") and argv[5] == "join-node"
+    for name in ("prepare-node", "init-control-plane", "join-command", "join-node",
+                 "install-addons"):
+        assert script(name).startswith("#!/usr/bin/env bash")
