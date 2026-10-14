@@ -83,8 +83,8 @@ export function PhysicalDisksCard({ disks, checkedAt }: { disks: PhysicalDisk[];
                 <th className={`${tbl.th} text-right`}>Tamanho</th>
                 <th className={tbl.th}>Uso</th>
                 <th className={tbl.th}>Saúde (SMART)</th>
-                <th className={tbl.th} title="Vida útil restante informada pelo SSD (100% = novo)">
-                  Vida útil
+                <th className={tbl.th} title="Quanto da vida útil o SSD já consumiu (0% = novo)">
+                  Desgaste
                 </th>
               </tr>
             </thead>
@@ -105,8 +105,13 @@ export function PhysicalDisksCard({ disks, checkedAt }: { disks: PhysicalDisk[];
                     <Health d={d} />
                   </td>
                   <td className={`${tbl.td} w-40`}>
+                    {/* The API's wearout is the life left (100 = new); the meter shows wear, which goes red as it grows. */}
                     {d.wearout != null ? (
-                      <Meter value={d.wearout / 100} label={`${d.wearout}%`} title="Vida útil restante (100% = novo)" />
+                      <Meter
+                        value={(100 - d.wearout) / 100}
+                        label={`${100 - d.wearout}%`}
+                        title={`${d.wearout}% de vida útil restante`}
+                      />
                     ) : (
                       "—"
                     )}
