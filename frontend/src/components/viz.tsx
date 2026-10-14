@@ -79,18 +79,24 @@ export function Meter({
   value,
   label,
   title,
+  stacked = false,
 }: {
   value: number; // 0..1 (may exceed 1 for overcommit)
   label?: string;
   title?: string;
+  /** Label above a full-width bar, for narrow table columns with long labels. */
+  stacked?: boolean;
 }) {
   const clamped = Math.max(0, Math.min(value, 1));
   const level = value >= CRITICAL ? "critical" : value >= SERIOUS ? "serious" : null;
   const fill = level === "critical" ? "var(--viz-critical)" : level === "serious" ? "var(--viz-serious)" : "var(--viz-series-1)";
   return (
-    <div className="flex min-w-[9rem] items-center gap-2" title={title}>
+    <div
+      className={stacked ? "flex w-36 flex-col-reverse gap-1" : "flex min-w-[9rem] items-center gap-2"}
+      title={title}
+    >
       <div
-        className="h-2.5 flex-1 overflow-hidden rounded-full"
+        className={`${stacked ? "h-2" : "h-2.5 flex-1"} overflow-hidden rounded-full`}
         style={{ background: "var(--viz-meter-track)" }}
         role="meter"
         aria-valuemin={0}
@@ -100,7 +106,9 @@ export function Meter({
       >
         <div className="h-full rounded-full transition-[width]" style={{ width: `${clamped * 100}%`, background: fill }} />
       </div>
-      <span className="min-w-[3.5rem] shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-slate-700 dark:text-slate-300">
+      <span
+        className={`${stacked ? "" : "min-w-[3.5rem] shrink-0 text-right"} whitespace-nowrap text-xs tabular-nums text-slate-700 dark:text-slate-300`}
+      >
         {level && (
           <span aria-label={level === "critical" ? "crítico" : "alto"} className="mr-0.5">
             ⚠

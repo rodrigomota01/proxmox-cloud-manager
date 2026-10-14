@@ -35,12 +35,14 @@ export function UsageMeter({
   allocatable,
   format,
   what,
+  stacked,
 }: {
   usage: number | null | undefined;
   requests: number;
   allocatable: number;
   format: (v: number) => string;
   what: string;
+  stacked?: boolean;
 }) {
   if (!allocatable) return <span className="text-xs text-slate-500">—</span>;
   const measured = usage !== null && usage !== undefined;
@@ -50,6 +52,7 @@ export function UsageMeter({
       value={value / allocatable}
       label={`${format(value)} / ${format(allocatable)}`}
       title={measured ? `${what} em uso` : `${what} reservada pelos pods (sem metrics-server)`}
+      stacked={stacked}
     />
   );
 }
@@ -150,7 +153,16 @@ export function K8sAttentionPreview() {
 }
 
 /** Audited download, after a confirmation: the kubeconfig is cluster-admin. */
-export function DownloadKubeconfig({ c, tenant = false }: { c: K8sCluster; tenant?: boolean }) {
+/** `labelClassName` hides the text (e.g. below a container width), leaving the icon. */
+export function DownloadKubeconfig({
+  c,
+  tenant = false,
+  labelClassName,
+}: {
+  c: K8sCluster;
+  tenant?: boolean;
+  labelClassName?: string;
+}) {
   const download = useMutation({
     mutationFn: async () => {
       const opts = { params: { path: { cluster_id: c.id } }, parseAs: "text" as const };
@@ -180,6 +192,7 @@ export function DownloadKubeconfig({ c, tenant = false }: { c: K8sCluster; tenan
       <Button
         variant="secondary"
         title="Baixar kubeconfig"
+        aria-label="Baixar kubeconfig"
         disabled={download.isPending}
         onClick={() => {
           if (confirm(`Baixar o kubeconfig de "${c.name}"? Ele dá acesso de administrador ao cluster e o download fica registrado na auditoria.`)) {
@@ -187,7 +200,7 @@ export function DownloadKubeconfig({ c, tenant = false }: { c: K8sCluster; tenan
           }
         }}
       >
-        <Icon name="download" /> Kubeconfig
+        <Icon name="download" /> <span className={labelClassName}>Kubeconfig</span>
       </Button>
       {download.isError && <span className="ml-1 text-xs text-rose-600">{errorMessage(download.error)}</span>}
     </span>

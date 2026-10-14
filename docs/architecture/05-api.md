@@ -147,7 +147,7 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | Método | Rota | Permissão |
 |---|---|---|
 | GET | `/quotas` | membro do tenant → `{resource, limit, used, available}` (2a ✅) |
-| GET | `/billing/access` | membro do tenant — o que ele vê em Custos: `full`, `usage` ou `none` (admin da plataforma: sempre `full`) ✅ |
+| GET | `/billing/access` | membro do tenant — o que ele vê em Custos: `full`, `usage` ou `none` (quem tem `billing:manage` na plataforma: sempre `full`) ✅ |
 | GET | `/billing/prices` | membro do tenant, com visibilidade `full` (preços vigentes do cliente; a estimativa da criação é calculada com eles) ✅ |
 | GET | `/billing/summary?month=YYYY-MM` | `billing:view` (tenant: tudo; projeto: só os seus), visibilidade `full` — acumulado, custo atual, previsão, por recurso/projeto/instância/dia (ADR-0015) ✅ |
 | GET | `/billing/usage?month=YYYY-MM` | `billing:view` (mesma regra), visibilidade `full` ou `usage` — sem preços: vCPU·h, GiB·h de RAM e disco por projeto/VM/dia, o alocado agora e os clusters Kubernetes vinculados (com `k8s:view`) ✅ |

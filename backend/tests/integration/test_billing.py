@@ -305,9 +305,19 @@ async def test_cost_visibility_per_client(client, benv, app, owner_db):
 
     # hidden: nothing at all for the client's members
     assert (await set_visibility("none")).status_code == 200
-    assert await access(alice) == "none"
-    for path in ("/api/v1/billing/summary", "/api/v1/billing/usage", "/api/v1/billing/prices"):
-        assert (await client.get(path, headers=alice)).status_code == 403
+    # a platform-wide READ_ONLY (billing:view, no billing:manage) is bound too
+    auditor = await make_user(owner_db, "auditor@example.com")
+    await add_member(owner_db, benv.acme, auditor, "READ_ONLY")
+    await owner_db.execute(text(
+        "INSERT INTO role_bindings (id, user_id, role_id, scope_type)"
+        " SELECT gen_random_uuid(), :u, id, 'platform' FROM roles WHERE name = 'READ_ONLY'"
+    ), {"u": auditor.id})
+    await owner_db.commit()
+    for who in (alice, await benv.h("auditor", benv.acme)):
+        assert await access(who) == "none"
+        for path in ("/api/v1/billing/summary", "/api/v1/billing/usage",
+                     "/api/v1/billing/prices"):
+            assert (await client.get(path, headers=who)).status_code == 403
     p = (await client.get("/api/v1/admin/billing/summary", headers=root)).json()
     vis = {t["slug"]: t["cost_visibility"] for t in p["tenants"]}
     assert vis == {"acme": "none", "globex": "full"}
