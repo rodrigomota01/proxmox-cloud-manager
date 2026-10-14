@@ -16,19 +16,40 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, LargeBinary, Text, func
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, UUIDPk
 
-SOURCES = ("table", "manual")
+SOURCES = ("table", "manual", "managed")
+STATES = ("provisioning", "active", "updating", "error", "deleting")
+ROLES = ("control-plane", "worker")
 HEALTH = ("healthy", "warning", "critical", "unreachable")
 
 
 class K8sCluster(UUIDPk, Base):
     __tablename__ = "k8s_clusters"
-    __table_args__ = (CheckConstraint(f"source IN {SOURCES}", name="source"),)
+    __table_args__ = (
+        CheckConstraint(f"source IN {SOURCES}", name="source"),
+        CheckConstraint(f"state IS NULL OR state IN {STATES}", name="state"),
+        # ADR-0018: a cluster the platform created always has an owner and a server
+        CheckConstraint(
+            "source <> 'managed' OR (state IS NOT NULL AND tenant_id IS NOT NULL"
+            " AND project_id IS NOT NULL AND provider_cluster_id IS NOT NULL)",
+            name="managed_has_owner",
+        ),
+    )
 
     name: Mapped[str] = mapped_column(Text, unique=True)  # kubernetes_clusters.client
     # the table sync only touches (and removes) its own rows
@@ -50,6 +71,49 @@ class K8sCluster(UUIDPk, Base):
     kubeconfig_error: Mapped[str | None] = mapped_column(Text)
     source_modified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    # --- source='managed' (ADR-0018): created by the platform on its own VMs ---
+    state: Mapped[str | None] = mapped_column(Text)
+    state_message: Mapped[str | None] = mapped_column(Text)  # current step or error
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="RESTRICT")
+    )
+    provider_cluster_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("provider_clusters.id", ondelete="RESTRICT")
+    )
+    image_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("images.id", ondelete="SET NULL")
+    )
+    kubernetes_version: Mapped[str | None] = mapped_column(Text)
+    # networks, API endpoint, load balancer address and component versions; no secrets
+    spec: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+
+class K8sNodePool(UUIDPk, Base):
+    """A group of identical nodes. One control-plane pool (1 node in phase 1) and one or
+    more worker pools; each node is an Instance with k8s_pool_id pointing here."""
+
+    __tablename__ = "k8s_node_pools"
+    __table_args__ = (
+        CheckConstraint(f"role IN {ROLES}", name="role"),
+        CheckConstraint("count >= 0", name="count"),
+        UniqueConstraint("k8s_cluster_id", "name"),
+    )
+
+    k8s_cluster_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("k8s_clusters.id", ondelete="CASCADE")
+    )
+    name: Mapped[str] = mapped_column(Text)
+    role: Mapped[str] = mapped_column(Text)
+    count: Mapped[int] = mapped_column(Integer)
+    vcpus: Mapped[int] = mapped_column(Integer)
+    memory_mb: Mapped[int] = mapped_column(Integer)
+    disk_gb: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

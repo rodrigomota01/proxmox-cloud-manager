@@ -15,6 +15,7 @@ from app.admin.schemas import (
     AdminTopInstanceOut,
     AdminTopInstancesOut,
     AdminUsageOut,
+    AdminVolumeOut,
     AdoptRequest,
     BulkAdoptRequest,
     ClusterCreate,
@@ -30,6 +31,7 @@ from app.admin.schemas import (
     NodeMetricsOut,
     NodeOut,
     OverviewOut,
+    PhysicalDiskOut,
     StorageOut,
     SyncRunOut,
 )
@@ -131,6 +133,8 @@ def admin_instance_out(
         node=str(i.provider_ref["node"]), tags=i.tags, managed=i.managed,
         pool=i.provider_pool, read_only=not operable(i, settings.get(i.cluster_id, {})),
         ipv4=ip.address if ip else None, ipv4_source=ip.source if ip else None,
+        volumes=[AdminVolumeOut(**{k: d.get(k) for k in AdminVolumeOut.model_fields})
+                 for d in i.disks or []],
         last_seen_at=i.last_seen_at,
     )
 
@@ -258,6 +262,8 @@ async def nodes_out(db: DbSession, nodes: list[Node]) -> list[NodeOut]:
             instances_total=total, instances_running=running,
             vcpus_allocated=vcpus, memory_allocated_mb=memory,
             guests_net_in_bps=net_in, guests_net_out_bps=net_out,
+            disks=[PhysicalDiskOut(**d) for d in n.disks or []],
+            disks_checked_at=n.disks_checked_at,
         ))
     return out
 

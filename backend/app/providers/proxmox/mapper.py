@@ -1,11 +1,13 @@
 """PVE dicts -> domain types. The only module that knows PVE field names."""
 
 import ipaddress
+import re
 from typing import Any
 
 from app.providers.base import (
     FilesystemUsage,
     GuestAddress,
+    GuestExecStatus,
     GuestNic,
     InstanceKind,
     InstanceObservation,
@@ -14,12 +16,15 @@ from app.providers.base import (
     NicSpec,
     NodeInfo,
     NodeMetricPoint,
+    PhysicalDisk,
     PowerState,
     ProviderRef,
     StaticIPv4,
     StorageObservation,
     TemplateDetails,
     TemplateObservation,
+    VirtualDisk,
+    VolumeUsage,
 )
 
 _KIND = {"qemu": InstanceKind.VM, "lxc": InstanceKind.CONTAINER}
@@ -118,6 +123,18 @@ def guest_addresses(result: list[dict[str, Any]]) -> list[GuestAddress]:
                 continue
             out.append(GuestAddress(mac, ip.with_prefixlen))
     return out
+
+
+def exec_status(item: dict[str, Any]) -> GuestExecStatus:
+    """From GET .../agent/exec-status."""
+    exited = bool(_int(item.get("exited")))
+    return GuestExecStatus(
+        exited=exited,
+        exitcode=_int(item.get("exitcode")) if exited else None,
+        out=str(item.get("out-data") or ""),
+        err=str(item.get("err-data") or ""),
+        truncated=bool(_int(item.get("out-truncated")) or _int(item.get("err-truncated"))),
+    )
 
 
 def metric_point(item: dict[str, Any]) -> MetricPoint | None:
@@ -221,6 +238,80 @@ def disk_size_gb(spec: str) -> int:
                 return int(float(value[:-1]) * _SIZE_UNITS[unit])
             return int(value) // _GIB
     return 0
+
+
+def size_bytes(spec: str) -> int:
+    """'storage-vz:10001/vm-10001-disk-0.qcow2,size=32G' -> 34359738368"""
+    for part in spec.split(","):
+        if part.startswith("size="):
+            value = part[5:]
+            unit = value[-1].upper()
+            try:
+                if unit in _SIZE_UNITS:
+                    return int(float(value[:-1]) * _SIZE_UNITS[unit] * _GIB)
+                return int(value)
+            except ValueError:
+                return 0
+    return 0
+
+
+_VM_DISK = re.compile(r"^(?:(?:scsi|virtio|sata|ide)\d+|efidisk0|tpmstate0)$")
+_CT_DISK = re.compile(r"^(?:rootfs|mp\d+)$")
+
+
+def vm_disks(config: dict[str, Any], pve_type: str) -> list[VirtualDisk]:
+    """Every disk in a guest's configuration. VMs: scsiN/virtioN/sataN/ideN plus EFI and
+    TPM state; containers: rootfs and mpN. Left out: CD-ROMs, cloud-init drives,
+    passthrough and container bind mounts (no storage behind them)."""
+    pattern = _CT_DISK if pve_type == "lxc" else _VM_DISK
+    out: list[VirtualDisk] = []
+    for key in sorted((k for k in config if pattern.match(k)), key=_disk_order):
+        spec = str(config[key])
+        volume, _, rest = spec.partition(",")
+        if "media=cdrom" in spec or "cloudinit" in volume or ":" not in volume:
+            continue  # CD-ROM / cloud-init / passthrough (/dev/...) / bind mount
+        filename = volume.split(":", 1)[1].rsplit("/", 1)[-1]
+        fmt = _kv(rest).get("format") or (
+            filename.rsplit(".", 1)[1] if "." in filename
+            else "subvol" if filename.startswith("subvol-") else None
+        )
+        out.append(VirtualDisk(key, volume.split(":", 1)[0], volume, size_bytes(spec), fmt))
+    return out
+
+
+def _disk_order(key: str) -> tuple[int, str, int]:
+    """rootfs first, then by bus and number: scsi2 before scsi10."""
+    head = key.rstrip("0123456789")
+    num = key[len(head):]
+    return (0 if key == "rootfs" else 1, head, int(num) if num else 0)
+
+
+def volumes(content: list[dict[str, Any]]) -> list[VolumeUsage]:
+    """From GET /nodes/{node}/storage/{storage}/content?content=images."""
+    return [
+        VolumeUsage(str(v["volid"]), _int(v.get("size")),
+                    _int(v["used"]) if v.get("used") is not None else None)
+        for v in content if v.get("volid")
+    ]
+
+
+def physical_disks(items: list[dict[str, Any]]) -> list[PhysicalDisk]:
+    """From GET /nodes/{node}/disks/list."""
+    out = []
+    for d in items:
+        health = d.get("health")
+        wearout = d.get("wearout")
+        out.append(PhysicalDisk(
+            device=str(d.get("devpath") or "?"),
+            model=d.get("model") or None,
+            serial=d.get("serial") or None,
+            type=d.get("type") or None,
+            size_bytes=_int(d.get("size")),
+            used=d.get("used") or None,
+            health=str(health) if health and health != "UNKNOWN" else None,
+            wearout=int(wearout) if isinstance(wearout, int | float) else None,  # "N/A"
+        ))
+    return sorted(out, key=lambda x: x.device)
 
 
 def boot_disk(config: dict[str, Any]) -> str | None:

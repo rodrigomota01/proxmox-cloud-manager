@@ -227,6 +227,10 @@ class ComputeService:
         return instance, job
 
     async def _require_operable(self, instance: Instance) -> None:
+        if instance.k8s_cluster_id is not None:
+            raise Conflict(
+                "This VM is a node of a Kubernetes cluster: manage it through the cluster"
+            )
         cluster = await self.db.get_one(ProviderCluster, instance.cluster_id)
         if not operable(instance, cluster.settings):
             raise Conflict(

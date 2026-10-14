@@ -43,6 +43,8 @@ class Image(UUIDPk, Timestamps, Base):
         ForeignKey("tenants.id", ondelete="CASCADE")
     )
     active: Mapped[bool] = mapped_column(Boolean, server_default="true")
+    # set = a Kubernetes node image with this fixed version (ADR-0018); only for clusters
+    kubernetes_version: Mapped[str | None] = mapped_column(Text)
 
 
 class ImageTemplate(UUIDPk, Base):

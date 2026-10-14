@@ -10,6 +10,7 @@ import { PowerActions } from "@/components/power-actions";
 import { DeleteInstance } from "@/components/delete-instance";
 import { InstanceMetrics } from "@/components/metrics-panel";
 import { DiskUsage } from "@/components/disk-usage";
+import { VolumeList } from "@/components/disks";
 import { IpAddress } from "@/components/ip-address";
 import { Meter, mib, rate, uptime } from "@/components/viz";
 import { ActivityRow } from "@/components/activity";
@@ -95,7 +96,7 @@ export default function InstanceDetailPage() {
                 ["Região / zona", i.region_name ? `${i.region_name} · ${i.zone_name}` : "—"],
                 ["vCPUs", i.vcpus],
                 ["Memória", `${(i.memory_mb / 1024).toFixed(1)} GiB`],
-                ["Disco raiz", `${i.root_disk_gb} GiB`],
+                ["Discos", <VolumeList key="v" volumes={i.volumes} rootDiskGb={i.root_disk_gb} />],
                 [
                   "IP",
                   <IpAddress key="ip" ip={i.ipv4} source={i.ipv4_source} gateway={i.gateway} detailed />,

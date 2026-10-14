@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Icon } from "@/components/icons";
+import { volumesSummary } from "@/components/disks";
 import { IpAddress } from "@/components/ip-address";
 import { NoTenant } from "@/components/no-tenant";
 import { PageHeader, ResourceIcon, SearchInput, Toolbar } from "@/components/page";
 import { PowerActions } from "@/components/power-actions";
-import { Button, Card, Empty, ErrorBox, PowerBadge, Select, StateBadge, tbl } from "@/components/ui";
+import { Badge, Button, Card, Empty, ErrorBox, PowerBadge, Select, StateBadge, tbl } from "@/components/ui";
 import { Meter, SortHeader, mib, uptime, useSorted } from "@/components/viz";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
 import { useProjectNames, useProjects } from "@/lib/queries";
@@ -150,6 +151,11 @@ export default function InstancesPage() {
                           <Link href={`/instances/${i.id}`} className={tbl.link}>
                             {i.name}
                           </Link>
+                          {i.k8s_cluster_id && (
+                            <Link href={`/kubernetes/${i.k8s_cluster_id}`} title="Nó de um cluster Kubernetes: operado pelo cluster">
+                              <Badge tone="indigo">nó k8s</Badge>
+                            </Link>
+                          )}
                         </div>
                         <div className="mt-0.5 pl-7 text-xs text-slate-500">
                           {projectNames.get(i.project_id) ?? "—"} · {i.vcpus} vCPU
@@ -180,7 +186,7 @@ export default function InstancesPage() {
                           <span className="text-slate-400">{mib(i.memory_mb)}</span>
                         )}
                       </td>
-                      <td className={`${tbl.td} text-right tabular-nums`}>{i.root_disk_gb} GiB</td>
+                      <td className={`${tbl.td} text-right tabular-nums`}>{volumesSummary(i.volumes, i.root_disk_gb)}</td>
                       <td className={`${tbl.td} text-xs`}>
                         <IpAddress ip={i.ipv4} source={i.ipv4_source} />
                       </td>

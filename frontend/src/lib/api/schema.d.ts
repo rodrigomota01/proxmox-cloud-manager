@@ -517,6 +517,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/kubernetes/clusters/provision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin Provision Cluster
+         * @description Creates a cluster on the platform's VMs for a client (its quota and project).
+         */
+        post: operations["admin_provision_cluster_api_v1_admin_kubernetes_clusters_provision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/kubernetes/clusters/{cluster_id}": {
         parameters: {
             query?: never;
@@ -533,6 +553,26 @@ export interface paths {
          * @description Only clusters registered here; nothing is done to the cluster itself.
          */
         delete: operations["delete_cluster_api_v1_admin_kubernetes_clusters__cluster_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/kubernetes/clusters/{cluster_id}/destroy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin Destroy Cluster
+         * @description Destroys a cluster the platform created, with its VMs.
+         */
+        post: operations["admin_destroy_cluster_api_v1_admin_kubernetes_clusters__cluster_id__destroy_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1442,7 +1482,11 @@ export interface paths {
         /** Tenant List Clusters */
         get: operations["tenant_list_clusters_api_v1_kubernetes_clusters_get"];
         put?: never;
-        post?: never;
+        /**
+         * Tenant Create Cluster
+         * @description Creates the node VMs and installs Kubernetes on them (minutes). Follow the job.
+         */
+        post: operations["tenant_create_cluster_api_v1_kubernetes_clusters_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1458,6 +1502,51 @@ export interface paths {
         };
         /** Tenant Get Cluster */
         get: operations["tenant_get_cluster_api_v1_kubernetes_clusters__cluster_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Tenant Delete Cluster
+         * @description Destroys the cluster's VMs and frees its addresses. Clusters created here only.
+         */
+        delete: operations["tenant_delete_cluster_api_v1_kubernetes_clusters__cluster_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kubernetes/clusters/{cluster_id}/kubeconfig": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tenant Download Kubeconfig
+         * @description Admin kubeconfig of a cluster the platform created for this client (k8s:admin).
+         *     Every download is audited.
+         */
+        get: operations["tenant_download_kubeconfig_api_v1_kubernetes_clusters__cluster_id__kubeconfig_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kubernetes/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tenant K8S Images
+         * @description Kubernetes node images: choosing one is choosing the Kubernetes version.
+         */
+        get: operations["tenant_k8s_images_api_v1_kubernetes_images_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1958,6 +2047,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Kubernetes Version */
+            kubernetes_version: string | null;
             /** Min Disk Gb */
             min_disk_gb: number;
             /** Name */
@@ -2024,6 +2115,8 @@ export interface components {
             vcpus: number;
             /** Vmid */
             vmid: number;
+            /** Volumes */
+            volumes: components["schemas"]["AdminVolumeOut"][];
         };
         /** AdminJobDetail */
         AdminJobDetail: {
@@ -2240,6 +2333,21 @@ export interface components {
             last_login_at: string | null;
             /** Locked */
             locked: boolean;
+        };
+        /** AdminVolumeOut */
+        AdminVolumeOut: {
+            /** Format */
+            format: string | null;
+            /** Name */
+            name: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Storage */
+            storage: string;
+            /** Used Bytes */
+            used_bytes: number | null;
+            /** Volume */
+            volume: string;
         };
         /** AdminZoneOut */
         AdminZoneOut: {
@@ -2925,6 +3033,8 @@ export interface components {
              * @default
              */
             description?: string;
+            /** Kubernetes Version */
+            kubernetes_version?: string | null;
             /** Name */
             name: string;
             /**
@@ -2977,6 +3087,8 @@ export interface components {
             default_user?: string | null;
             /** Description */
             description?: string | null;
+            /** Kubernetes Version */
+            kubernetes_version?: string | null;
             /** Name */
             name?: string | null;
         };
@@ -3110,6 +3222,8 @@ export interface components {
             ipv4: string | null;
             /** Ipv4 Source */
             ipv4_source: string | null;
+            /** K8S Cluster Id */
+            k8s_cluster_id: string | null;
             /** Kind */
             kind: string;
             /** Last Seen At */
@@ -3145,6 +3259,8 @@ export interface components {
             uptime_seconds: number;
             /** Vcpus */
             vcpus: number;
+            /** Volumes */
+            volumes: components["schemas"]["VolumeOut"][];
             /** Zone Id */
             zone_id: string | null;
             /** Zone Name */
@@ -3316,12 +3432,52 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** K8sAdminProvision */
+        K8sAdminProvision: {
+            control_plane: components["schemas"]["K8sNodeSize"];
+            /**
+             * Image Id
+             * Format: uuid
+             */
+            image_id: string;
+            /** Name */
+            name: string;
+            /** Network */
+            network: components["schemas"]["K8sIpamNetwork"] | components["schemas"]["K8sStaticNetwork"];
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Ssh Key Ids
+             * @default []
+             */
+            ssh_key_ids?: string[];
+            /**
+             * Tenant Id
+             * Format: uuid
+             */
+            tenant_id: string;
+            /** Workers */
+            workers: components["schemas"]["K8sWorkerPool"][];
+            /**
+             * Zone Id
+             * Format: uuid
+             */
+            zone_id: string;
+        };
         /** K8sClusterCreate */
         K8sClusterCreate: {
             /** Kubeconfig */
             kubeconfig: string;
             /** Name */
             name: string;
+        };
+        /** K8sClusterDelete */
+        K8sClusterDelete: {
+            /** Confirm */
+            confirm: string;
         };
         /** K8sClusterDetail */
         K8sClusterDetail: {
@@ -3352,6 +3508,7 @@ export interface components {
             k8s_nodes: components["schemas"]["K8sNodeOut"][];
             /** Kubeconfig Error */
             kubeconfig_error: string | null;
+            managed?: components["schemas"]["K8sManagedOut"] | null;
             /** Name */
             name: string;
             /** Namespaces */
@@ -3371,7 +3528,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "table" | "manual";
+            source: "table" | "manual" | "managed";
             /** Source Modified At */
             source_modified_at: string | null;
             /**
@@ -3414,6 +3571,7 @@ export interface components {
             id: string;
             /** Kubeconfig Error */
             kubeconfig_error: string | null;
+            managed?: components["schemas"]["K8sManagedOut"] | null;
             /** Name */
             name: string;
             /** Nodes */
@@ -3425,7 +3583,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: "table" | "manual";
+            source: "table" | "manual" | "managed";
             /** Source Modified At */
             source_modified_at: string | null;
             /**
@@ -3477,6 +3635,22 @@ export interface components {
             /** Path */
             path: string;
         };
+        /** K8sImageOut */
+        K8sImageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kubernetes Version */
+            kubernetes_version: string;
+            /** Min Disk Gb */
+            min_disk_gb: number;
+            /** Name */
+            name: string;
+            /** Zone Ids */
+            zone_ids: string[];
+        };
         /** K8sIngressOut */
         K8sIngressOut: {
             /** Address */
@@ -3501,10 +3675,66 @@ export interface components {
             /** Tls */
             tls: boolean;
         };
+        /**
+         * K8sIpamNetwork
+         * @description Addresses from the IPAM (GET /zones/{id}/addresses): one per node, in pool order
+         *     (control plane first), plus the load balancer's. All in the same network.
+         */
+        K8sIpamNetwork: {
+            /**
+             * Dns
+             * @default []
+             */
+            dns?: string[];
+            /**
+             * Lb Address Id
+             * Format: uuid
+             */
+            lb_address_id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            mode: "ipam";
+            /** Node Address Ids */
+            node_address_ids: string[];
+        };
         /** K8sKubeconfigPut */
         K8sKubeconfigPut: {
             /** Kubeconfig */
             kubeconfig: string;
+        };
+        /** K8sManagedOut */
+        K8sManagedOut: {
+            /** Api Endpoint */
+            api_endpoint: string | null;
+            /** Components */
+            components: {
+                [key: string]: string;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Kubernetes Version */
+            kubernetes_version: string;
+            /** Lb Ip */
+            lb_ip: string | null;
+            /** Pools */
+            pools: components["schemas"]["K8sPoolOut"][];
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "provisioning" | "active" | "updating" | "error" | "deleting";
+            /** State Message */
+            state_message: string | null;
         };
         /** K8sNamespaceOut */
         K8sNamespaceOut: {
@@ -3578,6 +3808,15 @@ export interface components {
             /** Version */
             version: string | null;
         };
+        /** K8sNodeSize */
+        K8sNodeSize: {
+            /** Disk Gb */
+            disk_gb: number;
+            /** Memory Mb */
+            memory_mb: number;
+            /** Vcpus */
+            vcpus: number;
+        };
         /** K8sPodOut */
         K8sPodOut: {
             /** Cpu Usage */
@@ -3605,6 +3844,59 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** K8sPoolOut */
+        K8sPoolOut: {
+            /** Count */
+            count: number;
+            /** Disk Gb */
+            disk_gb: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Memory Mb */
+            memory_mb: number;
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "control-plane" | "worker";
+            /** Vcpus */
+            vcpus: number;
+        };
+        /** K8sProvision */
+        K8sProvision: {
+            control_plane: components["schemas"]["K8sNodeSize"];
+            /**
+             * Image Id
+             * Format: uuid
+             */
+            image_id: string;
+            /** Name */
+            name: string;
+            /** Network */
+            network: components["schemas"]["K8sIpamNetwork"] | components["schemas"]["K8sStaticNetwork"];
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /**
+             * Ssh Key Ids
+             * @default []
+             */
+            ssh_key_ids?: string[];
+            /** Workers */
+            workers: components["schemas"]["K8sWorkerPool"][];
+            /**
+             * Zone Id
+             * Format: uuid
+             */
+            zone_id: string;
+        };
         /** K8sServiceOut */
         K8sServiceOut: {
             /** Cluster Ip */
@@ -3619,6 +3911,26 @@ export interface components {
             ports: string[];
             /** Type */
             type: string | null;
+        };
+        /**
+         * K8sStaticNetwork
+         * @description Addresses typed by hand: the nodes' (prefix and gateway from `node_ipv4`, same
+         *     subnet) and the load balancer's. `bridge`/`vlan`: platform admins only.
+         */
+        K8sStaticNetwork: {
+            /** Bridge */
+            bridge?: string | null;
+            /** Lb Ip */
+            lb_ip: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            mode: "static";
+            /** Node Ipv4 */
+            node_ipv4: components["schemas"]["IPv4Config"][];
+            /** Vlan */
+            vlan?: number | null;
         };
         /**
          * K8sSummaryOut
@@ -3694,6 +4006,19 @@ export interface components {
             id: number;
             /** Role */
             role: string | null;
+        };
+        /** K8sWorkerPool */
+        K8sWorkerPool: {
+            /** Count */
+            count: number;
+            /** Disk Gb */
+            disk_gb: number;
+            /** Memory Mb */
+            memory_mb: number;
+            /** Name */
+            name: string;
+            /** Vcpus */
+            vcpus: number;
         };
         /** K8sWorkloadOut */
         K8sWorkloadOut: {
@@ -3915,6 +4240,10 @@ export interface components {
             cpu_count: number;
             /** Cpu Usage */
             cpu_usage: number;
+            /** Disks */
+            disks: components["schemas"]["PhysicalDiskOut"][];
+            /** Disks Checked At */
+            disks_checked_at: string | null;
             /** Guests Net In Bps */
             guests_net_in_bps: number;
             /** Guests Net Out Bps */
@@ -4006,6 +4335,25 @@ export interface components {
             permissions: string[];
             /** Scope */
             scope: string;
+        };
+        /** PhysicalDiskOut */
+        PhysicalDiskOut: {
+            /** Device */
+            device: string;
+            /** Health */
+            health: string | null;
+            /** Model */
+            model: string | null;
+            /** Serial */
+            serial: string | null;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Type */
+            type: string | null;
+            /** Used */
+            used: string | null;
+            /** Wearout */
+            wearout: number | null;
         };
         /** PlatformCostOut */
         PlatformCostOut: {
@@ -4689,6 +5037,18 @@ export interface components {
              * @default 10000
              */
             start?: number;
+        };
+        /**
+         * VolumeOut
+         * @description One virtual disk of the instance (tenant view: no storage or volume names).
+         */
+        VolumeOut: {
+            /** Name */
+            name: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Used Bytes */
+            used_bytes: number | null;
         };
         /** ZoneCreate */
         ZoneCreate: {
@@ -5811,6 +6171,41 @@ export interface operations {
             };
         };
     };
+    admin_provision_cluster_api_v1_admin_kubernetes_clusters_provision_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["K8sAdminProvision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Accepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_cluster_api_v1_admin_kubernetes_clusters__cluster_id__get: {
         parameters: {
             query?: never;
@@ -5859,6 +6254,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_destroy_cluster_api_v1_admin_kubernetes_clusters__cluster_id__destroy_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["K8sClusterDelete"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Accepted"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -7847,6 +8279,41 @@ export interface operations {
             };
         };
     };
+    tenant_create_cluster_api_v1_kubernetes_clusters_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["K8sProvision"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Accepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     tenant_get_cluster_api_v1_kubernetes_clusters__cluster_id__get: {
         parameters: {
             query?: never;
@@ -7865,6 +8332,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["K8sClusterDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tenant_delete_cluster_api_v1_kubernetes_clusters__cluster_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["K8sClusterDelete"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Accepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tenant_download_kubeconfig_api_v1_kubernetes_clusters__cluster_id__kubeconfig_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/yaml": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tenant_k8s_images_api_v1_kubernetes_images_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["K8sImageOut"][];
                 };
             };
             /** @description Validation Error */

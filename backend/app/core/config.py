@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     k8s_poll_interval_seconds: float = 60.0
     k8s_poll_timeout_seconds: float = 30.0
     k8s_poll_concurrency: int = 4
+    # clusters the platform creates (ADR-0018): Let's Encrypt account e-mail
+    k8s_acme_email: str = "support@atena.io"
     # concurrent job runners per worker process (a slow shutdown on one server must not
     # hold back operations on another)
     job_concurrency: int = 4

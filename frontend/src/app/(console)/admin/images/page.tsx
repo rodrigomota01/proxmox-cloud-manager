@@ -71,6 +71,7 @@ function RegisterDialog({
       default_user: String(f.get("default_user")),
       visibility,
       tenant_id: visibility === "tenant" ? String(f.get("tenant_id")) : null,
+      kubernetes_version: String(f.get("kubernetes_version") ?? "").trim() || null,
     });
   }
 
@@ -110,6 +111,12 @@ function RegisterDialog({
             </Field>
             <Field label="Usuário padrão" hint="Usuário que o cloud-init cria e que recebe as chaves SSH.">
               <Input name="default_user" required defaultValue="debian" pattern="[a-z_][a-z0-9_\-]{0,31}" />
+            </Field>
+            <Field
+              label="Versão do Kubernetes (opcional)"
+              hint="Só para templates de nós Kubernetes (ex.: 1.37.1). A imagem passa a ser usada só para criar clusters."
+            >
+              <Input name="kubernetes_version" pattern="\d+\.\d+\.\d+" placeholder="1.37.1" />
             </Field>
             <Field label="Visibilidade">
               <Select className="w-full" value={visibility} onChange={(e) => setVisibility(e.target.value as "public" | "tenant")}>
@@ -225,6 +232,11 @@ export default function AdminImagesPage() {
                         <div className="text-xs text-slate-500">
                           usuário {i.default_user} · disco mín. {i.min_disk_gb} GiB
                         </div>
+                        {i.kubernetes_version && (
+                          <div className="mt-1">
+                            <Badge tone="indigo">Kubernetes {i.kubernetes_version}</Badge>
+                          </div>
+                        )}
                       </td>
                       <td className={tbl.td}>
                         <Badge tone={i.visibility === "public" ? "blue" : "gray"}>

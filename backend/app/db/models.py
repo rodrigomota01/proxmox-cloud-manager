@@ -11,7 +11,7 @@ from app.images.models import Image, ImageTemplate
 from app.inventory.models import Node, ProviderCluster, ProviderCredential, StoragePool, SyncRun
 from app.ipam.models import IpamAddress, IpamNetwork
 from app.jobs.models import Job, JobEvent
-from app.k8s.models import K8sCluster, K8sSnapshot
+from app.k8s.models import K8sCluster, K8sNodePool, K8sSnapshot
 from app.regions.models import Region, Zone
 from app.sshkeys.models import SshPublicKey
 from app.tenancy.models import Project, Tenant, TenantMembership, TenantQuota
@@ -30,6 +30,7 @@ __all__ = [
     "Job",
     "JobEvent",
     "K8sCluster",
+    "K8sNodePool",
     "K8sSnapshot",
     "Node",
     "NotificationChannel",

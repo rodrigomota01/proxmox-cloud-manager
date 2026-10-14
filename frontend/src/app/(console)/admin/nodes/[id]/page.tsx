@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { ConnectionInstances, ConnectionSettings } from "@/components/admin/connection";
 import { IpamPanel } from "@/components/admin/ipam-panel";
+import { NodeStorageCard, PhysicalDisksCard } from "@/components/disks";
 import { NodeMetrics } from "@/components/metrics-panel";
 import { DescriptionList, PageHeader } from "@/components/page";
 import { Card, ErrorBox, Status, formatBytes } from "@/components/ui";
@@ -139,6 +140,8 @@ export default function NodeDetailPage() {
             <DescriptionList columns={3} items={rows} />
           </Card>
           {online && <NodeMetrics nodeId={n.id} />}
+          <PhysicalDisksCard disks={n.disks} checkedAt={n.disks_checked_at} />
+          <NodeStorageCard clusterId={n.cluster_id} node={n.name} />
         </>
       )}
     </div>

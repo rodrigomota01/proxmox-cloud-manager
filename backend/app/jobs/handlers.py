@@ -5,5 +5,6 @@ from app.compute import jobs as compute_jobs
 from app.inventory import jobs as inventory_jobs
 from app.ipam import service as ipam_jobs
 from app.jobs.queue import HANDLERS
+from app.k8s import jobs as k8s_jobs
 
-__all__ = ["HANDLERS", "alert_jobs", "compute_jobs", "inventory_jobs", "ipam_jobs"]
+__all__ = ["HANDLERS", "alert_jobs", "compute_jobs", "inventory_jobs", "ipam_jobs", "k8s_jobs"]

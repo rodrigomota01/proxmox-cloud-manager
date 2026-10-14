@@ -138,6 +138,17 @@ class SyncRunOut(BaseModel):
     error: str | None
 
 
+class PhysicalDiskOut(BaseModel):
+    device: str
+    model: str | None
+    serial: str | None
+    type: str | None
+    size_bytes: int
+    used: str | None
+    health: str | None
+    wearout: int | None  # SSD life left, 0..100
+
+
 class NodeBase(BaseModel):
     id: uuid.UUID
     cluster_id: uuid.UUID
@@ -165,6 +176,8 @@ class NodeOut(NodeBase):
     # traffic of the guests on this node (sum of their rates), not the host NICs
     guests_net_in_bps: float
     guests_net_out_bps: float
+    disks: list[PhysicalDiskOut]  # empty until the first read
+    disks_checked_at: datetime | None
 
 
 class NodeMetricPointOut(BaseModel):
@@ -196,6 +209,15 @@ class StorageOut(BaseModel):
     used_bytes: int
 
 
+class AdminVolumeOut(BaseModel):
+    name: str
+    storage: str
+    volume: str
+    format: str | None
+    size_bytes: int
+    used_bytes: int | None  # space taken in the storage; None = not listable by the token
+
+
 class AdminInstanceOut(BaseModel):
     """Admin view: includes provider identifiers (vmid/node), never shown to tenants."""
 
@@ -219,6 +241,7 @@ class AdminInstanceOut(BaseModel):
     read_only: bool  # outside the cluster's managed pool: visible, not operable
     ipv4: str | None  # see app/compute/addresses.py
     ipv4_source: str | None
+    volumes: list[AdminVolumeOut]
     last_seen_at: datetime | None
 
 

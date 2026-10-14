@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { AddHypervisorDialog } from "@/components/admin/connection";
 import { ClusterStatus } from "@/components/cluster-status";
+import { failingDisks } from "@/components/disks";
 import { Icon } from "@/components/icons";
 import { PageHeader, ResourceIcon, SearchInput, StatTile, Toolbar } from "@/components/page";
 import { Alert, Badge, Button, Card, Empty, ErrorBox, Select, Status, formatBytes, tbl } from "@/components/ui";
@@ -232,6 +233,13 @@ export default function NodesPage() {
                           </td>
                           <td className={tbl.td}>
                             <NodeStatus status={n.status} />
+                            {failingDisks(n.disks).length > 0 && (
+                              <div className="mt-0.5">
+                                <Status tone="warn">
+                                  {failingDisks(n.disks).length} disco(s) com SMART {failingDisks(n.disks)[0].health}
+                                </Status>
+                              </div>
+                            )}
                           </td>
                           <td className={tbl.td}>{online ? <Meter value={n.cpu_usage} title={`CPU de ${n.name}`} /> : "—"}</td>
                           <td className={tbl.td}>

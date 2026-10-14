@@ -33,6 +33,9 @@ PERMISSIONS: dict[str, str] = {
     "quota:manage": "Manage quotas",
     "billing:view": "View usage and cost",
     "k8s:view": "View the Kubernetes clusters linked to the tenant (never the kubeconfig)",
+    "k8s:create": "Create Kubernetes clusters on the platform's VMs (ADR-0018)",
+    "k8s:delete": "Delete Kubernetes clusters the platform created, with their VMs",
+    "k8s:admin": "Download the admin kubeconfig of the tenant's platform-created clusters",
     "billing:manage": "Manage price tables",
     "audit:view": "View audit logs",
     "tenant:create": "Create tenants",
@@ -54,6 +57,7 @@ def _compute(actions: tuple[str, ...]) -> set[str]:
 # every tenant role sees the costs of what it can see, and the tenant's clusters
 _COMMON_VIEW = {"storage:view", "network:view", "quota:view", "billing:view", "k8s:view"}
 _SNAPSHOTS = {"snapshot:create", "snapshot:rollback"}
+_K8S_ADMIN = {"k8s:create", "k8s:delete", "k8s:admin"}
 
 ROLES: dict[str, tuple[str, list[str], set[str]]] = {
     # name: (description, allowed scopes, permissions)
@@ -68,13 +72,13 @@ ROLES: dict[str, tuple[str, list[str], set[str]]] = {
             "template:clone", "template:create", "network:manage", "project:create",
             "project:delete", "member:manage", "billing:view", "audit:view", "tenant:manage",
             "alert:manage",
-        },
+        } | _K8S_ADMIN,
     ),
     "PROJECT_ADMIN": (
         "Everything inside the project",
         ["project"],
         _compute(_LIFECYCLE) | _SNAPSHOTS | _COMMON_VIEW
-        | {"template:clone", "member:manage", "billing:view"},
+        | {"template:clone", "member:manage", "billing:view"} | _K8S_ADMIN,
     ),
     "OPERATOR": (
         "Operate instances, no create/delete",

@@ -11,9 +11,19 @@ from app.compute.models import Instance
 from app.db.session import set_tenant_scope
 from app.inventory.guest_disk import poll_guest_disks
 from app.inventory.models import ProviderCluster, ProviderCredential
+from app.inventory.node_disks import poll_node_disks
+from app.ipam.sync import poll_guest_config
 from app.jobs import handlers  # noqa: F401 - registers job handlers
 from app.jobs.queue import run_one
-from app.providers.base import FilesystemUsage, GuestAddress, PowerState
+from app.providers.base import (
+    FilesystemUsage,
+    GuestAddress,
+    PhysicalDisk,
+    PowerState,
+    StorageObservation,
+    VirtualDisk,
+    VolumeUsage,
+)
 from app.providers.registry import ProviderRegistry
 from app.worker.main import reconcile_all
 from tests.integration.factories import (
@@ -415,3 +425,47 @@ async def test_disk_usage_containers_and_guest_agent(client, ctx, app, registry,
     }
     assert (by_vmid[10001]["ipv4"], by_vmid[10001]["ipv4_source"]) == ("10.0.0.5/24", "agent")
     assert by_vmid[10003]["ipv4"] is None
+
+
+async def test_every_virtual_disk_and_physical_disks(client, ctx, app, registry, fake, owner_db):
+    root = ctx["root"]
+    await _cluster_with_creds(client, root)
+    gib = 1024**3
+    vol0, vol1 = "storage-vz:10001/vm-10001-disk-0.qcow2", "big:vm-10001-disk-1"
+    fake.disks["10001"] = [
+        VirtualDisk("scsi0", "storage-vz", vol0, 32 * gib, "qcow2"),
+        VirtualDisk("scsi1", "big", vol1, 500 * gib, "raw"),
+    ]
+    fake.storage += [
+        StorageObservation("tagima", "storage-vz", "dir", ("images", "iso"), False, True,
+                           1000 * gib, 100 * gib),
+        StorageObservation("tagima", "big", "lvmthin", ("images",), False, True,
+                           1000 * gib, 1 * gib),
+        StorageObservation("tagima", "isos", "dir", ("iso",), False, True, gib, 0),  # skipped
+    ]
+    # the token can list storage-vz; "big" lists nothing it may see
+    fake.volumes[("tagima", "storage-vz")] = [VolumeUsage(vol0, 32 * gib, 2 * gib)]
+    fake.node_disk_list["tagima"] = [PhysicalDisk(
+        "/dev/nvme0n1", "Micron_7400", "S1", "nvme", 3840 * gib, "linux_raid_member",
+        "PASSED", 97,
+    )]
+    await reconcile_all(app.state.sessionmaker, registry)
+    await poll_guest_config(app.state.sessionmaker, registry)
+    await poll_node_disks(app.state.sessionmaker, registry)
+
+    vm = await owner_db.scalar(
+        select(Instance).where(Instance.provider_ref["vmid"].as_integer() == 10001)
+    )
+    assert [(d["name"], d["used_bytes"]) for d in vm.disks] == [("scsi0", 2 * gib), ("scsi1", None)]
+
+    by_vmid = {
+        i["vmid"]: i for i in (await client.get("/api/v1/admin/instances", headers=root)).json()
+    }
+    assert [(v["name"], v["storage"], v["size_bytes"]) for v in by_vmid[10001]["volumes"]] == [
+        ("scsi0", "storage-vz", 32 * gib), ("scsi1", "big", 500 * gib),
+    ]
+    [node] = (await client.get("/api/v1/admin/nodes", headers=root)).json()
+    assert [(d["device"], d["health"], d["wearout"]) for d in node["disks"]] == [
+        ("/dev/nvme0n1", "PASSED", 97)
+    ]
+    assert node["disks_checked_at"] is not None

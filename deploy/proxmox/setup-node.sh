@@ -67,7 +67,11 @@ privs() {
   local IFS=,; echo "${out[*]}"
 }
 
+# Guest agent inside the pool: read (disk, IPs) and, for Kubernetes clusters (ADR-0018),
+# run the platform's install scripts and write files. PVE 8 has all of it in VM.Monitor;
+# PVE 9 splits it into VM.GuestAgent.*.
 ROLE_PRIVS=$(privs VM.Audit VM.PowerMgmt VM.Console VM.Monitor VM.GuestAgent.Audit \
+  VM.GuestAgent.Unrestricted VM.GuestAgent.FileWrite \
   Pool.Audit Datastore.Audit Sys.Audit \
   VM.Allocate VM.Clone VM.Config.CPU VM.Config.Memory VM.Config.Disk VM.Config.Network \
   VM.Config.Cloudinit VM.Config.Options)

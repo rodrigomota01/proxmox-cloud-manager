@@ -8,6 +8,8 @@ from app.providers.base import (
     FilesystemUsage,
     GuestAddress,
     GuestAgentUnavailable,
+    GuestConfig,
+    GuestExecStatus,
     GuestNic,
     InstanceObservation,
     InstanceSpec,
@@ -16,6 +18,7 @@ from app.providers.base import (
     NodeMetricPoint,
     OperationHandle,
     OperationResult,
+    PhysicalDisk,
     PowerAction,
     ProgressCb,
     ProviderAuthError,
@@ -24,6 +27,7 @@ from app.providers.base import (
     ProviderRef,
     ProviderValidationError,
     TemplateDetails,
+    VolumeUsage,
 )
 from app.providers.proxmox import mapper
 from app.providers.proxmox.client import ProxmoxClient
@@ -79,8 +83,20 @@ class ProxmoxProvider:
         return sorted((p for p in points if p is not None), key=lambda p: p.time)
 
     async def guest_nics(self, ref: ProviderRef) -> list[GuestNic]:
+        return (await self.guest_config(ref)).nics
+
+    async def guest_config(self, ref: ProviderRef) -> GuestConfig:
         config = await self.client.get(f"{self._path(ref)}/config") or {}
-        return mapper.nics(config, ref.data["type"])
+        pve_type = ref.data["type"]
+        return GuestConfig(mapper.nics(config, pve_type), mapper.vm_disks(config, pve_type))
+
+    async def storage_volumes(self, node: str, storage: str) -> list[VolumeUsage]:
+        path = f"/nodes/{quote(node, safe='')}/storage/{quote(storage, safe='')}/content"
+        return mapper.volumes(await self.client.get(path, {"content": "images"}) or [])
+
+    async def node_disks(self, node: str) -> list[PhysicalDisk]:
+        path = f"/nodes/{quote(node, safe='')}/disks/list"
+        return mapper.physical_disks(await self.client.get(path, {"include-partitions": 0}) or [])
 
     async def guest_filesystems(self, ref: ProviderRef) -> list[FilesystemUsage]:
         return mapper.filesystems(await self._agent(ref, "get-fsinfo"))
@@ -89,16 +105,39 @@ class ProxmoxProvider:
         return mapper.guest_addresses(await self._agent(ref, "network-get-interfaces"))
 
     async def _agent(self, ref: ProviderRef, command: str) -> list[dict[str, Any]]:
+        data = await self._agent_call("GET", ref, command)
+        return (data or {}).get("result") or []
+
+    async def _agent_call(
+        self, method: str, ref: ProviderRef, command: str, data: dict[str, Any] | None = None
+    ) -> Any:
+        path = f"{self._path(ref)}/agent/{command}"
         try:
-            data = await self.client.get(f"{self._path(ref)}/agent/{command}")
+            if method == "GET":
+                return await self.client.get(path, data)
+            return await self.client.post(path, data)
         except ProviderAuthError:
             raise
         except ProviderError as exc:
-            # 500 "QEMU guest agent is not running" / "No QEMU guest agent configured"
+            # 500 "QEMU guest agent is not running" / "No QEMU guest agent configured" /
+            # "Agent error: PID 12 does not exist"
             if "agent" in str(exc).lower():
                 raise GuestAgentUnavailable(str(exc)) from exc
             raise
-        return (data or {}).get("result") or []
+
+    async def guest_ping(self, ref: ProviderRef) -> None:
+        await self._agent_call("POST", ref, "ping")
+
+    async def guest_exec_start(
+        self, ref: ProviderRef, command: list[str], stdin: str | None = None
+    ) -> int:
+        data: dict[str, Any] = {"command": command}
+        if stdin is not None:
+            data["input-data"] = stdin
+        return int((await self._agent_call("POST", ref, "exec", data))["pid"])
+
+    async def guest_exec_status(self, ref: ProviderRef, pid: int) -> GuestExecStatus:
+        return mapper.exec_status(await self._agent_call("GET", ref, "exec-status", {"pid": pid}))
 
     async def node_metrics(self, node: str, timeframe: str) -> list[NodeMetricPoint]:
         rows = await self.client.get(

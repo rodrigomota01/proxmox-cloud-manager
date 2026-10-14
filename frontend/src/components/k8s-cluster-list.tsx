@@ -16,6 +16,7 @@ import {
   type K8sCluster,
   type K8sMode,
   LinkTenantDialog,
+  ManagedState,
   UsageMeter,
 } from "@/components/k8s";
 import { Icon } from "@/components/icons";
@@ -135,11 +136,18 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
           )
         }
         actions={
-          admin && (
-            <Button onClick={() => setAdding(true)}>
-              <Icon name="plus" /> Adicionar cluster
-            </Button>
-          )
+          <>
+            <Link href={`${base}/new`}>
+              <Button>
+                <Icon name="plus" /> Criar cluster
+              </Button>
+            </Link>
+            {admin && (
+              <Button variant="secondary" onClick={() => setAdding(true)}>
+                Cadastrar existente
+              </Button>
+            )}
+          </>
         }
       />
       <ErrorBox message={clusters.isError ? errorMessage(clusters.error) : null} />
@@ -185,8 +193,18 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
               Adicione um ou cadastre na tabela kubernetes_clusters.
             </Empty>
           ) : (
-            <Empty icon="kubernetes" title="Nenhum cluster vinculado">
-              Nenhum cluster Kubernetes está vinculado a este cliente. Fale com o administrador da plataforma.
+            <Empty
+              icon="kubernetes"
+              title="Nenhum cluster"
+              action={
+                <Link href={`${base}/new`}>
+                  <Button>
+                    <Icon name="plus" /> Criar cluster
+                  </Button>
+                </Link>
+              }
+            >
+              Crie um cluster nas VMs da plataforma, ou peça ao administrador para vincular um existente.
             </Empty>
           )
         ) : (
@@ -265,7 +283,7 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
                           </td>
                         )}
                         <td className={`${tbl.td} whitespace-nowrap`}>
-                          <HealthBadge s={s} />
+                          {c.managed && c.managed.state !== "active" ? <ManagedState c={c} /> : <HealthBadge s={s} />}
                           {s && s.reasons.length > 0 && (
                             <div className="mt-0.5 max-w-[16rem] whitespace-normal text-xs text-slate-600 dark:text-slate-400">{s.reasons[0]}</div>
                           )}
@@ -320,6 +338,7 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
                           <td className={`${tbl.td} text-right`}>
                             <div className="flex items-center justify-end gap-1">
                               <DownloadKubeconfig c={c} labelClassName="hidden @7xl:inline" />
+                              {c.source !== "managed" && (
                               <Menu
                                 ariaLabel={`Ações de ${c.name}`}
                                 items={[
@@ -329,6 +348,7 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
                                   },
                                 ]}
                               />
+                              )}
                             </div>
                           </td>
                         )}

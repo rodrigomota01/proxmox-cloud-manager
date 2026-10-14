@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { ClusterStatus } from "@/components/cluster-status";
+import { volumesSummary } from "@/components/disks";
 import { IpAddress } from "@/components/ip-address";
 import { DescriptionList, ResourceIcon, Toolbar } from "@/components/page";
 import {
@@ -25,6 +26,7 @@ import {
   Select,
   Spinner,
   Textarea,
+  formatBytes,
   formatDate,
   tbl,
 } from "@/components/ui";
@@ -676,7 +678,10 @@ function InstanceTable({
                 <PowerBadge state={i.power_state} />
               </td>
               <td className={`${tbl.td} whitespace-nowrap tabular-nums text-slate-600 dark:text-slate-400`}>
-                {i.vcpus} vCPU · {(i.memory_mb / 1024).toFixed(1)} GiB · {i.root_disk_gb} GiB
+                {i.vcpus} vCPU · {(i.memory_mb / 1024).toFixed(1)} GiB ·{" "}
+                <span title={i.volumes.map((v) => `${v.name}: ${formatBytes(v.size_bytes)} em ${v.storage}`).join("\n")}>
+                  {volumesSummary(i.volumes, i.root_disk_gb)}
+                </span>
               </td>
               {action && <td className={`${tbl.td} text-right`}>{action(i)}</td>}
             </tr>

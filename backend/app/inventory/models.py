@@ -77,6 +77,9 @@ class Node(UUIDPk, Base):
     # the node's own root filesystem (OS, logs); guest disks live in storage_pools
     root_disk_bytes: Mapped[int] = mapped_column(BigInteger, server_default="0")
     root_disk_used_bytes: Mapped[int] = mapped_column(BigInteger, server_default="0")
+    # physical disks with SMART health (app/inventory/node_disks.py)
+    disks: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    disks_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

@@ -12,8 +12,11 @@ import {
   daysText,
   DownloadKubeconfig,
   ExpiryBadge,
+  DestroyClusterButton,
   HealthBadge,
+  K8S_STEPS,
   type K8sMode,
+  ManagedState,
   LinkTenantDialog,
   UsageMeter,
 } from "@/components/k8s";
@@ -69,11 +72,98 @@ function NamespaceSelect({ value, options, onChange }: { value: string; options:
   );
 }
 
-function Overview({ d }: { d: Detail }) {
-  const s = d.snapshot;
-  if (!s) return <Empty icon="kubernetes" title="Ainda não coletado">A primeira leitura acontece em até um minuto.</Empty>;
+/** A cluster the platform created: lifecycle, steps, pools and what was installed. */
+function ManagedCard({ d }: { d: Detail }) {
+  const m = d.managed;
+  if (!m) return null;
+  const current = K8S_STEPS.findIndex(([k]) => k === m.state_message);
   return (
     <div className="space-y-4">
+      {m.state === "error" && (
+        <Alert variant="danger" title="A criação do cluster falhou">
+          <p className="font-mono text-xs break-all">{m.state_message}</p>
+          <p className="mt-1">As VMs foram mantidas para diagnóstico. Exclua o cluster para liberar as VMs e os IPs.</p>
+        </Alert>
+      )}
+      {m.state === "provisioning" && (
+        <Card title="Criando o cluster" description="Leva alguns minutos; esta página se atualiza sozinha.">
+          <ol className="space-y-1.5 text-sm">
+            {K8S_STEPS.slice(1).map(([key, label], i) => {
+              const idx = i + 1;
+              const tone = idx < current ? "ok" : idx === current ? "progress" : "off";
+              return (
+                <li key={key}>
+                  <Status tone={tone}>{label}</Status>
+                </li>
+              );
+            })}
+          </ol>
+        </Card>
+      )}
+      <Card title="Cluster gerenciado pela plataforma">
+        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ["Kubernetes", m.kubernetes_version],
+            ["API", m.api_endpoint ? `https://${m.api_endpoint}:6443` : "—"],
+            ["IP do load balancer", m.lb_ip ?? "—"],
+            ["Criado em", day(m.created_at)],
+          ].map(([k, v]) => (
+            <div key={k}>
+              <dt className="text-xs text-slate-500">{k}</dt>
+              <dd className="font-mono">{v}</dd>
+            </div>
+          ))}
+        </dl>
+        <table className={`${tbl.table} mt-4`}>
+          <thead className={thead}>
+            <tr>
+              <th className={th}>Pool</th>
+              <th className={th}>Papel</th>
+              <th className={`${th} text-right`}>Nós</th>
+              <th className={th}>Tamanho de cada nó</th>
+            </tr>
+          </thead>
+          <tbody className={tbody}>
+            {m.pools.map((p) => (
+              <tr key={p.id} className={tr}>
+                <td className={`${td} font-medium`}>{p.name}</td>
+                <td className={td}>{p.role === "control-plane" ? "control plane" : "worker"}</td>
+                <td className={`${td} text-right tabular-nums`}>{p.count}</td>
+                <td className={`${td} tabular-nums`}>
+                  {p.vcpus} vCPU · {(p.memory_mb / 1024).toFixed(0)} GiB · {p.disk_gb} GiB
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="mt-3 text-xs text-slate-500">
+          Componentes:{" "}
+          {Object.entries(m.components)
+            .map(([k, v]) => `${k.replace("_", "-")} ${v}`)
+            .join(" · ")}
+          . Publique aplicações com <code>HTTPRoute</code> apontando para o Gateway <code>public</code> (namespace{" "}
+          <code>gateway</code>); certificados com os ClusterIssuers <code>letsencrypt</code> e <code>letsencrypt-staging</code>.
+        </p>
+      </Card>
+    </div>
+  );
+}
+
+function Overview({ d }: { d: Detail }) {
+  const s = d.snapshot;
+  if (!s) {
+    return (
+      <div className="space-y-4">
+        <ManagedCard d={d} />
+        {(!d.managed || d.managed.state === "active") && (
+          <Empty icon="kubernetes" title="Ainda não coletado">A primeira leitura acontece em até um minuto.</Empty>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-4">
+      <ManagedCard d={d} />
       {s.health !== "healthy" && (
         <Alert variant={s.health === "critical" ? "danger" : "warning"} title="O que pede atenção">
           <ul className="list-inside list-disc space-y-0.5">
@@ -667,16 +757,24 @@ export function K8sClusterDetail({ mode }: { mode: K8sMode }) {
         kind="k8s"
         status={
           <span className="flex items-center gap-2">
-            <HealthBadge s={s} />
+            {d.managed && d.managed.state !== "active" ? <ManagedState c={d} /> : <HealthBadge s={s} />}
             {admin && d.source === "manual" && <Badge>manual</Badge>}
+            {d.source === "managed" && <Badge tone="indigo">criado pela plataforma</Badge>}
           </span>
         }
         actions={
-          admin && (
+          d.source === "managed" ? (
             <>
-              <DownloadKubeconfig c={d} />
-              <AdminActions d={d} />
+              <DownloadKubeconfig c={d} tenant={!admin} />
+              <DestroyClusterButton c={d} admin={admin} onDone={() => router.push(base)} />
             </>
+          ) : (
+            admin && (
+              <>
+                <DownloadKubeconfig c={d} />
+                <AdminActions d={d} />
+              </>
+            )
           )
         }
         tabs={tabs}

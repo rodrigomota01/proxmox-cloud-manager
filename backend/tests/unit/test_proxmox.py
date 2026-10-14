@@ -319,3 +319,90 @@ def test_nics_from_vm_and_container_config():
     }, "lxc")
     assert (ct.mac, ct.ip) == ("aa:bb:cc:00:11:22", "152.236.18.21/31")
     assert ct.gateway == "152.236.18.20"
+
+
+def test_vm_disks_every_disk_but_cdroms_cloudinit_and_passthrough():
+    disks = mapper.vm_disks({
+        "scsi0": "storage-vz:10001/vm-10001-disk-0.qcow2,size=32G",
+        "scsi10": "storage-vz:10001/vm-10001-disk-2.qcow2,size=1T",
+        "scsi2": "local-lvm:vm-10001-disk-1,size=512M,format=raw",
+        "ide2": "storage-vz:10001/vm-10001-cloudinit.qcow2,media=cdrom,size=4M",
+        "ide0": "local:iso/debian.iso,media=cdrom",
+        "sata0": "/dev/disk/by-id/ata-WDC_X,size=100G",  # passthrough
+        "efidisk0": "storage-vz:10001/vm-10001-disk-3.raw,efitype=4m,size=528K",
+        "unused0": "storage-vz:10001/vm-10001-disk-9.qcow2",
+        "scsihw": "virtio-scsi-pci",
+    }, "qemu")
+    assert [(d.name, d.storage, d.size_bytes, d.format) for d in disks] == [
+        ("efidisk0", "storage-vz", 528 * 1024, "raw"),
+        ("scsi0", "storage-vz", 32 * 1024**3, "qcow2"),
+        ("scsi2", "local-lvm", 512 * 1024**2, "raw"),
+        ("scsi10", "storage-vz", 1024**4, "qcow2"),
+    ]
+    assert disks[1].volume == "storage-vz:10001/vm-10001-disk-0.qcow2"
+
+    ct = mapper.vm_disks({
+        "rootfs": "storage-vz:300/vm-300-disk-0.raw,size=8G",
+        "mp0": "local-zfs:subvol-300-disk-1,mp=/data,size=20G",
+        "mp1": "/srv/share,mp=/share",  # bind mount
+    }, "lxc")
+    assert [(d.name, d.format) for d in ct] == [("rootfs", "raw"), ("mp0", "subvol")]
+
+
+@respx.mock
+async def test_storage_volumes_and_node_disks():
+    respx.get(f"{API}/nodes/tagima/storage/storage-vz/content").respond(json={"data": [
+        {"volid": "storage-vz:10001/vm-10001-disk-0.qcow2", "size": 34359738368,
+         "used": 2110410752, "format": "qcow2", "vmid": 10001},
+        {"volid": "storage-vz:10002/vm-10002-disk-0.raw", "size": 10, "format": "raw"},
+    ]})
+    p = ProxmoxProvider(_client())
+    v = await p.storage_volumes("tagima", "storage-vz")
+    assert [(x.size_bytes, x.used_bytes) for x in v] == [(34359738368, 2110410752), (10, None)]
+    assert respx.calls.last.request.url.params["content"] == "images"
+
+    respx.get(f"{API}/nodes/tagima/disks/list").respond(json={"data": [
+        {"devpath": "/dev/sda", "model": "HDD", "type": "hdd", "size": 2, "health": "UNKNOWN",
+         "wearout": "N/A", "used": "LVM"},
+        {"devpath": "/dev/nvme0n1", "model": "Micron_7400", "serial": "S1", "type": "nvme",
+         "size": 3840755982336, "health": "PASSED", "wearout": 97, "used": "linux_raid_member"},
+    ]})
+    nvme, sda = sorted(await p.node_disks("tagima"), key=lambda d: d.type != "nvme")
+    assert (nvme.device, nvme.health, nvme.wearout, nvme.used) == (
+        "/dev/nvme0n1", "PASSED", 97, "linux_raid_member")
+    assert (sda.health, sda.wearout) == (None, None)
+
+
+@respx.mock
+async def test_guest_exec_passes_stdin_and_maps_status():
+    ref = mapper.instance_ref(10001, "tagima", "qemu")
+    base = f"{API}/nodes/tagima/qemu/10001/agent"
+    start = respx.post(f"{base}/exec").respond(json={"data": {"pid": 42}})
+    p = ProxmoxProvider(_client())
+    assert await p.guest_exec_start(ref, ["bash", "-c", "read x"], stdin="secret\n") == 42
+    sent = start.calls.last.request.content.decode()
+    assert "input-data=secret" in sent and "command=bash" in sent
+
+    status = respx.get(f"{base}/exec-status")
+    status.respond(json={"data": {"exited": 0}})
+    assert (await p.guest_exec_status(ref, 42)).exited is False
+    status.respond(json={"data": {"exited": 1, "exitcode": 2, "out-data": "o", "err-data": "e",
+                                  "out-truncated": 1}})
+    st = await p.guest_exec_status(ref, 42)
+    assert (st.exited, st.exitcode, st.out, st.err, st.truncated) == (True, 2, "o", "e", True)
+    status.mock(return_value=httpx.Response(
+        500, extensions={"reason_phrase": b"Agent error: PID 42 does not exist"}
+    ))
+    with pytest.raises(GuestAgentUnavailable):
+        await p.guest_exec_status(ref, 42)
+
+
+def test_bundle_command_runs_platform_scripts_with_env():
+    from app.k8s.bundle import command, script
+
+    argv = command("join-node", {"NODE_NAME": "lab-app-1"})
+    assert argv[:2] == ["env", "NODE_NAME=lab-app-1"]
+    assert argv[2:4] == ["bash", "-c"] and argv[4] == script("join-node") and argv[5] == "join-node"
+    for name in ("prepare-node", "init-control-plane", "join-command", "join-node",
+                 "install-addons"):
+        assert script(name).startswith("#!/usr/bin/env bash")

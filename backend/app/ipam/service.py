@@ -6,7 +6,7 @@ import aiomysql
 
 from app.core.config import Settings
 from app.ipam.source import IpamSource, MysqlIpamSource
-from app.ipam.sync import poll_guest_nics, sync_ipam
+from app.ipam.sync import poll_guest_config, sync_ipam
 from app.jobs.queue import JobContext, JobFailed, handler
 
 _override: IpamSource | None = None
@@ -35,5 +35,5 @@ async def ipam_sync(ctx: JobContext) -> dict[str, Any]:
         stats = await sync_ipam(ctx.sessionmaker, source)
     except (aiomysql.Error, OSError) as exc:
         raise JobFailed("IPAM_UNAVAILABLE", f"MySQL: {exc}") from exc
-    await poll_guest_nics(ctx.sessionmaker, ctx.providers)
+    await poll_guest_config(ctx.sessionmaker, ctx.providers)
     return stats
