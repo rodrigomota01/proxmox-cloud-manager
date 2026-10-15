@@ -18,7 +18,7 @@ from app.api.deps import (
 )
 from app.auth.service import AuthService
 from app.core.pagination import PageParams, page_params
-from app.infra.mailer import Mail, Mailer
+from app.infra.mailer import Mail, Mailer, send_logged
 from app.tenancy.models import Project, Tenant
 from app.tenancy.schemas import (
     Confirm,
@@ -57,7 +57,7 @@ PathTenant = Annotated[TenantContext, Depends(path_tenant)]
 
 def _send_later(background: BackgroundTasks, mailer: Mailer, mail: Mail | None) -> None:
     if mail is not None:
-        background.add_task(mailer.send, mail)
+        background.add_task(send_logged, mailer, mail)
 
 
 def tenant_out(t: Tenant) -> TenantOut:

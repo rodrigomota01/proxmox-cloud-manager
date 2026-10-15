@@ -11,8 +11,14 @@ x-backend-env: &backend-env
   CM_JWT_PRIVATE_KEY: ${CM_JWT_PRIVATE_KEY:-}
   CM_KEK: ${CM_KEK:-}
   CM_COOKIE_SECURE: ${CM_COOKIE_SECURE:-false}
-  CM_SMTP_HOST: mailpit
-  CM_SMTP_PORT: "1025"
+  CM_PUBLIC_BASE_URL: ${CM_PUBLIC_BASE_URL:-http://localhost}
+  # sem nada no .env: Mailpit (http://localhost:8025); SMTP real: ver .env.example
+  CM_SMTP_HOST: ${CM_SMTP_HOST:-mailpit}
+  CM_SMTP_PORT: ${CM_SMTP_PORT:-1025}
+  CM_SMTP_TLS: ${CM_SMTP_TLS:-none}
+  CM_SMTP_USERNAME: ${CM_SMTP_USERNAME:-}
+  CM_SMTP_PASSWORD: ${CM_SMTP_PASSWORD:-}
+  CM_SMTP_FROM: ${CM_SMTP_FROM:-Cloud Manager <no-reply@cloud-manager.local>}
   CM_IPAM_MYSQL_URL: ${CM_IPAM_MYSQL_URL:-}
 
 services:

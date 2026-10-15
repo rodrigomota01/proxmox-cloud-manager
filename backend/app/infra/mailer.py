@@ -63,6 +63,17 @@ class LogOnlyMailer:
         logger.warning("smtp not configured; e-mail dropped", extra={"subject": mail.subject})
 
 
+async def send_logged(mailer: Mailer, mail: Mail) -> None:
+    """For sends in a background task, after the response: a failure becomes one log line
+    (no traceback, never the body) instead of an unhandled error."""
+    try:
+        await mailer.send(mail)
+    except (OSError, smtplib.SMTPException) as e:  # ssl.SSLError is an OSError
+        logger.error(
+            "e-mail not sent", extra={"subject": mail.subject, "error": f"{type(e).__name__}: {e}"}
+        )
+
+
 def build_mailer(settings: Settings) -> Mailer:
     if settings.smtp_host:
         login = None

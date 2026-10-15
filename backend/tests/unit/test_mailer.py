@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from app.core.config import Settings
 from app.infra import mailer as mailer_mod
-from app.infra.mailer import LogOnlyMailer, Mail, SmtpMailer, build_mailer
+from app.infra.mailer import LogOnlyMailer, Mail, SmtpMailer, build_mailer, send_logged
 
 pytestmark = pytest.mark.anyio
 
@@ -90,3 +90,14 @@ def test_username_without_password_is_refused():
 def test_empty_values_from_compose_are_unset():
     s = _settings(smtp_host="", smtp_username="", smtp_password="")
     assert isinstance(build_mailer(s), LogOnlyMailer)
+
+
+async def test_send_logged_turns_a_failure_into_one_log_line(caplog):
+    class Refused:
+        async def send(self, mail):
+            raise mailer_mod.smtplib.SMTPAuthenticationError(535, b"authentication failed")
+
+    await send_logged(Refused(), MAIL)  # does not raise
+    (record,) = [r for r in caplog.records if r.message == "e-mail not sent"]
+    assert record.error.startswith("SMTPAuthenticationError: (535")
+    assert record.exc_info is None and "token" not in record.getMessage()

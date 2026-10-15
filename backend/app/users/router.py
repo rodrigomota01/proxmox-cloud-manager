@@ -25,7 +25,7 @@ from app.auth.service import AuthService
 from app.core.errors import NotFound
 from app.core.pagination import PageParams, page_params, paginate
 from app.iam.models import User
-from app.infra.mailer import Mailer
+from app.infra.mailer import Mailer, send_logged
 from app.tenancy.models import Tenant, TenantMembership
 from app.tenancy.schemas import Page
 from app.users.service import UserAdminService, platform_roles
@@ -222,7 +222,7 @@ async def create_user(
     mailer: MailerDep,
 ) -> AdminUserDetail:
     user, mail = await svc.create(body.email, body.display_name)
-    background.add_task(mailer.send, mail)
+    background.add_task(send_logged, mailer, mail)
     await db.refresh(user)
     return await user_detail(db, user)
 
@@ -257,7 +257,7 @@ async def unlock_user(
 async def send_password_reset(
     user_id: uuid.UUID, background: BackgroundTasks, _: UserAdmin, svc: Svc, mailer: MailerDep
 ) -> None:
-    background.add_task(mailer.send, await svc.send_password_reset(user_id))
+    background.add_task(send_logged, mailer, await svc.send_password_reset(user_id))
 
 
 @router.post("/admin/users/{user_id}/sessions/revoke", tags=["admin"])

@@ -29,7 +29,7 @@ from app.core.config import Settings
 from app.core.errors import Forbidden, NotFound, Unauthenticated
 from app.core.security import signing_key
 from app.iam.models import Role, RoleBinding, User
-from app.infra.mailer import Mailer
+from app.infra.mailer import Mailer, send_logged
 from app.tenancy.models import Tenant, TenantMembership
 
 REFRESH_COOKIE = "cm_rt"
@@ -136,7 +136,7 @@ async def forgot_password(
 ) -> None:
     mail = await svc.request_password_reset(body.email, ip=client_ip(request))
     if mail is not None:
-        background.add_task(mailer.send, mail)
+        background.add_task(send_logged, mailer, mail)
 
 
 @router.post("/auth/password/reset", status_code=status.HTTP_204_NO_CONTENT)
