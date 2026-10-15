@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -15,6 +16,7 @@ function safeNext(value: string | null): string {
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -25,8 +27,13 @@ function LoginForm() {
     setError(null);
     const result = await login(String(form.get("email")), String(form.get("password")));
     setBusy(false);
-    if (result.ok) router.replace(safeNext(params.get("next")));
-    else setError(result.message);
+    if (result.ok) {
+      // the cache may still hold the previous user's data (logout, or an expired session)
+      queryClient.clear();
+      router.replace(safeNext(params.get("next")));
+    } else {
+      setError(result.message);
+    }
   }
 
   return (
