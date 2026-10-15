@@ -140,7 +140,7 @@ async def refresh_ipam(
     """NICs of every guest (for IP matching), then the IPAM copy and the Kubernetes
     clusters when configured. A MySQL outage only delays the copies; it never stops
     the reconcile loop."""
-    await poll_guest_config(sessionmaker, registry)
+    await poll_guest_config(sessionmaker, registry, concurrency=settings.reconcile_concurrency)
     source = source_for(settings)
     if source is None:
         return
@@ -223,7 +223,7 @@ async def reconcile_loop(
     stop: asyncio.Event,
 ) -> None:
     loop = asyncio.get_running_loop()
-    next_disk_poll = next_ipam = next_billing = 0.0
+    next_billing = 0.0
     while not stop.is_set():
         try:
             await reconcile_all(
@@ -231,13 +231,6 @@ async def reconcile_loop(
                 concurrency=settings.reconcile_concurrency,
                 cluster_timeout=settings.reconcile_timeout_seconds,
             )
-            if loop.time() >= next_disk_poll:
-                next_disk_poll = loop.time() + settings.guest_disk_interval_seconds
-                await poll_guest_disks(sessionmaker, registry)
-                await poll_node_disks(sessionmaker, registry)
-            if loop.time() >= next_ipam:
-                next_ipam = loop.time() + settings.ipam_sync_interval_seconds
-                await refresh_ipam(settings, sessionmaker, registry)
             changes = await run_alerts(sessionmaker)
             if changes:
                 logger.info("alerts changed", extra={"changes": len(changes)})
@@ -247,6 +240,34 @@ async def reconcile_loop(
                 await accrue(sessionmaker, settings.billing_max_gap_seconds)
         except Exception:  # keep the loop alive; the next tick retries
             logger.exception("reconcile loop error")
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=settings.reconcile_interval_seconds)
+        except TimeoutError:
+            continue
+
+
+async def housekeeping_loop(
+    settings: Settings,
+    sessionmaker: async_sessionmaker[AsyncSession],
+    registry: ProviderRegistry,
+    stop: asyncio.Event,
+) -> None:
+    """Heavy reads (guest agent, SMART, storage listings, IPAM): their own loop, so a server
+    slow at them never delays the inventory sync of the others."""
+    loop = asyncio.get_running_loop()
+    next_disk_poll = next_ipam = 0.0
+    fanout = {"concurrency": settings.reconcile_concurrency}
+    while not stop.is_set():
+        try:
+            if loop.time() >= next_disk_poll:
+                next_disk_poll = loop.time() + settings.guest_disk_interval_seconds
+                await poll_guest_disks(sessionmaker, registry, **fanout)
+                await poll_node_disks(sessionmaker, registry, **fanout)
+            if loop.time() >= next_ipam:
+                next_ipam = loop.time() + settings.ipam_sync_interval_seconds
+                await refresh_ipam(settings, sessionmaker, registry)
+        except Exception:  # keep the loop alive; the next tick retries
+            logger.exception("housekeeping loop error")
         try:
             await asyncio.wait_for(stop.wait(), timeout=settings.reconcile_interval_seconds)
         except TimeoutError:
@@ -295,6 +316,7 @@ async def run(settings: Settings | None = None) -> None:
         await asyncio.gather(
             job_loop(settings, sessionmaker, registry, stop),
             reconcile_loop(settings, sessionmaker, registry, stop),
+            housekeeping_loop(settings, sessionmaker, registry, stop),
             k8s_loop(settings, sessionmaker, registry, stop),
         )
     finally:

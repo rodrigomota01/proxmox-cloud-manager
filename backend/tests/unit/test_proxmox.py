@@ -140,6 +140,34 @@ async def test_circuit_breaker_opens_after_failures():
 
 
 @respx.mock
+async def test_slow_get_is_tried_once_with_its_own_timeout_and_spares_the_breaker():
+    # disks/list runs smartctl on the node: a retry would start it again, and a node slow
+    # at it must not open the breaker for power and inventory calls
+    route = respx.get(f"{API}/nodes/n/disks/list").mock(side_effect=httpx.ReadTimeout("t"))
+    client = _client(slow_timeout=42.0, breaker=CircuitBreaker(threshold=1, reset_seconds=60))
+    with pytest.raises(ProviderUnavailable, match="ReadTimeout"):
+        await client.get("/nodes/n/disks/list", slow=True)
+    assert route.call_count == 1
+    assert route.calls[0].request.extensions["timeout"]["read"] == 42.0
+    respx.get(f"{API}/version").respond(json={"data": {"version": "8"}})
+    assert await client.get("/version") == {"version": "8"}  # breaker still closed
+
+
+@respx.mock
+async def test_provider_reads_disks_and_storage_as_slow():
+    disks = respx.get(f"{API}/nodes/n/disks/list").mock(side_effect=httpx.ReadTimeout("t"))
+    content = respx.get(f"{API}/nodes/n/storage/local/content").mock(
+        side_effect=httpx.ReadTimeout("t")
+    )
+    provider = ProxmoxProvider(_client())
+    with pytest.raises(ProviderUnavailable):
+        await provider.node_disks("n")
+    with pytest.raises(ProviderUnavailable):
+        await provider.storage_volumes("n", "local")
+    assert (disks.call_count, content.call_count) == (1, 1)
+
+
+@respx.mock
 async def test_secret_never_in_repr_or_errors():
     respx.get(f"{API}/version").respond(401)
     client = _client()

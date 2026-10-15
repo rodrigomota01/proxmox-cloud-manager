@@ -92,11 +92,12 @@ class ProxmoxProvider:
 
     async def storage_volumes(self, node: str, storage: str) -> list[VolumeUsage]:
         path = f"/nodes/{quote(node, safe='')}/storage/{quote(storage, safe='')}/content"
-        return mapper.volumes(await self.client.get(path, {"content": "images"}) or [])
+        return mapper.volumes(await self.client.get(path, {"content": "images"}, slow=True) or [])
 
     async def node_disks(self, node: str) -> list[PhysicalDisk]:
         path = f"/nodes/{quote(node, safe='')}/disks/list"
-        return mapper.physical_disks(await self.client.get(path, {"include-partitions": 0}) or [])
+        disks = await self.client.get(path, {"include-partitions": 0}, slow=True)
+        return mapper.physical_disks(disks or [])
 
     async def guest_filesystems(self, ref: ProviderRef) -> list[FilesystemUsage]:
         return mapper.filesystems(await self._agent(ref, "get-fsinfo"))

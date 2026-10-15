@@ -6,6 +6,9 @@
   verification is allowed only in dev.
 - GETs are retried with exponential backoff + jitter on transport errors and
   502/503/504; mutations are not retried (not idempotent).
+- Slow reads (`slow=True`: SMART, storage listings) get a longer timeout, one attempt
+  and no say in the circuit breaker: a retry would start the same heavy command again on
+  the node, and a node slow at those must not block power and inventory calls.
 - A per-cluster semaphore bounds concurrency; a circuit breaker stops hammering a
   cluster that keeps failing.
 """
@@ -71,6 +74,7 @@ class ProxmoxClient:
         *,
         verify: ssl.SSLContext | bool = True,
         timeout: float = 15.0,
+        slow_timeout: float = 60.0,
         max_concurrency: int = 8,
         retries: int = 3,
         breaker: CircuitBreaker | None = None,
@@ -86,6 +90,7 @@ class ProxmoxClient:
         )
         self._sem = asyncio.Semaphore(max_concurrency)
         self._retries = retries
+        self._slow_timeout = slow_timeout
         self.breaker = breaker or CircuitBreaker()
         self.token_id = token_id
 
@@ -95,8 +100,10 @@ class ProxmoxClient:
     async def aclose(self) -> None:
         await self._http.aclose()
 
-    async def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
-        return await self._request("GET", path, params=params, retry=True)
+    async def get(
+        self, path: str, params: dict[str, Any] | None = None, *, slow: bool = False
+    ) -> Any:
+        return await self._request("GET", path, params=params, retry=not slow, slow=slow)
 
     async def post(self, path: str, data: dict[str, Any] | None = None) -> Any:
         return await self._request("POST", path, data=data, retry=False)
@@ -108,10 +115,18 @@ class ProxmoxClient:
         return await self._request("DELETE", path, params=params, retry=False)
 
     async def _request(
-        self, method: str, path: str, *, retry: bool, params: Any = None, data: Any = None
+        self,
+        method: str,
+        path: str,
+        *,
+        retry: bool,
+        params: Any = None,
+        data: Any = None,
+        slow: bool = False,
     ) -> Any:
         self.breaker.check()
         attempts = self._retries + 1 if retry else 1
+        timeout = self._slow_timeout if slow else httpx.USE_CLIENT_DEFAULT
         last: ProviderError | None = None
         for attempt in range(attempts):
             if attempt:
@@ -120,7 +135,9 @@ class ProxmoxClient:
                 await asyncio.sleep(min(0.25 * 2**attempt, 4.0) * jitter)
             try:
                 async with self._sem:
-                    response = await self._http.request(method, path, params=params, data=data)
+                    response = await self._http.request(
+                        method, path, params=params, data=data, timeout=timeout
+                    )
             except httpx.TransportError as exc:
                 last = ProviderUnavailable(f"{method} {path}: {type(exc).__name__}")
                 continue
@@ -129,7 +146,8 @@ class ProxmoxClient:
                 continue
             self.breaker.success()
             return self._unwrap(method, path, response)
-        self.breaker.failure()
+        if not slow:
+            self.breaker.failure()
         if last is None:  # unreachable: attempts >= 1 and every failed one sets it
             last = ProviderUnavailable(f"{method} {path}: no attempt made")
         logger.warning("proxmox request failed", extra={"error": str(last)})

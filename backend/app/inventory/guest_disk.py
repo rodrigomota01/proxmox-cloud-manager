@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.compute.models import Instance
 from app.db.session import set_platform_scope
 from app.infra.secrets import SecretsError
+from app.inventory.fanout import for_each_cluster
 from app.inventory.models import ProviderCluster, ProviderCredential
 from app.providers.base import (
     CloudProvider,
@@ -44,6 +45,7 @@ async def poll_guest_disks(
     sessionmaker: async_sessionmaker[AsyncSession],
     registry: ProviderRegistry,
     *,
+    concurrency: int = 4,
     cluster_timeout: float = 120.0,
 ) -> None:
     async with sessionmaker() as db, db.begin():
@@ -55,14 +57,14 @@ async def poll_guest_disks(
                 .where(ProviderCluster.status == "online")
             )
         ).scalars().all()
-    for cluster_id in ids:  # sequential: this is background housekeeping, not urgent
-        try:
-            async with asyncio.timeout(cluster_timeout):
-                await _poll_cluster(sessionmaker, registry, cluster_id)
-        except TimeoutError:
-            logger.warning("guest disk poll timed out", extra={"cluster_id": str(cluster_id)})
-        except Exception:
-            logger.exception("guest disk poll crashed", extra={"cluster_id": str(cluster_id)})
+
+    async def poll(cluster_id: uuid.UUID) -> None:
+        await _poll_cluster(sessionmaker, registry, cluster_id)
+
+    await for_each_cluster(
+        ids, poll, what="guest disk poll", concurrency=concurrency,
+        cluster_timeout=cluster_timeout,
+    )
 
 
 async def _poll_cluster(

@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.compute.models import Instance
 from app.db.session import set_platform_scope
 from app.infra.secrets import SecretsError
+from app.inventory.fanout import for_each_cluster
 from app.inventory.models import Node, ProviderCluster, ProviderCredential, StoragePool
 from app.ipam.models import IpamAddress
 from app.ipam.source import IpamSource, PoolRow
@@ -82,7 +83,11 @@ async def sync_ipam(
 
 
 async def poll_guest_config(
-    sessionmaker: async_sessionmaker[AsyncSession], registry: ProviderRegistry
+    sessionmaker: async_sessionmaker[AsyncSession],
+    registry: ProviderRegistry,
+    *,
+    concurrency: int = 4,
+    cluster_timeout: float = 120.0,
 ) -> None:
     async with sessionmaker() as db, db.begin():
         await set_platform_scope(db)
@@ -93,12 +98,14 @@ async def poll_guest_config(
                 .where(ProviderCluster.status == "online")
             )
         ).scalars().all()
-    for cluster_id in ids:
-        try:
-            async with asyncio.timeout(120):
-                await _poll_cluster(sessionmaker, registry, cluster_id)
-        except Exception:  # one server must not stop the others
-            logger.exception("guest config poll failed", extra={"cluster_id": str(cluster_id)})
+
+    async def poll(cluster_id: uuid.UUID) -> None:
+        await _poll_cluster(sessionmaker, registry, cluster_id)
+
+    await for_each_cluster(
+        ids, poll, what="guest config poll", concurrency=concurrency,
+        cluster_timeout=cluster_timeout,
+    )
 
 
 async def _poll_cluster(
@@ -111,6 +118,8 @@ async def _poll_cluster(
         cluster = await db.get(ProviderCluster, cluster_id)
         if cluster is None:
             return
+        # no row lock while talking to the server (slow on a struggling node): the inventory
+        # sync and the jobs keep working; the rows are locked below, only to write
         guests = (
             await db.execute(
                 select(Instance)
@@ -119,7 +128,6 @@ async def _poll_cluster(
                     Instance.state.not_in(("provisioning", "deleting")),
                     Instance.provider_ref.has_key("vmid"),
                 )
-                .with_for_update()
             )
         ).scalars().all()
         pools = (await db.execute(
@@ -143,9 +151,23 @@ async def _poll_cluster(
                 "guest config poll skipped", extra={"cluster": cluster.name, "error": str(exc)}
             )
             return
-        for instance, config in zip(guests, results, strict=True):
-            if config is None:
-                continue
+        read = {g.id: c for g, c in zip(guests, results, strict=True) if c is not None}
+        if not read:
+            return
+        # a job may have started on a guest meanwhile: lock, re-read and skip those
+        current = (
+            await db.execute(
+                select(Instance)
+                .where(
+                    Instance.id.in_(read), Instance.deleted_at.is_(None),
+                    Instance.state.not_in(("provisioning", "deleting")),
+                )
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).scalars().all()
+        for instance in current:
+            config = read[instance.id]
             nics = [asdict(n) for n in config.nics]
             if nics != instance.nics:
                 instance.nics = nics
