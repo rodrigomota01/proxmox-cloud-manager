@@ -4,12 +4,14 @@
   create-admin   create a SUPER_ADMIN user (bootstrap)        (CM_MIGRATION_DATABASE_URL)
   gen-keys       print new keys for .env (CM_JWT_PRIVATE_KEY, CM_KEK; or --only one)
   openapi        print the OpenAPI document (committed as docs/api/openapi.json)
+  send-test-email  send one e-mail with the CM_SMTP_* settings (checks TLS and login)
 """
 
 import argparse
 import asyncio
 import getpass
 import os
+import smtplib
 import sys
 from pathlib import Path
 
@@ -23,6 +25,7 @@ from app.core.security import generate_private_key_pem, hash_password
 from app.db.session import create_engine, create_sessionmaker
 from app.iam.catalog import sync_catalog
 from app.iam.models import Role, RoleBinding, User
+from app.infra.mailer import LogOnlyMailer, Mail, build_mailer
 from app.infra.secrets import generate_kek
 
 ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
@@ -79,6 +82,25 @@ def openapi_document() -> str:
     return json.dumps(spec, indent=2, sort_keys=True, ensure_ascii=False)
 
 
+def send_test_email(to: str) -> None:
+    settings = get_settings()
+    mailer = build_mailer(settings)
+    if isinstance(mailer, LogOnlyMailer):
+        raise SystemExit("CM_SMTP_HOST is not set")
+    mail = Mail(
+        to=to,
+        subject="Cloud Manager: e-mail de teste",
+        body=f"Envio de teste a partir de {settings.public_base_url}. Nada a fazer.",
+    )
+    try:
+        asyncio.run(mailer.send(mail))
+    except (OSError, smtplib.SMTPException) as e:  # ssl.SSLError is an OSError
+        raise SystemExit(f"failed: {type(e).__name__}: {e}") from None
+    sys.stdout.write(
+        f"sent to {to} via {settings.smtp_host}:{settings.smtp_port} (tls={settings.smtp_tls})\n"
+    )
+
+
 def _read_password() -> str:
     if pw := os.environ.get("CM_ADMIN_PASSWORD"):
         return pw
@@ -98,6 +120,8 @@ def main(argv: list[str] | None = None) -> None:
     p_keys = sub.add_parser("gen-keys")
     p_keys.add_argument("--only", choices=["jwt", "kek"])
     sub.add_parser("openapi")
+    p_mail = sub.add_parser("send-test-email")
+    p_mail.add_argument("--to", required=True)
     args = parser.parse_args(argv)
 
     if args.cmd == "migrate":
@@ -107,6 +131,8 @@ def main(argv: list[str] | None = None) -> None:
         if len(password) < 12:
             raise SystemExit("password must have at least 12 characters")
         asyncio.run(create_admin(args.email, args.name, password))
+    elif args.cmd == "send-test-email":
+        send_test_email(args.to)
     elif args.cmd == "openapi":
         sys.stdout.write(openapi_document() + "\n")
     elif args.cmd == "gen-keys":
