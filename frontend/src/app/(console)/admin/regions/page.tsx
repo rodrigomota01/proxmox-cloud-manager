@@ -121,6 +121,125 @@ function NewZoneForm({ region }: { region: Region }) {
   );
 }
 
+/** Name, country and description; the slug is fixed (servers and instances refer to it). */
+function EditRegionDialog({ region, onClose }: { region: Region | null; onClose: () => void }) {
+  const invalidate = useInvalidate();
+  const save = useMutation({
+    mutationFn: async (body: Schemas["RegionUpdate"]) =>
+      unwrap(
+        await api.PATCH("/api/v1/admin/regions/{region_id}", {
+          params: { path: { region_id: region!.id } },
+          body,
+        }),
+      ),
+    onSuccess: () => {
+      invalidate();
+      onClose();
+    },
+  });
+  const close = () => {
+    save.reset(); // an error from this edit must not show up on the next one
+    onClose();
+  };
+  return (
+    <Dialog open={region !== null} onClose={close} title="Editar região">
+      {region && (
+        <form
+          key={region.id}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            save.mutate({
+              name: String(f.get("name")),
+              country_code: String(f.get("country_code")),
+              description: String(f.get("description") ?? ""),
+            });
+          }}
+          className="space-y-3"
+        >
+          <Field label="Identificador" hint="Não muda: servidores e instâncias se referem a ele.">
+            <Input value={region.slug} disabled readOnly />
+          </Field>
+          <Field label="Nome">
+            <Input name="name" required maxLength={100} defaultValue={region.name} autoFocus />
+          </Field>
+          <Field label="País (código ISO)" hint="BR, US, CA…">
+            <Input name="country_code" required maxLength={2} defaultValue={region.country_code} />
+          </Field>
+          <Field label="Descrição (opcional)">
+            <Input name="description" maxLength={500} defaultValue={region.description} />
+          </Field>
+          <ErrorBox message={save.isError ? errorMessage(save.error) : null} />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={close}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={save.isPending}>
+              Salvar
+            </Button>
+          </div>
+        </form>
+      )}
+    </Dialog>
+  );
+}
+
+/** Name and description; the slug is fixed (servers and instances refer to it). */
+function EditZoneDialog({ zone, onClose }: { zone: Schemas["AdminZoneOut"] | null; onClose: () => void }) {
+  const invalidate = useInvalidate();
+  const save = useMutation({
+    mutationFn: async (body: Schemas["ZoneUpdate"]) =>
+      unwrap(
+        await api.PATCH("/api/v1/admin/zones/{zone_id}", {
+          params: { path: { zone_id: zone!.id } },
+          body,
+        }),
+      ),
+    onSuccess: () => {
+      invalidate();
+      onClose();
+    },
+  });
+  const close = () => {
+    save.reset();
+    onClose();
+  };
+  return (
+    <Dialog open={zone !== null} onClose={close} title="Editar zona">
+      {zone && (
+        <form
+          key={zone.id}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            save.mutate({ name: String(f.get("name")), description: String(f.get("description") ?? "") });
+          }}
+          className="space-y-3"
+        >
+          <Field label="Identificador" hint="Não muda: servidores e instâncias se referem a ele.">
+            <Input value={zone.slug} disabled readOnly />
+          </Field>
+          <Field label="Nome">
+            <Input name="name" required maxLength={100} defaultValue={zone.name} autoFocus />
+          </Field>
+          <Field label="Descrição (opcional)">
+            <Input name="description" maxLength={500} defaultValue={zone.description} />
+          </Field>
+          <ErrorBox message={save.isError ? errorMessage(save.error) : null} />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={close}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={save.isPending}>
+              Salvar
+            </Button>
+          </div>
+        </form>
+      )}
+    </Dialog>
+  );
+}
+
 function ZoneToggle({ zone }: { zone: Schemas["AdminZoneOut"] }) {
   const invalidate = useInvalidate();
   const toggle = useMutation({
@@ -142,6 +261,8 @@ function ZoneToggle({ zone }: { zone: Schemas["AdminZoneOut"] }) {
 
 export default function RegionsPage() {
   const [creating, setCreating] = useState(false);
+  const [editingRegion, setEditingRegion] = useState<Region | null>(null);
+  const [editingZone, setEditingZone] = useState<Schemas["AdminZoneOut"] | null>(null);
   const regions = useQuery({
     queryKey: ["admin", "regions"],
     queryFn: async () => unwrap(await api.GET("/api/v1/admin/regions")),
@@ -196,7 +317,14 @@ export default function RegionsPage() {
             </span>
           }
           description={`${r.zones.length} zona(s)`}
-          actions={<NewZoneForm region={r} />}
+          actions={
+            <div className="flex flex-wrap items-end gap-2">
+              <Button variant="ghost" onClick={() => setEditingRegion(r)}>
+                Editar região
+              </Button>
+              <NewZoneForm region={r} />
+            </div>
+          }
           flush
         >
           {r.zones.length === 0 ? (
@@ -229,7 +357,10 @@ export default function RegionsPage() {
                           <Status tone="warn">Sem servidor pronto</Status>
                         )}
                       </td>
-                      <td className={`${tbl.td} text-right`}>
+                      <td className={`${tbl.td} whitespace-nowrap text-right`}>
+                        <Button variant="ghost" onClick={() => setEditingZone(z)}>
+                          Editar
+                        </Button>
                         <ZoneToggle zone={z} />
                       </td>
                     </tr>
@@ -241,6 +372,8 @@ export default function RegionsPage() {
         </Card>
       ))}
       <NewRegionDialog open={creating} onClose={() => setCreating(false)} />
+      <EditRegionDialog region={editingRegion} onClose={() => setEditingRegion(null)} />
+      <EditZoneDialog zone={editingZone} onClose={() => setEditingZone(null)} />
     </div>
   );
 }

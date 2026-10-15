@@ -50,11 +50,29 @@ destino**. Depois, em *Imagens*, registre os templates deste servidor.
   isso exigiria privilégio administrativo amplo no token, e hoje ele só altera o que
   está dentro do pool — se vazar, as VMs de clientes fora dele seguem intocáveis.
 - Quem cria o pool e dá as permissões ao token é o `setup-node.sh` (`POOL=<nome>`,
-  padrão `cm-lab`). Para usar outro nome, rode o script de novo com `POOL=<nome>`
+  padrão `cloud-manager`). Para usar outro nome, rode o script de novo com `POOL=<nome>`
   **antes** de salvá-lo na plataforma; senão a criação de VM falha por permissão.
 - Sem pool **ou** sem zona, o servidor é sincronizado e monitorado, mas **não recebe
   VMs novas**: a zona dele não aparece em *Nova instância* (a aba Configuração avisa).
 - Só VMs dentro do pool são operáveis (ligar/desligar/excluir); as de fora, mesmo
+
+### Trocar o pool (ex.: do antigo `cm-lab` para `cloud-manager`)
+
+O Proxmox não renomeia pools. Em cada servidor:
+
+```bash
+POOL=cloud-manager AUDIT_ALL=1 STORAGE=<storage> BRIDGE=<bridge> TEMPLATES="<vmid>" bash setup-node.sh
+pvesh set /pools/cloud-manager --vms <VMID>[,<VMID>...]   # se o pool antigo tinha VMs
+```
+
+Depois, na plataforma, troque o **pool de destino** do servidor. Por fim, remova as ACLs
+do pool antigo (o script não as remove) e o pool, que precisa estar vazio:
+
+```bash
+pveum acl delete /pool/cm-lab --users cloudmgr@pve --roles CloudManager
+pveum acl delete /pool/cm-lab --tokens 'cloudmgr@pve!cm' --roles CloudManager
+pveum pool delete cm-lab
+```
   adotadas por um cliente, ficam **somente leitura**.
 
 As seções abaixo documentam o passo a passo manual equivalente (usado no primeiro lab).
@@ -72,7 +90,7 @@ limitações dele (cloud-init e guest agent mais antigos).
 > esse role passou a poder criar VMs (Fase 2a), aquela ACL ficaria ampla demais: use
 > `CMNode` (só `Sys.Audit`). O `setup-node.sh` remove a ACL antiga automaticamente.
 
-O token só enxerga e controla os guests do pool `cm-lab`. Guests fora do pool ficam
+O token só enxerga e controla os guests do pool `cloud-manager`. Guests fora do pool ficam
 invisíveis para a plataforma. Nenhum comando abaixo reinicia serviços ou altera guests
 existentes; tudo é desfeito com `pveum user delete cloudmgr@pve && pveum role delete CloudManager`.
 
@@ -80,16 +98,16 @@ existentes; tudo é desfeito com `pveum user delete cloudmgr@pve && pveum role d
 > fazem expansão de histórico do `!`.
 
 ```bash
-pvesh create /pools --poolid cm-lab --comment "Cloud Manager - testes"
-# mover guests descartáveis para o pool (ou clonar com --pool cm-lab)
-pvesh set /pools/cm-lab --vms <VMID>[,<VMID>...]
+pvesh create /pools --poolid cloud-manager --comment "Cloud Manager"
+# mover guests descartáveis para o pool (ou clonar com --pool cloud-manager)
+pvesh set /pools/cloud-manager --vms <VMID>[,<VMID>...]
 
 pveum user add cloudmgr@pve --comment "Cloud Manager service account"
 pveum role add CloudManager --privs "VM.Audit,VM.PowerMgmt,VM.Console,VM.Monitor,Pool.Audit,Datastore.Audit,Sys.Audit"
 pveum user token add cloudmgr@pve cm --privsep 1 --comment "cloud-manager"   # secret aparece uma vez
 
-pveum acl modify /pool/cm-lab --users  cloudmgr@pve      --roles CloudManager
-pveum acl modify /pool/cm-lab --tokens 'cloudmgr@pve!cm' --roles CloudManager
+pveum acl modify /pool/cloud-manager --users  cloudmgr@pve      --roles CloudManager
+pveum acl modify /pool/cloud-manager --tokens 'cloudmgr@pve!cm' --roles CloudManager
 pveum role add CMNode --privs "Sys.Audit"   # /nodes: leitura do status dos nodes, nada mais
 pveum acl modify /nodes       --users  cloudmgr@pve      --roles CMNode
 pveum acl modify /nodes       --tokens 'cloudmgr@pve!cm' --roles CMNode
@@ -123,7 +141,7 @@ pveum acl modify /sdn/zones/localnetwork/vmbr0 --tokens 'cloudmgr@pve!cm' --role
 pveum user token permissions cloudmgr@pve cm   # conferência
 ```
 
-Na plataforma: defina o **pool de destino** do servidor (ex.: `cm-lab`) e registre o
+Na plataforma: defina o **pool de destino** do servidor (ex.: `cloud-manager`) e registre o
 template em *Admin → Imagens*. O template precisa de drive de cloud-init; chaves, senha e
 IP dele **não** são herdados pelas VMs criadas.
 

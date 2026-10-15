@@ -781,8 +781,8 @@ export function AddHypervisorDialog({
             ))}
           </Select>
         </Field>
-        <Field label="Pool de destino" hint="Pool do Proxmox onde as VMs novas nascem (o escopo das ACLs do token), ex.: cm-lab.">
-          <Input name="pool" maxLength={64} pattern="[A-Za-z0-9._\-]+" placeholder="cm-lab" disabled={created !== null} />
+        <Field label="Pool de destino" hint="Pool do Proxmox onde as VMs novas nascem (o escopo das ACLs do token), ex.: cloud-manager.">
+          <Input name="pool" maxLength={64} pattern="[A-Za-z0-9._\-]+" placeholder="cloud-manager" disabled={created !== null} />
         </Field>
         <Field
           label="CA própria (opcional)"

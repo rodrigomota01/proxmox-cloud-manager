@@ -4,7 +4,7 @@
 #
 #   STORAGE=vz-folder BRIDGE=vmbr0 TEMPLATES="9998" bash setup-node.sh
 #
-#   POOL       pool the platform owns (default cm-lab). Guests outside it stay invisible.
+#   POOL       pool the platform owns (default cloud-manager). Guests outside it stay invisible.
 #   STORAGE    storage where new disks go (Datastore.Audit + AllocateSpace there only)
 #   STORAGE_AUDIT  1 (default) = read-only view of EVERY storage (Datastore.Audit on
 #              /storage): size and usage of all of them in the platform; disks are still
@@ -21,7 +21,7 @@
 # It never touches existing guests. The token secret is printed ONCE (on creation).
 set -euo pipefail
 
-POOL=${POOL:-cm-lab}
+POOL=${POOL:-cloud-manager}
 AUDIT_ALL=${AUDIT_ALL:-0}
 STORAGE_AUDIT=${STORAGE_AUDIT:-1}
 STORAGE=${STORAGE:?set STORAGE (pvesm status)}
