@@ -6,12 +6,13 @@ Traefik (HTTPS), frontend, API, worker, Redis e PostgreSQL (volume `pgdata`).
 
 ## Pré-requisitos
 
-- Docker Engine com Compose v2.
+- Docker Engine com Compose v2.23 ou mais novo (o script das roles do banco vai inline no compose).
 - DNS do `CM_DOMAIN` apontando para a VM; portas 80 e 443 abertas da internet (o Let's Encrypt
   valida pela 80).
 - Saída da VM para: API dos Proxmox (8006), API dos clusters Kubernetes (6443), SMTP (587)
   e o registry.
-- Este repositório clonado na VM (o compose monta `deploy/docker/postgres/init`).
+- Na VM bastam dois arquivos, num diretório só de root (ex.: `/opt/cloud-manager`):
+  `docker-compose-prod.yaml` e `.env.prod` (modo 600).
 
 ## 1. Login no registry (uma vez)
 
@@ -22,7 +23,7 @@ cat chave-sa.b64 | docker login -u _json_key_base64 --password-stdin https://us-
 ## 2. Configuração
 
 ```bash
-cp .env.prod.example .env.prod   # preencha tudo
+cp .env.prod.example .env.prod && chmod 600 .env.prod   # preencha tudo
 docker run --rm us-central1-docker.pkg.dev/atena-cloud/acloud/cloud-manager-backend:<tag> \
   python -m app.cli gen-keys     # cole CM_JWT_PRIVATE_KEY e CM_KEK no .env.prod
 ```
@@ -36,6 +37,7 @@ senhas do `.env.prod`.
 ## 3. Subir
 
 ```bash
+# sem estar no grupo docker, prefixe com sudo (o login no registry também: sudo docker login)
 alias dcp='docker compose -f docker-compose-prod.yaml --env-file .env.prod'
 dcp pull
 dcp up -d                       # postgres, migrate (roda e termina), depois api e worker

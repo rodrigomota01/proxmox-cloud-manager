@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copiado inline em docker-compose-prod.yaml (configs.pg-roles): mude os dois juntos.
 # Creates the two application roles described in ADR-0004:
 #   cm_owner -> owns schema objects, runs Alembic migrations
 #   cm_app   -> runtime role for API/worker; NOT owner, NO BYPASSRLS (so RLS applies)

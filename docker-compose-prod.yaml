@@ -5,6 +5,7 @@
 #   docker compose -f docker-compose-prod.yaml --env-file .env.prod pull
 #   docker compose -f docker-compose-prod.yaml --env-file .env.prod up -d
 #
+# Arquivo autossuficiente: na VM bastam ele e o .env.prod (Compose >= 2.23, configs inline).
 # Passo a passo (login no registry, primeiro admin, backup): deploy/prod/README.md
 
 name: cloud-manager
@@ -142,7 +143,9 @@ services:
       CM_APP_PASSWORD: ${CM_APP_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./deploy/docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    configs:
+      - source: pg-roles
+        target: /docker-entrypoint-initdb.d/01-roles.sh
     shm_size: 256mb
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -177,3 +180,25 @@ networks:
 volumes:
   pgdata:
   letsencrypt:
+
+configs:
+  # Mesmo conteúdo de deploy/docker/postgres/init/01-roles.sh ($$ = $ literal para o compose).
+  # Sem bit de execução o entrypoint do postgres faz `source`: nada de set -u nem exit aqui.
+  pg-roles:
+    content: |
+      psql -v ON_ERROR_STOP=1 \
+           --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" \
+           -v owner_pw="$$CM_OWNER_PASSWORD" -v app_pw="$$CM_APP_PASSWORD" <<'SQL'
+      CREATE ROLE cm_owner LOGIN PASSWORD :'owner_pw' NOSUPERUSER NOCREATEROLE NOBYPASSRLS;
+      CREATE ROLE cm_app   LOGIN PASSWORD :'app_pw'   NOSUPERUSER NOCREATEROLE NOCREATEDB NOBYPASSRLS;
+
+      SELECT format('ALTER DATABASE %I OWNER TO cm_owner', current_database()) \gexec
+      REVOKE ALL ON SCHEMA public FROM PUBLIC;
+      ALTER SCHEMA public OWNER TO cm_owner;
+      GRANT USAGE ON SCHEMA public TO cm_app;
+
+      ALTER DEFAULT PRIVILEGES FOR ROLE cm_owner IN SCHEMA public
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO cm_app;
+      ALTER DEFAULT PRIVILEGES FOR ROLE cm_owner IN SCHEMA public
+        GRANT USAGE, SELECT ON SEQUENCES TO cm_app;
+      SQL
