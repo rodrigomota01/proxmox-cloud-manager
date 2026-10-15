@@ -1,0 +1,179 @@
+# Produção numa VM: imagens do Artifact Registry (pipeline .github/workflows/images.yml),
+# HTTPS com Let's Encrypt no Traefik e PostgreSQL no volume pgdata (backup: deploy/prod/README.md).
+#
+#   cp .env.prod.example .env.prod   # preencha tudo
+#   docker compose -f docker-compose-prod.yaml --env-file .env.prod pull
+#   docker compose -f docker-compose-prod.yaml --env-file .env.prod up -d
+#
+# Passo a passo (login no registry, primeiro admin, backup): deploy/prod/README.md
+
+name: cloud-manager
+
+x-image: &backend-image "${CM_REGISTRY:-us-central1-docker.pkg.dev/atena-cloud/acloud}/cloud-manager-backend:${CM_IMAGE_TAG:?set CM_IMAGE_TAG (ex.: sha-8f3236c)}"
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "20m", max-file: "5" }
+
+x-hardening: &hardening
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+
+x-backend-env: &backend-env
+  CM_ENV: production
+  CM_LOG_LEVEL: ${CM_LOG_LEVEL:-INFO}
+  CM_DATABASE_URL: postgresql://cm_app:${CM_APP_PASSWORD:?set CM_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-cloudmanager}
+  CM_REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD}@redis:6379/0
+  CM_JWT_PRIVATE_KEY: ${CM_JWT_PRIVATE_KEY:?set CM_JWT_PRIVATE_KEY (app.cli gen-keys)}
+  CM_KEK: ${CM_KEK:?set CM_KEK (app.cli gen-keys)}
+  CM_COOKIE_SECURE: "true"
+  CM_PUBLIC_BASE_URL: https://${CM_DOMAIN:?set CM_DOMAIN}
+  CM_ALLOWED_ORIGINS: '["https://${CM_DOMAIN}"]'
+  CM_SMTP_HOST: ${CM_SMTP_HOST:?set CM_SMTP_HOST}
+  CM_SMTP_PORT: ${CM_SMTP_PORT:-587}
+  CM_SMTP_TLS: ${CM_SMTP_TLS:-starttls}
+  CM_SMTP_USERNAME: ${CM_SMTP_USERNAME:-}
+  CM_SMTP_PASSWORD: ${CM_SMTP_PASSWORD:-}
+  CM_SMTP_FROM: ${CM_SMTP_FROM:?set CM_SMTP_FROM}
+  CM_IPAM_MYSQL_URL: ${CM_IPAM_MYSQL_URL:-}
+
+services:
+  traefik:
+    image: traefik:v3.6
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=cloud-manager_edge
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.websecure.http.tls.certresolver=le
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL:?set ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.httpchallenge.entrypoint=web
+      - --accesslog=true
+      - --accesslog.format=json
+    ports:
+      - "80:80"     # desafio HTTP do Let's Encrypt e redirect para https
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    networks: [edge]
+    logging: *logging
+    restart: unless-stopped
+
+  frontend:
+    image: ${CM_REGISTRY:-us-central1-docker.pkg.dev/atena-cloud/acloud}/cloud-manager-frontend:${CM_IMAGE_TAG}
+    depends_on: [api]
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.frontend.rule=Host(`${CM_DOMAIN}`)
+      - traefik.http.routers.frontend.priority=1
+      - traefik.http.routers.frontend.entrypoints=websecure
+      - traefik.http.services.frontend.loadbalancer.server.port=3000
+    networks: [edge]
+    <<: *hardening
+    tmpfs: [/tmp, /app/.next/cache]
+    logging: *logging
+    restart: unless-stopped
+
+  # Alembic + catálogo RBAC como cm_owner; roda a cada `up` e termina. api/worker esperam.
+  migrate:
+    image: *backend-image
+    command: ["python", "-m", "app.cli", "migrate"]
+    environment:
+      <<: *backend-env
+      CM_MIGRATION_DATABASE_URL: postgresql://cm_owner:${CM_OWNER_PASSWORD:?set CM_OWNER_PASSWORD}@postgres:5432/${POSTGRES_DB:-cloudmanager}
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      disable: true
+    networks: [internal]
+    <<: *hardening
+    logging: *logging
+    restart: "no"
+
+  api:
+    image: *backend-image
+    environment: *backend-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.api.rule=Host(`${CM_DOMAIN}`) && (PathPrefix(`/api`) || PathPrefix(`/ws`))
+      - traefik.http.routers.api.priority=100
+      - traefik.http.routers.api.entrypoints=websecure
+      - traefik.http.services.api.loadbalancer.server.port=8000
+    networks: [edge, internal]          # edge também dá saída (SMTP)
+    <<: *hardening
+    logging: *logging
+    restart: unless-stopped
+
+  worker:
+    image: *backend-image
+    command: ["python", "-m", "app.worker.main"]
+    environment: *backend-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      disable: true
+    networks: [internal, egress]        # egress: Proxmox (8006), clusters k8s (6443), SMTP
+    <<: *hardening
+    logging: *logging
+    restart: unless-stopped
+
+  # Na primeira subida (volume vazio) o init cria as roles cm_owner (migrations) e cm_app
+  # (runtime, sem BYPASSRLS; ADR-0004). Sem porta publicada: backup com `exec pg_dump`.
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cloudmanager}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      CM_OWNER_PASSWORD: ${CM_OWNER_PASSWORD}
+      CM_APP_PASSWORD: ${CM_APP_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    shm_size: 256mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [internal]
+    logging: *logging
+    restart: unless-stopped
+
+  # Só pub/sub, rate limit e tickets efêmeros: sem persistência e sem backup.
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "no", "--save", ""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" --no-auth-warning ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [internal]
+    logging: *logging
+    restart: unless-stopped
+
+networks:
+  edge:
+  egress:
+  internal:
+    internal: true
+
+volumes:
+  pgdata:
+  letsencrypt:
