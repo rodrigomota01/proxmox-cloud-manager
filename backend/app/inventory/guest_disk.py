@@ -97,9 +97,20 @@ async def _poll_cluster(
                 "guest disk poll skipped", extra={"cluster": cluster.name, "error": str(exc)}
             )
             return
+        # the inventory sync runs alongside and bumps Instance.version: re-read the rows
+        # under a lock, only to write, so this does not overwrite a stale version
+        read = {vm.id: r for vm, r in zip(vms, results, strict=True)}
+        current = (
+            await db.execute(
+                select(Instance)
+                .where(Instance.id.in_(read), Instance.deleted_at.is_(None))
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).scalars().all()
         now = datetime.now(UTC)
-        for vm, result in zip(vms, results, strict=True):
-            apply(vm, result, now)
+        for vm in current:
+            apply(vm, read[vm.id], now)
 
 
 AgentRead = tuple[list[FilesystemUsage], list[GuestAddress] | None]

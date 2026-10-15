@@ -5,10 +5,10 @@ from dataclasses import replace
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.compute.models import Instance
-from app.db.session import set_tenant_scope
+from app.db.session import set_platform_scope, set_tenant_scope
 from app.inventory.guest_disk import poll_guest_disks
 from app.inventory.models import ProviderCluster, ProviderCredential
 from app.inventory.node_disks import poll_node_disks
@@ -425,6 +425,49 @@ async def test_disk_usage_containers_and_guest_agent(client, ctx, app, registry,
     }
     assert (by_vmid[10001]["ipv4"], by_vmid[10001]["ipv4_source"]) == ("10.0.0.5/24", "agent")
     assert by_vmid[10003]["ipv4"] is None
+
+
+async def test_guest_polls_survive_a_sync_that_runs_meanwhile(
+    client, ctx, app, registry, fake, owner_db, monkeypatch
+):
+    """The housekeeping loop runs alongside the inventory sync, which bumps
+    Instance.version (optimistic lock) while a slow server is still being read."""
+    from app.inventory import guest_disk
+
+    await _cluster_with_creds(client, ctx["root"])
+    fake.instances["10001"] = replace(fake.instances["10001"], power_state=PowerState.RUNNING)
+    fake.filesystems["10001"] = [FilesystemUsage("/", "ext4", 1, 4)]
+    await reconcile_all(app.state.sessionmaker, registry)
+
+    async def bump_versions() -> None:
+        async with app.state.sessionmaker() as db, db.begin():
+            await set_platform_scope(db)
+            await db.execute(update(Instance).values(version=Instance.version + 1))
+
+    original_read_all = guest_disk.read_all
+
+    async def read_all_during_a_sync(provider, refs):
+        await bump_versions()
+        return await original_read_all(provider, refs)
+
+    monkeypatch.setattr(guest_disk, "read_all", read_all_during_a_sync)
+    await poll_guest_disks(app.state.sessionmaker, registry)
+
+    original_config = fake.guest_config
+
+    async def config_during_a_sync(ref):
+        await bump_versions()
+        return await original_config(ref)
+
+    monkeypatch.setattr(fake, "guest_config", config_during_a_sync)
+    fake.disks["10001"] = [VirtualDisk("scsi0", "storage-vz", "v0", 4, "qcow2")]
+    await poll_guest_config(app.state.sessionmaker, registry)
+
+    vm = (await owner_db.execute(
+        select(Instance).where(Instance.provider_ref["vmid"].as_integer() == 10001)
+    )).scalar_one()
+    assert vm.guest_agent == "ok" and vm.disk_usage == 0.25
+    assert [d["volume"] for d in vm.disks] == ["v0"]
 
 
 async def test_every_virtual_disk_and_physical_disks(client, ctx, app, registry, fake, owner_db):
