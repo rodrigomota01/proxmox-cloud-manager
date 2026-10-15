@@ -1,11 +1,13 @@
-"""Outgoing e-mail. Dev uses Mailpit (SMTP without auth/TLS on the internal network)."""
+"""Outgoing e-mail. Dev uses Mailpit (SMTP without auth/TLS on the internal network);
+production uses STARTTLS or implicit TLS, with a login, and always verifies the certificate."""
 
 import asyncio
 import logging
 import smtplib
+import ssl
 from dataclasses import dataclass
 from email.message import EmailMessage
-from typing import Protocol
+from typing import Literal, Protocol
 
 from app.core.config import Settings
 
@@ -24,14 +26,30 @@ class Mailer(Protocol):
 
 
 class SmtpMailer:
-    def __init__(self, host: str, port: int, sender: str) -> None:
-        self.host, self.port, self.sender = host, port, sender
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        sender: str,
+        tls: Literal["none", "starttls", "ssl"] = "none",
+        login: tuple[str, str] | None = None,
+    ) -> None:
+        self.host, self.port, self.sender, self.tls, self.login = host, port, sender, tls, login
 
     def _send_sync(self, mail: Mail) -> None:
         msg = EmailMessage()
         msg["From"], msg["To"], msg["Subject"] = self.sender, mail.to, mail.subject
         msg.set_content(mail.body)
-        with smtplib.SMTP(self.host, self.port, timeout=10) as smtp:
+        context = ssl.create_default_context()
+        if self.tls == "ssl":
+            smtp = smtplib.SMTP_SSL(self.host, self.port, timeout=10, context=context)
+        else:
+            smtp = smtplib.SMTP(self.host, self.port, timeout=10)
+        with smtp:
+            if self.tls == "starttls":
+                smtp.starttls(context=context)  # raises if the server does not offer it
+            if self.login:
+                smtp.login(*self.login)
             smtp.send_message(msg)
 
     async def send(self, mail: Mail) -> None:
@@ -47,5 +65,10 @@ class LogOnlyMailer:
 
 def build_mailer(settings: Settings) -> Mailer:
     if settings.smtp_host:
-        return SmtpMailer(settings.smtp_host, settings.smtp_port, settings.smtp_from)
+        login = None
+        if settings.smtp_username and settings.smtp_password:
+            login = (settings.smtp_username, settings.smtp_password.get_secret_value())
+        return SmtpMailer(
+            settings.smtp_host, settings.smtp_port, settings.smtp_from, settings.smtp_tls, login
+        )
     return LogOnlyMailer()

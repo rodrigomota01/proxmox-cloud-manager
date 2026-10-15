@@ -4,7 +4,7 @@ from functools import lru_cache
 from typing import Literal
 from zoneinfo import ZoneInfo
 
-from pydantic import Field, PostgresDsn, RedisDsn, SecretStr, field_validator
+from pydantic import Field, PostgresDsn, RedisDsn, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -89,15 +89,29 @@ class Settings(BaseSettings):
     smtp_host: str | None = None  # unset -> e-mails are only logged (without the token)
     smtp_port: int = 1025
     smtp_from: str = "Cloud Manager <no-reply@cloud-manager.local>"
+    # "starttls" (usually 587) or "ssl" (implicit TLS, usually 465); the certificate is verified
+    smtp_tls: Literal["none", "starttls", "ssl"] = "none"
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
 
     @field_validator(
-        "jwt_private_key", "kek", "smtp_host", "migration_database_url", "ipam_mysql_url",
+        "jwt_private_key", "kek", "smtp_host", "smtp_username", "smtp_password",
+        "migration_database_url", "ipam_mysql_url",
         mode="before",
     )
     @classmethod
     def _empty_is_unset(cls, value: object) -> object:
         # compose passes `${VAR:-}` as an empty string
         return None if value == "" else value
+
+    @model_validator(mode="after")
+    def _smtp_login_needs_tls(self) -> "Settings":
+        if (self.smtp_username is None) != (self.smtp_password is None):
+            raise ValueError("CM_SMTP_USERNAME and CM_SMTP_PASSWORD go together")
+        if self.smtp_username is not None and self.smtp_tls == "none":
+            # never send the password in clear text
+            raise ValueError("CM_SMTP_USERNAME requires CM_SMTP_TLS=starttls or ssl")
+        return self
 
     @field_validator("billing_timezone")
     @classmethod
