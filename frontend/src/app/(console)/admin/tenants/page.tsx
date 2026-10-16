@@ -8,22 +8,23 @@ import { Menu, PageHeader, ResourceIcon, SearchInput, Toolbar } from "@/componen
 import { Button, Card, Dialog, Empty, ErrorBox, Field, Input, Status, tbl } from "@/components/ui";
 import { Meter, mib } from "@/components/viz";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useT, type MessageKey } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 
 type Tenant = Schemas["TenantOut"];
 
-const LABEL: Record<string, string> = {
-  instances: "Instâncias",
-  vcpus: "vCPUs",
-  memory_mb: "Memória (MiB)",
-  storage_gb: "Disco (GiB)",
+const LABEL: Record<string, MessageKey> = {
+  instances: "tenants.resources.instances",
+  vcpus: "tenants.resources.vcpus",
+  memory_mb: "tenants.resources.memoryMib",
+  storage_gb: "tenants.resources.storageGib",
 };
-const COLUMNS = [
-  { resource: "instances", label: "Instâncias", format: (v: number) => String(v) },
-  { resource: "vcpus", label: "vCPUs", format: (v: number) => String(v) },
-  { resource: "memory_mb", label: "Memória", format: mib },
-  { resource: "storage_gb", label: "Disco", format: (v: number) => `${v} GiB` },
-] as const;
+const COLUMNS: { resource: string; label: MessageKey; format: (v: number) => string }[] = [
+  { resource: "instances", label: "tenants.resources.instances", format: (v: number) => String(v) },
+  { resource: "vcpus", label: "tenants.resources.vcpus", format: (v: number) => String(v) },
+  { resource: "memory_mb", label: "tenants.resources.memory", format: mib },
+  { resource: "storage_gb", label: "tenants.resources.storage", format: (v: number) => `${v} GiB` },
+];
 
 function useQuotas(tenantId: string) {
   return useQuery({
@@ -38,6 +39,7 @@ function useQuotas(tenantId: string) {
 }
 
 function QuotaEditor({ tenantId, onSaved }: { tenantId: string; onSaved: () => void }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const quotas = useQuotas(tenantId);
   const save = useMutation({
@@ -68,11 +70,11 @@ function QuotaEditor({ tenantId, onSaved }: { tenantId: string; onSaved: () => v
   return (
     <form onSubmit={submit} className="space-y-4">
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        Limites valem para a criação de instâncias; instâncias adotadas também contam no uso.
+        {t("tenants.quotas.help")}
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {quotas.data.map((q) => (
-          <Field key={q.resource} label={LABEL[q.resource] ?? q.resource} hint={`Em uso: ${q.used}`}>
+          <Field key={q.resource} label={LABEL[q.resource] ? t(LABEL[q.resource]) : q.resource} hint={t("tenants.quotas.inUse", { used: q.used })}>
             <Input name={q.resource} type="number" min={0} required defaultValue={q.limit} />
           </Field>
         ))}
@@ -80,10 +82,10 @@ function QuotaEditor({ tenantId, onSaved }: { tenantId: string; onSaved: () => v
       <ErrorBox message={save.isError ? errorMessage(save.error) : null} />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="secondary" onClick={onSaved}>
-          Cancelar
+          {t("tenants.quotas.cancel")}
         </Button>
         <Button type="submit" disabled={save.isPending}>
-          Salvar quotas
+          {t("tenants.quotas.save")}
         </Button>
       </div>
     </form>
@@ -91,6 +93,7 @@ function QuotaEditor({ tenantId, onSaved }: { tenantId: string; onSaved: () => v
 }
 
 function NewTenantDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [invited, setInvited] = useState<string | null>(null);
   const create = useMutation({
@@ -106,18 +109,19 @@ function NewTenantDialog({ open, onClose }: { open: boolean; onClose: () => void
     onClose();
   };
   return (
-    <Dialog open={open} onClose={close} title="Novo cliente (tenant)">
+    <Dialog open={open} onClose={close} title={t("tenants.create.title")}>
       {invited !== null ? (
         <div className="space-y-4 text-sm">
-          <p>Cliente criado.</p>
+          <p>{t("tenants.create.created")}</p>
           {invited && (
             <p>
-              <strong>{invited}</strong> recebeu um convite por e-mail para definir a senha e entra como
-              admin do cliente.
+              {t("tenants.create.invited").split("{email}")[0]}
+              <strong>{invited}</strong>
+              {t("tenants.create.invited").split("{email}")[1]}
             </p>
           )}
           <div className="flex justify-end">
-            <Button onClick={close}>Fechar</Button>
+            <Button onClick={close}>{t("common.close")}</Button>
           </div>
         </div>
       ) : (
@@ -134,25 +138,25 @@ function NewTenantDialog({ open, onClose }: { open: boolean; onClose: () => void
           }}
           className="space-y-3"
         >
-          <Field label="Nome do cliente">
+          <Field label={t("tenants.create.name")}>
             <Input name="name" required maxLength={100} placeholder="Pluxee" />
           </Field>
-          <Field label="Identificador" hint="Minúsculas, números e hífen. Não muda depois (vira parte do pool no Proxmox).">
+          <Field label={t("tenants.create.slug")} hint={t("tenants.create.slugHint")}>
             <Input name="slug" required pattern="[a-z0-9]([a-z0-9\-]{0,30}[a-z0-9])?" placeholder="pluxee" />
           </Field>
           <Field
-            label="E-mail do responsável (opcional)"
-            hint="Recebe um convite e vira admin do cliente: cria projetos, convida a equipe e gerencia VMs."
+            label={t("tenants.create.adminEmail")}
+            hint={t("tenants.create.adminEmailHint")}
           >
-            <Input name="admin_email" type="email" placeholder="ti@cliente.com" />
+            <Input name="admin_email" type="email" placeholder={t("tenants.create.emailPlaceholder")} />
           </Field>
           <ErrorBox message={create.isError ? errorMessage(create.error) : null} />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={close}>
-              Cancelar
+              {t("tenants.create.cancel")}
             </Button>
             <Button type="submit" disabled={create.isPending}>
-              Criar cliente
+              {t("tenants.create.submit")}
             </Button>
           </div>
         </form>
@@ -170,6 +174,7 @@ function TenantRow({
   open: (tenantId: string, path: string) => void;
   editQuotas: (t: Tenant) => void;
 }) {
+  const tr = useT();
   const quotas = useQuotas(t.id);
   const byResource = new Map((quotas.data ?? []).map((q) => [q.resource, q]));
   return (
@@ -184,7 +189,7 @@ function TenantRow({
         <div className="mt-0.5 pl-9 font-mono text-xs text-slate-500">{t.slug}</div>
       </td>
       <td className={tbl.td}>
-        {t.status === "active" ? <Status tone="ok">Ativo</Status> : <Status tone="warn">{t.status}</Status>}
+        {t.status === "active" ? <Status tone="ok">{tr("tenants.row.active")}</Status> : <Status tone="warn">{t.status}</Status>}
       </td>
       {COLUMNS.map((c) => {
         const q = byResource.get(c.resource);
@@ -194,7 +199,7 @@ function TenantRow({
               <Meter
                 value={q.limit ? q.used / q.limit : q.used ? 1 : 0}
                 label={`${c.format(q.used)} / ${c.format(q.limit)}`}
-                title={`${c.label} de ${t.name}: em uso sobre o limite`}
+                title={tr("tenants.row.meterTitle", { resource: tr(c.label), name: t.name })}
               />
             ) : (
               <span className="text-slate-400">—</span>
@@ -204,12 +209,12 @@ function TenantRow({
       })}
       <td className={`${tbl.td} text-right`}>
         <Menu
-          ariaLabel={`Ações de ${t.name}`}
+          ariaLabel={tr("tenants.row.actionsFor", { name: t.name })}
           items={[
-            { label: "Editar quotas", onClick: () => editQuotas(t) },
-            { label: "Membros", onClick: () => open(t.id, "/members") },
-            { label: "Projetos", onClick: () => open(t.id, "/projects") },
-            { label: "Custos", onClick: () => open(t.id, "/costs") },
+            { label: tr("tenants.row.editQuotas"), onClick: () => editQuotas(t) },
+            { label: tr("tenants.row.members"), onClick: () => open(t.id, "/members") },
+            { label: tr("tenants.row.projects"), onClick: () => open(t.id, "/projects") },
+            { label: tr("tenants.row.costs"), onClick: () => open(t.id, "/costs") },
           ]}
         />
       </td>
@@ -218,6 +223,7 @@ function TenantRow({
 }
 
 export default function AdminTenantsPage() {
+  const t = useT();
   const router = useRouter();
   const { selectTenant } = useSession();
   const [creating, setCreating] = useState(false);
@@ -233,51 +239,51 @@ export default function AdminTenantsPage() {
   };
   const q = search.trim().toLowerCase();
   const visible = (tenants.data ?? []).filter(
-    (t) => !q || t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q),
+    (row) => !q || row.name.toLowerCase().includes(q) || row.slug.toLowerCase().includes(q),
   );
 
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Clientes e quotas"
-        description="Cada cliente é isolado: seus usuários só veem os recursos do próprio cliente. Limites valem para a criação de instâncias; instâncias adotadas também contam no uso."
-        actions={<Button onClick={() => setCreating(true)}>Novo cliente</Button>}
+        title={t("tenants.list.title")}
+        description={t("tenants.list.description")}
+        actions={<Button onClick={() => setCreating(true)}>{t("tenants.list.newClient")}</Button>}
       />
       <ErrorBox message={tenants.isError ? errorMessage(tenants.error) : null} />
       <Card flush>
-        <Toolbar count={tenants.data ? `${visible.length} de ${tenants.data.length} clientes` : undefined}>
-          <SearchInput value={search} onChange={setSearch} placeholder="Filtrar por nome ou identificador…" />
+        <Toolbar count={tenants.data ? t("tenants.list.count", { shown: visible.length, total: tenants.data.length }) : undefined}>
+          <SearchInput value={search} onChange={setSearch} placeholder={t("tenants.list.filter")} />
         </Toolbar>
         {tenants.data?.length === 0 ? (
           <Empty
-            title="Nenhum cliente"
+            title={t("tenants.list.emptyTitle")}
             icon="building"
-            action={<Button onClick={() => setCreating(true)}>Novo cliente</Button>}
+            action={<Button onClick={() => setCreating(true)}>{t("tenants.list.newClient")}</Button>}
           >
-            Crie o primeiro cliente para começar a provisionar VMs.
+            {t("tenants.list.emptyBody")}
           </Empty>
         ) : tenants.data && visible.length === 0 ? (
-          <Empty title="Nenhum resultado">Nenhum cliente corresponde ao filtro.</Empty>
+          <Empty title={t("tenants.list.noResultsTitle")}>{t("tenants.list.noResultsBody")}</Empty>
         ) : (
           <div className={tbl.wrap}>
             <table className={`${tbl.table} min-w-[64rem]`}>
               <thead className={tbl.thead}>
                 <tr>
-                  <th className={tbl.th}>Cliente</th>
-                  <th className={tbl.th}>Status</th>
+                  <th className={tbl.th}>{t("tenants.list.client")}</th>
+                  <th className={tbl.th}>{t("tenants.list.status")}</th>
                   {COLUMNS.map((c) => (
                     <th key={c.resource} className={tbl.th}>
-                      {c.label}
+                      {t(c.label)}
                     </th>
                   ))}
                   <th className={tbl.th}>
-                    <span className="sr-only">Ações</span>
+                    <span className="sr-only">{t("common.actions")}</span>
                   </th>
                 </tr>
               </thead>
               <tbody className={tbl.tbody}>
-                {visible.map((t) => (
-                  <TenantRow key={t.id} t={t} open={open} editQuotas={setEditing} />
+                {visible.map((row) => (
+                  <TenantRow key={row.id} t={row} open={open} editQuotas={setEditing} />
                 ))}
               </tbody>
             </table>
@@ -285,7 +291,7 @@ export default function AdminTenantsPage() {
         )}
       </Card>
       <NewTenantDialog open={creating} onClose={() => setCreating(false)} />
-      <Dialog open={editing !== null} onClose={() => setEditing(null)} title={`Quotas de ${editing?.name ?? ""}`}>
+      <Dialog open={editing !== null} onClose={() => setEditing(null)} title={t("tenants.quotas.title", { name: editing?.name ?? "" })}>
         {editing && <QuotaEditor key={editing.id} tenantId={editing.id} onSaved={() => setEditing(null)} />}
       </Dialog>
     </div>

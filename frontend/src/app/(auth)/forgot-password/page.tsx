@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Button, Field, Input } from "@/components/ui";
+import { useT } from "@/lib/i18n";
 
 export default function ForgotPasswordPage() {
+  const t = useT();
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -26,9 +28,9 @@ export default function ForgotPasswordPage() {
   if (sent) {
     return (
       <div className="space-y-4 text-sm">
-        <p>Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha.</p>
+        <p>{t("auth.resetSent")}</p>
         <Link href="/login" className="text-brand-600 hover:underline dark:text-brand-400">
-          Voltar ao login
+          {t("auth.backToLogin")}
         </Link>
       </div>
     );
@@ -36,15 +38,15 @@ export default function ForgotPasswordPage() {
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <Field label="E-mail">
+      <Field label={t("auth.email")}>
         <Input name="email" type="email" autoComplete="username" required autoFocus />
       </Field>
       <Button type="submit" className="w-full" disabled={busy}>
-        Enviar link
+        {t("auth.sendLink")}
       </Button>
       <p className="text-center text-sm">
         <Link href="/login" className="text-brand-600 hover:underline dark:text-brand-400">
-          Voltar ao login
+          {t("auth.backToLogin")}
         </Link>
       </p>
     </form>

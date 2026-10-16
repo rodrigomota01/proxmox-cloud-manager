@@ -7,6 +7,7 @@ import { useState } from "react";
 import { StatTile } from "@/components/page";
 import { Card, tbl } from "@/components/ui";
 import { api, ApiError, unwrap, type Schemas } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 import { money, monthLabel, num } from "@/lib/money";
 
 /** One bar per day of the month (days without a value stay empty). */
@@ -21,6 +22,7 @@ export function DailyBars({
   format: (v: number) => string;
   what: string;
 }) {
+  const t = useT();
   const [hover, setHover] = useState<number | null>(null);
   const [y, m] = month.split("-").map(Number);
   const count = new Date(y, m, 0).getDate();
@@ -33,12 +35,12 @@ export function DailyBars({
       <div className="mb-1 h-5 text-xs tabular-nums text-slate-600 dark:text-slate-400" aria-live="polite">
         {h !== null && hover !== null
           ? `${String(hover + 1).padStart(2, "0")}/${String(m).padStart(2, "0")}: ${format(h)}`
-          : `Máximo diário: ${format(max)}`}
+          : t("costs.daily.max", { value: format(max) })}
       </div>
       <div
         className="flex h-32 items-end gap-[2px] border-b border-[var(--viz-axis)]"
         role="img"
-        aria-label={`${what} por dia em ${monthLabel(month)}`}
+        aria-label={t("costs.daily.perDay", { what, month: monthLabel(month) })}
         onMouseLeave={() => setHover(null)}
       >
         {values.map((v, i) => (
@@ -78,12 +80,13 @@ export function DailyCostBars({
   days: Schemas["DayCostOut"][];
   currency: string;
 }) {
+  const t = useT();
   return (
     <DailyBars
       month={month}
       days={days.map((d) => ({ date: d.date, value: num(d.cost) }))}
       format={(v) => money(v, currency)}
-      what="Custo"
+      what={t("costs.daily.cost")}
     />
   );
 }
@@ -106,25 +109,26 @@ export function CostTiles({
   current: boolean;
   month: string;
 }) {
+  const t = useT();
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <StatTile
         icon="coins"
-        label={current ? "Custo no mês até agora" : `Custo em ${monthLabel(month)}`}
+        label={current ? t("costs.tiles.accruedCurrent") : t("costs.tiles.accruedIn", { month: monthLabel(month) })}
         value={money(accrued, currency)}
-        hint={current ? monthLabel(month) : "mês encerrado"}
+        hint={current ? monthLabel(month) : t("costs.tiles.monthClosed")}
       />
       <StatTile
         icon="power"
-        label="Custo atual"
-        value={current ? `${money(runRate, currency)}/mês` : "—"}
-        hint={current ? `${money(runRateHourly, currency, true)}/hora com as instâncias de agora` : undefined}
+        label={t("costs.tiles.runRate")}
+        value={current ? t("costs.tiles.perMonth", { value: money(runRate, currency) }) : "—"}
+        hint={current ? t("costs.tiles.perHourNow", { value: money(runRateHourly, currency, true) }) : undefined}
       />
       <StatTile
         icon="history"
-        label="Previsão para o mês"
+        label={t("costs.tiles.forecast")}
         value={forecast !== null ? money(forecast, currency) : "—"}
-        hint={current ? "acumulado + custo atual até o fim do mês" : undefined}
+        hint={current ? t("costs.tiles.forecastHint") : undefined}
       />
     </div>
   );
@@ -132,6 +136,7 @@ export function CostTiles({
 
 /** Tenant dashboard: cost so far, run rate and forecast. Hidden without billing:view. */
 export function TenantCostPreview({ tenantId }: { tenantId: string }) {
+  const t = useT();
   const summary = useQuery({
     queryKey: ["billing", "summary", tenantId, "current"],
     queryFn: async () => unwrap(await api.GET("/api/v1/billing/summary")),
@@ -142,10 +147,10 @@ export function TenantCostPreview({ tenantId }: { tenantId: string }) {
   if (!s) return null;
   return (
     <Card
-      title="Custos"
+      title={t("costs.preview.title")}
       actions={
         <Link href="/costs" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
-          Ver detalhes
+          {t("costs.preview.details")}
         </Link>
       }
     >
@@ -164,6 +169,7 @@ export function TenantCostPreview({ tenantId }: { tenantId: string }) {
 
 /** Platform overview: the whole platform, top clients by cost. */
 export function PlatformCostPreview() {
+  const t = useT();
   const summary = useQuery({
     queryKey: ["admin", "billing", "summary", "current"],
     queryFn: async () => unwrap(await api.GET("/api/v1/admin/billing/summary")),
@@ -171,13 +177,13 @@ export function PlatformCostPreview() {
   });
   const s = summary.data;
   if (!s) return null;
-  const top = s.tenants.filter((t) => num(t.accrued) > 0 || num(t.run_rate_monthly) > 0).slice(0, 5);
+  const top = s.tenants.filter((x) => num(x.accrued) > 0 || num(x.run_rate_monthly) > 0).slice(0, 5);
   return (
     <Card
-      title="Custos de todos os clientes"
+      title={t("costs.preview.platformTitle")}
       actions={
         <Link href="/costs" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
-          Custo por cliente
+          {t("costs.preview.perClient")}
         </Link>
       }
     >
@@ -196,17 +202,17 @@ export function PlatformCostPreview() {
             <table className={tbl.table}>
               <thead className={tbl.thead}>
                 <tr>
-                  <th className={tbl.th}>Cliente</th>
-                  <th className={`${tbl.th} text-right`}>No mês</th>
-                  <th className={`${tbl.th} text-right`}>Custo atual/mês</th>
+                  <th className={tbl.th}>{t("costs.table.client")}</th>
+                  <th className={`${tbl.th} text-right`}>{t("costs.table.thisMonth")}</th>
+                  <th className={`${tbl.th} text-right`}>{t("costs.table.runRateMonth")}</th>
                 </tr>
               </thead>
               <tbody className={tbl.tbody}>
-                {top.map((t) => (
-                  <tr key={t.tenant_id} className={tbl.tr}>
-                    <td className={`${tbl.td} font-medium`}>{t.name}</td>
-                    <td className={`${tbl.td} text-right tabular-nums`}>{money(t.accrued, s.currency)}</td>
-                    <td className={`${tbl.td} text-right tabular-nums`}>{money(t.run_rate_monthly, s.currency)}</td>
+                {top.map((x) => (
+                  <tr key={x.tenant_id} className={tbl.tr}>
+                    <td className={`${tbl.td} font-medium`}>{x.name}</td>
+                    <td className={`${tbl.td} text-right tabular-nums`}>{money(x.accrued, s.currency)}</td>
+                    <td className={`${tbl.td} text-right tabular-nums`}>{money(x.run_rate_monthly, s.currency)}</td>
                   </tr>
                 ))}
               </tbody>

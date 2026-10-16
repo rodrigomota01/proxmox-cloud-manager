@@ -11,6 +11,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 import { api, setActiveTenant, unwrap, type Schemas } from "@/lib/api/client";
 import { getAccessToken, onAuthChange, refresh } from "@/lib/auth/session";
+import { isLocale, useLocale } from "@/lib/i18n";
 
 type Me = Schemas["MeResponse"];
 
@@ -97,6 +98,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     enabled: authenticated,
     staleTime: 60_000,
   });
+
+  // the language saved on the account wins over this browser's
+  const { setLocale } = useLocale();
+  const accountLocale = me.data?.locale;
+  useEffect(() => {
+    if (isLocale(accountLocale)) setLocale(accountLocale);
+  }, [accountLocale, setLocale]);
 
   const isPlatformAdmin = !!me.data?.platform_roles.some((r) =>
     ["SUPER_ADMIN", "PLATFORM_ADMIN"].includes(r),

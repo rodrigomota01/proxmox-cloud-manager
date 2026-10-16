@@ -1,0 +1,111 @@
+import type { Same } from "../types";
+
+const pt = {
+  resources: {
+    instances: "Instâncias",
+    vcpus: "vCPUs",
+    memoryMib: "Memória (MiB)",
+    storageGib: "Disco (GiB)",
+    memory: "Memória",
+    storage: "Disco",
+  },
+  quotas: {
+    help: "Limites valem para a criação de instâncias; instâncias adotadas também contam no uso.",
+    inUse: "Em uso: {used}",
+    cancel: "Cancelar",
+    save: "Salvar quotas",
+    title: "Quotas de {name}",
+  },
+  create: {
+    title: "Novo cliente (tenant)",
+    created: "Cliente criado.",
+    invited: "{email} recebeu um convite por e-mail para definir a senha e entra como admin do cliente.",
+    name: "Nome do cliente",
+    slug: "Identificador",
+    slugHint: "Minúsculas, números e hífen. Não muda depois (vira parte do pool no Proxmox).",
+    adminEmail: "E-mail do responsável (opcional)",
+    adminEmailHint: "Recebe um convite e vira admin do cliente: cria projetos, convida a equipe e gerencia VMs.",
+    emailPlaceholder: "ti@cliente.com",
+    cancel: "Cancelar",
+    submit: "Criar cliente",
+  },
+  row: {
+    active: "Ativo",
+    meterTitle: "{resource} de {name}: em uso sobre o limite",
+    actionsFor: "Ações de {name}",
+    editQuotas: "Editar quotas",
+    members: "Membros",
+    projects: "Projetos",
+    costs: "Custos",
+  },
+  list: {
+    title: "Clientes e quotas",
+    description:
+      "Cada cliente é isolado: seus usuários só veem os recursos do próprio cliente. Limites valem para a criação de instâncias; instâncias adotadas também contam no uso.",
+    newClient: "Novo cliente",
+    count: "{shown} de {total} clientes",
+    filter: "Filtrar por nome ou identificador…",
+    emptyTitle: "Nenhum cliente",
+    emptyBody: "Crie o primeiro cliente para começar a provisionar VMs.",
+    noResultsTitle: "Nenhum resultado",
+    noResultsBody: "Nenhum cliente corresponde ao filtro.",
+    client: "Cliente",
+    status: "Status",
+  },
+};
+
+const en: Same<typeof pt> = {
+  resources: {
+    instances: "Instances",
+    vcpus: "vCPUs",
+    memoryMib: "Memory (MiB)",
+    storageGib: "Disk (GiB)",
+    memory: "Memory",
+    storage: "Disk",
+  },
+  quotas: {
+    help: "Limits apply when creating instances; adopted instances also count toward usage.",
+    inUse: "In use: {used}",
+    cancel: "Cancel",
+    save: "Save quotas",
+    title: "Quotas for {name}",
+  },
+  create: {
+    title: "New client (tenant)",
+    created: "Client created.",
+    invited: "{email} received an email invitation to set a password and joins as the client's admin.",
+    name: "Client name",
+    slug: "Identifier",
+    slugHint: "Lowercase letters, numbers and hyphens. Can't be changed later (becomes part of the Proxmox pool).",
+    adminEmail: "Owner's email (optional)",
+    adminEmailHint: "Receives an invitation and becomes the client's admin: creates projects, invites the team and manages VMs.",
+    emailPlaceholder: "it@client.com",
+    cancel: "Cancel",
+    submit: "Create client",
+  },
+  row: {
+    active: "Active",
+    meterTitle: "{resource} for {name}: usage against the limit",
+    actionsFor: "Actions for {name}",
+    editQuotas: "Edit quotas",
+    members: "Members",
+    projects: "Projects",
+    costs: "Costs",
+  },
+  list: {
+    title: "Clients and quotas",
+    description:
+      "Each client is isolated: its users only see the client's own resources. Limits apply when creating instances; adopted instances also count toward usage.",
+    newClient: "New client",
+    count: "{shown} of {total} clients",
+    filter: "Filter by name or identifier…",
+    emptyTitle: "No clients",
+    emptyBody: "Create the first client to start provisioning VMs.",
+    noResultsTitle: "No results",
+    noResultsBody: "No clients match the filter.",
+    client: "Client",
+    status: "Status",
+  },
+};
+
+export default { pt, en };

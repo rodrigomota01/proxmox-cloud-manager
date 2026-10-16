@@ -5,8 +5,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page";
 import { Button, Card, Empty, ErrorBox, Field, Input, Textarea, formatDate } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 
 export default function SshKeysPage() {
+  const t = useT();
   const queryClient = useQueryClient();
   const keys = useQuery({
     queryKey: ["ssh-keys"],
@@ -36,45 +38,46 @@ export default function SshKeysPage() {
   return (
     <>
       <PageHeader
-        title="Chaves SSH"
+        title={t("compute.sshKeys.title")}
         description={
           <>
-            Chaves <strong>públicas</strong> usadas para acessar as instâncias que você criar. Nunca cole a chave
-            privada.
+            {t("compute.sshKeys.descBefore")}
+            <strong>{t("compute.sshKeys.descStrong")}</strong>
+            {t("compute.sshKeys.descAfter")}
           </>
         }
       />
       <div className="max-w-3xl space-y-4">
 
-        <Card title="Suas chaves">
-          {keys.data?.length === 0 && <Empty>Nenhuma chave cadastrada.</Empty>}
+        <Card title={t("compute.sshKeys.yourKeys")}>
+          {keys.data?.length === 0 && <Empty>{t("compute.sshKeys.empty")}</Empty>}
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {keys.data?.map((k) => (
               <li key={k.id} className="flex items-center justify-between gap-4 py-2 text-sm">
                 <div className="min-w-0">
                   <div className="font-medium">{k.name}</div>
                   <div className="truncate font-mono text-xs text-slate-500">{k.fingerprint}</div>
-                  <div className="text-xs text-slate-500">Adicionada em {formatDate(k.created_at)}</div>
+                  <div className="text-xs text-slate-500">{t("compute.sshKeys.addedOn", { date: formatDate(k.created_at) })}</div>
                 </div>
                 <Button variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate(k.id)}>
-                  Remover
+                  {t("compute.sshKeys.remove")}
                 </Button>
               </li>
             ))}
           </ul>
         </Card>
 
-        <Card title="Adicionar chave">
+        <Card title={t("compute.sshKeys.addKey")}>
           <form onSubmit={submit} className="space-y-3">
-            <Field label="Nome">
-              <Input name="name" required maxLength={64} placeholder="notebook" />
+            <Field label={t("compute.sshKeys.name")}>
+              <Input name="name" required maxLength={64} placeholder={t("compute.sshKeys.namePlaceholder")} />
             </Field>
-            <Field label="Chave pública" hint="Conteúdo do arquivo .pub, ex.: ~/.ssh/id_ed25519.pub">
-              <Textarea name="public_key" rows={3} required placeholder="ssh-ed25519 AAAA… voce@notebook" />
+            <Field label={t("compute.sshKeys.publicKey")} hint={t("compute.sshKeys.publicKeyHint")}>
+              <Textarea name="public_key" rows={3} required placeholder={t("compute.sshKeys.publicKeyPlaceholder")} />
             </Field>
             <ErrorBox message={add.isError ? errorMessage(add.error) : null} />
             <Button type="submit" disabled={add.isPending}>
-              Adicionar
+              {t("compute.sshKeys.add")}
             </Button>
           </form>
         </Card>

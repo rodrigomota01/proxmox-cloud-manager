@@ -6,21 +6,23 @@ import { useState } from "react";
 import { Menu } from "@/components/page";
 import { Badge, Button, Dialog, ErrorBox, JobBadge, Spinner } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useT, type MessageKey } from "@/lib/i18n";
 import { useJob } from "@/lib/jobs";
 import { usePermissions } from "@/lib/session";
 
 type Instance = Schemas["InstanceOut"];
 type Action = "start" | "shutdown" | "stop" | "restart";
 
-const ACTIONS: { action: Action; label: string; verb: string; when: string[] }[] = [
-  { action: "start", label: "Ligar", verb: "start", when: ["stopped", "paused", "unknown"] },
-  { action: "shutdown", label: "Desligar", verb: "stop", when: ["running", "unknown"] },
-  { action: "restart", label: "Reiniciar", verb: "restart", when: ["running"] },
-  { action: "stop", label: "Forçar desligamento", verb: "stop", when: ["running", "paused", "unknown"] },
+const ACTIONS: { action: Action; label: MessageKey; verb: string; when: string[] }[] = [
+  { action: "start", label: "compute.power.start", verb: "start", when: ["stopped", "paused", "unknown"] },
+  { action: "shutdown", label: "compute.power.shutdown", verb: "stop", when: ["running", "unknown"] },
+  { action: "restart", label: "compute.power.restart", verb: "restart", when: ["running"] },
+  { action: "stop", label: "compute.power.forceStop", verb: "stop", when: ["running", "paused", "unknown"] },
 ];
 
 /** Power buttons; `compact` (table rows) folds them into a kebab menu. */
 export function PowerActions({ instance, compact = false }: { instance: Instance; compact?: boolean }) {
+  const t = useT();
   const perms = usePermissions(`project:${instance.project_id}`);
   const [jobId, setJobId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -48,8 +50,8 @@ export function PowerActions({ instance, compact = false }: { instance: Instance
   if (instance.state !== "active") return null;
   if (instance.read_only) {
     return (
-      <span title="Fora do pool gerenciado pela plataforma: visível, mas sem ações.">
-        <Badge tone="gray">Somente leitura</Badge>
+      <span title={t("compute.power.readOnlyHint")}>
+        <Badge tone="gray">{t("compute.power.readOnly")}</Badge>
       </span>
     );
   }
@@ -60,8 +62,8 @@ export function PowerActions({ instance, compact = false }: { instance: Instance
       {compact ? (
         busy ? null : (
           <Menu
-            ariaLabel={`Ações de ${instance.name}`}
-            items={available.map((a) => ({ label: a.label, danger: a.action === "stop", onClick: () => onPick(a.action) }))}
+            ariaLabel={t("compute.power.actionsOf", { name: instance.name })}
+            items={available.map((a) => ({ label: t(a.label), danger: a.action === "stop", onClick: () => onPick(a.action) }))}
           />
         )
       ) : (
@@ -72,7 +74,7 @@ export function PowerActions({ instance, compact = false }: { instance: Instance
             disabled={busy}
             onClick={() => onPick(a.action)}
           >
-            {a.label}
+            {t(a.label)}
           </Button>
         ))
       )}
@@ -81,14 +83,15 @@ export function PowerActions({ instance, compact = false }: { instance: Instance
       {!compact && job?.status === "failed" && <ErrorBox message={job.error_message} />}
       {run.isError && <ErrorBox message={errorMessage(run.error)} />}
 
-      <Dialog open={confirming} onClose={() => setConfirming(false)} title="Forçar desligamento">
+      <Dialog open={confirming} onClose={() => setConfirming(false)} title={t("compute.power.forceStop")}>
         <p className="text-sm">
-          Desliga <strong>{instance.name}</strong> imediatamente, como tirar da tomada. Dados não
-          gravados podem ser perdidos. Prefira <em>Desligar</em>, que pede ao sistema operacional.
+          {t("compute.power.forceStopBefore")} <strong>{instance.name}</strong> {t("compute.power.forceStopMiddle")}{" "}
+          <em>{t("compute.power.shutdown")}</em>
+          {t("compute.power.forceStopAfter")}
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setConfirming(false)}>
-            Cancelar
+            {t("compute.power.cancel")}
           </Button>
           <Button
             variant="danger"
@@ -97,7 +100,7 @@ export function PowerActions({ instance, compact = false }: { instance: Instance
               trigger("stop");
             }}
           >
-            Forçar desligamento
+            {t("compute.power.forceStop")}
           </Button>
         </div>
       </Dialog>

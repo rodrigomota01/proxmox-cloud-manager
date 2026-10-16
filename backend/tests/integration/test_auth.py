@@ -123,6 +123,19 @@ async def test_me_lists_only_own_tenants(client, alice, owner_db):
     assert body["platform_roles"] == ["READ_ONLY"]
 
 
+async def test_locale_is_saved_on_the_user(client, alice):
+    headers = _bearer(await _login(client))
+    assert (await client.get("/api/v1/me", headers=headers)).json()["locale"] == "pt-BR"
+
+    r = await client.patch("/api/v1/me", headers=headers, json={"locale": "en"})
+    assert r.status_code == 200
+    assert r.json() == {"display_name": "alice", "locale": "en"}  # the name is untouched
+    assert (await client.get("/api/v1/me", headers=headers)).json()["locale"] == "en"
+
+    r = await client.patch("/api/v1/me", headers=headers, json={"locale": "fr"})
+    assert r.status_code == 422
+
+
 @pytest.mark.parametrize(
     "header",
     ["", "Bearer", "Bearer not-a-jwt", "Basic Zm9vOmJhcg==",

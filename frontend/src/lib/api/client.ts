@@ -5,6 +5,7 @@
 import createClient from "openapi-fetch";
 
 import { getAccessToken, refresh } from "@/lib/auth/session";
+import { translate } from "@/lib/i18n";
 import type { components, paths } from "./schema";
 
 export type Schemas = components["schemas"];
@@ -70,12 +71,12 @@ export function errorMessage(err: unknown): string {
       return err.fieldErrors.map((e) => `${e.field}: ${e.message}`).join("; ");
     }
     const byStatus: Record<number, string> = {
-      403: "Você não tem permissão para esta ação.",
-      404: "Recurso não encontrado.",
+      403: translate("errors.forbidden"),
+      404: translate("errors.notFound"),
       409: err.message,
-      503: "Serviço indisponível no momento.",
+      503: translate("errors.unavailable"),
     };
     return byStatus[err.status] ?? err.message;
   }
-  return "Erro inesperado.";
+  return translate("errors.unexpected");
 }

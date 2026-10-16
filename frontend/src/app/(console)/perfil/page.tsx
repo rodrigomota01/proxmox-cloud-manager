@@ -6,10 +6,12 @@ import { useState } from "react";
 import { PageHeader } from "@/components/page";
 import { Badge, Button, Card, ErrorBox, Field, Input, formatDate } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 
 function ProfileCard() {
   const { me } = useSession();
+  const t = useT();
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
   const save = useMutation({
@@ -21,7 +23,7 @@ function ProfileCard() {
     },
   });
   return (
-    <Card title="Dados">
+    <Card title={t("access.profile.data")}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -30,18 +32,18 @@ function ProfileCard() {
         }}
         className="space-y-3"
       >
-        <Field label="E-mail" hint="Para trocar o e-mail, peça a um administrador.">
+        <Field label={t("access.common.email")} hint={t("access.profile.emailHint")}>
           <Input value={me.email} disabled readOnly />
         </Field>
-        <Field label="Nome">
+        <Field label={t("access.common.name")}>
           <Input name="display_name" required maxLength={100} defaultValue={me.display_name} />
         </Field>
         <ErrorBox message={save.isError ? errorMessage(save.error) : null} />
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={save.isPending}>
-            Salvar
+            {t("access.common.save")}
           </Button>
-          {saved && <span className="text-sm text-emerald-600">Salvo.</span>}
+          {saved && <span className="text-sm text-emerald-600">{t("access.common.saved")}</span>}
         </div>
       </form>
     </Card>
@@ -50,6 +52,7 @@ function ProfileCard() {
 
 function PasswordCard() {
   const queryClient = useQueryClient();
+  const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const change = useMutation({
@@ -68,7 +71,7 @@ function PasswordCard() {
     setDone(false);
     setError(null);
     if (form.get("new_password") !== form.get("confirm")) {
-      setError("As senhas novas não conferem.");
+      setError(t("access.profile.passwordsDiffer"));
       return;
     }
     change.mutate(
@@ -81,25 +84,25 @@ function PasswordCard() {
   }
 
   return (
-    <Card title="Trocar senha">
+    <Card title={t("access.profile.changePassword")}>
       <form onSubmit={submit} className="space-y-3">
-        <Field label="Senha atual">
+        <Field label={t("access.profile.currentPassword")}>
           <Input name="current_password" type="password" autoComplete="current-password" required />
         </Field>
-        <Field label="Nova senha" hint="Mínimo de 12 caracteres.">
+        <Field label={t("access.profile.newPassword")} hint={t("access.profile.newPasswordHint")}>
           <Input name="new_password" type="password" autoComplete="new-password" minLength={12} required />
         </Field>
-        <Field label="Repita a nova senha">
+        <Field label={t("access.profile.repeatPassword")}>
           <Input name="confirm" type="password" autoComplete="new-password" minLength={12} required />
         </Field>
         <ErrorBox message={error ?? (change.isError ? errorMessage(change.error) : null)} />
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={change.isPending}>
-            Trocar senha
+            {t("access.profile.changePassword")}
           </Button>
           {done && (
             <span className="text-sm text-emerald-600">
-              Senha trocada. Suas outras sessões foram encerradas.
+              {t("access.profile.passwordChanged")}
             </span>
           )}
         </div>
@@ -110,6 +113,7 @@ function PasswordCard() {
 
 function SessionsCard() {
   const queryClient = useQueryClient();
+  const t = useT();
   const sessions = useQuery({
     queryKey: ["my-sessions"],
     queryFn: async () => unwrap(await api.GET("/api/v1/me/sessions")),
@@ -120,23 +124,26 @@ function SessionsCard() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["my-sessions"] }),
   });
   return (
-    <Card title="Sessões ativas">
+    <Card title={t("access.profile.sessions")}>
       <ul className="divide-y divide-slate-100 dark:divide-slate-800">
         {sessions.data?.map((s) => (
           <li key={s.id} className="flex items-center justify-between gap-4 py-2 text-sm">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs">{s.ip ?? "—"}</span>
-                {s.current && <Badge tone="green">esta sessão</Badge>}
+                {s.current && <Badge tone="green">{t("access.profile.thisSession")}</Badge>}
               </div>
               <div className="truncate text-xs text-slate-500">{s.user_agent ?? "—"}</div>
               <div className="text-xs text-slate-500">
-                Entrou em {formatDate(s.created_at)} · última atividade {formatDate(s.last_seen_at)}
+                {t("access.profile.sessionTimes", {
+                  created: formatDate(s.created_at),
+                  lastSeen: formatDate(s.last_seen_at),
+                })}
               </div>
             </div>
             {!s.current && (
               <Button variant="ghost" disabled={revoke.isPending} onClick={() => revoke.mutate(s.id)}>
-                Encerrar
+                {t("access.profile.revoke")}
               </Button>
             )}
           </li>
@@ -148,9 +155,10 @@ function SessionsCard() {
 }
 
 export default function ProfilePage() {
+  const t = useT();
   return (
     <>
-      <PageHeader title="Meu perfil" description="Seus dados, senha e sessões abertas." />
+      <PageHeader title={t("access.profile.title")} description={t("access.profile.description")} />
       <div className="max-w-3xl space-y-4">
         <ProfileCard />
         <PasswordCard />

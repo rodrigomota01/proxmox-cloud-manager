@@ -17,15 +17,18 @@ import {
   type K8sMode,
   LinkTenantDialog,
   ManagedState,
+  rich,
   UsageMeter,
 } from "@/components/k8s";
 import { Icon } from "@/components/icons";
 import { Menu, PageHeader, ResourceIcon, SearchInput, StatTile, Toolbar } from "@/components/page";
 import { Alert, Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Select, Textarea, tbl } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
+import { type MessageKey, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 
 function AddClusterDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const create = useMutation({
     mutationFn: async (body: { name: string; kubeconfig: string }) =>
@@ -40,7 +43,7 @@ function AddClusterDialog({ open, onClose }: { open: boolean; onClose: () => voi
     onClose();
   };
   return (
-    <Dialog open={open} onClose={close} title="Adicionar cluster Kubernetes">
+    <Dialog open={open} onClose={close} title={t("k8s.add.title")}>
       <form
         className="space-y-3"
         onSubmit={(e) => {
@@ -50,22 +53,21 @@ function AddClusterDialog({ open, onClose }: { open: boolean; onClose: () => voi
         }}
       >
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Para clusters que não estão na tabela <code>kubernetes_clusters</code>. O kubeconfig fica
-          criptografado e a plataforma só lê o cluster (nunca altera nada).
+          {rich(t("k8s.add.intro"), { table: <code>kubernetes_clusters</code> })}
         </p>
-        <Field label="Nome">
+        <Field label={t("k8s.common.name")}>
           <Input name="name" required maxLength={100} placeholder="pluxee-prod-cluster" />
         </Field>
-        <Field label="Kubeconfig" hint="Cole o YAML (ex.: ~/.kube/config) ou o base64 dele.">
+        <Field label="Kubeconfig" hint={t("k8s.add.kubeconfigHint")}>
           <Textarea name="kubeconfig" required rows={8} spellCheck={false} autoComplete="off" />
         </Field>
         <ErrorBox message={create.isError ? errorMessage(create.error) : null} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={close}>
-            Cancelar
+            {t("k8s.common.cancel")}
           </Button>
           <Button type="submit" disabled={create.isPending}>
-            Adicionar
+            {t("k8s.add.submit")}
           </Button>
         </div>
       </form>
@@ -73,13 +75,13 @@ function AddClusterDialog({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
-const HEALTH_FILTER = [
-  { value: "", label: "Qualquer saúde" },
-  { value: "healthy", label: "Saudáveis" },
-  { value: "warning", label: "Atenção" },
-  { value: "critical", label: "Críticos" },
-  { value: "unreachable", label: "Sem conexão" },
-  { value: "none", label: "Não coletados" },
+const HEALTH_FILTER: { value: string; label: MessageKey }[] = [
+  { value: "", label: "k8s.healthFilter.any" },
+  { value: "healthy", label: "k8s.healthFilter.healthy" },
+  { value: "warning", label: "k8s.healthFilter.warning" },
+  { value: "critical", label: "k8s.healthFilter.critical" },
+  { value: "unreachable", label: "k8s.healthFilter.unreachable" },
+  { value: "none", label: "k8s.healthFilter.none" },
 ];
 
 /** Container-width breakpoints of the table: WIDE cells show from the width up, NARROW ones
@@ -90,6 +92,7 @@ const NARROW = { client: "@[84rem]:hidden", counts: "@5xl:hidden", usage: "@6xl:
 /** Admin: every cluster, with registration, kubeconfig and the client link. Tenant: the
  * clusters linked to the client, read-only and without any kubeconfig action. */
 export function K8sClusterList({ mode }: { mode: K8sMode }) {
+  const t = useT();
   const { tenantId, tenant } = useSession();
   const admin = mode === "admin";
   const base = admin ? "/admin/kubernetes" : "/kubernetes";
@@ -122,29 +125,25 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Clusters Kubernetes"
-        breadcrumbs={[{ label: "Kubernetes" }, { label: "Clusters" }]}
+        title={t("k8s.list.title")}
+        breadcrumbs={[{ label: "Kubernetes" }, { label: t("k8s.common.clusters") }]}
         description={
           admin ? (
-          <>
-            Saúde e carga lidas da API de cada cluster a cada minuto, só leitura. Clusters vêm da tabela{" "}
-            <code>kubernetes_clusters</code> ou do cadastro manual. O vencimento é o mais próximo entre a data da
-            tabela e a do certificado no kubeconfig.
-          </>
+          <>{rich(t("k8s.list.adminDescription"), { table: <code>kubernetes_clusters</code> })}</>
           ) : (
-            `Clusters de ${tenant?.name ?? "seu cliente"}: saúde, carga e workloads lidos a cada minuto, só leitura.`
+            t("k8s.list.tenantDescription", { client: tenant?.name ?? t("k8s.list.yourClient") })
           )
         }
         actions={
           <>
             <Link href={`${base}/new`}>
               <Button>
-                <Icon name="plus" /> Criar cluster
+                <Icon name="plus" /> {t("k8s.common.createCluster")}
               </Button>
             </Link>
             {admin && (
               <Button variant="secondary" onClick={() => setAdding(true)}>
-                Cadastrar existente
+                {t("k8s.list.registerExisting")}
               </Button>
             )}
           </>
@@ -157,22 +156,27 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
           <StatTile
             icon="kubernetes"
             tone={bad ? "error" : count("warning") ? "warn" : "ok"}
-            label="Clusters"
+            label={t("k8s.common.clusters")}
             value={data.length}
-            hint={`${count("healthy")} saudáveis · ${count("warning")} atenção · ${count("critical")} críticos · ${count("unreachable")} sem conexão`}
+            hint={t("k8s.list.clustersHint", {
+              healthy: count("healthy"),
+              warning: count("warning"),
+              critical: count("critical"),
+              unreachable: count("unreachable"),
+            })}
           />
           <StatTile
             icon="server"
             tone={sum("nodes_ready") < sum("nodes") ? "warn" : undefined}
-            label="Nós prontos"
-            value={`${sum("nodes_ready")} de ${sum("nodes")}`}
+            label={t("k8s.common.nodesReady")}
+            value={t("k8s.common.nodesReadyValue", { ready: sum("nodes_ready"), total: sum("nodes") })}
           />
           <StatTile
             icon="layers"
             tone={sum("pods_problem") ? "warn" : undefined}
             label="Pods"
             value={sum("pods")}
-            hint={`${sum("pods_problem")} com problema`}
+            hint={t("k8s.common.withProblems", { count: sum("pods_problem") })}
           />
           <StatTile icon="folder" label="Namespaces" value={sum("namespaces")} />
         </div>
@@ -183,38 +187,38 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
           admin ? (
             <Empty
               icon="kubernetes"
-              title="Nenhum cluster"
+              title={t("k8s.common.noClusters")}
               action={
                 <Button onClick={() => setAdding(true)}>
-                  <Icon name="plus" /> Adicionar cluster
+                  <Icon name="plus" /> {t("k8s.list.addCluster")}
                 </Button>
               }
             >
-              Adicione um ou cadastre na tabela kubernetes_clusters.
+              {t("k8s.list.emptyAdmin")}
             </Empty>
           ) : (
             <Empty
               icon="kubernetes"
-              title="Nenhum cluster"
+              title={t("k8s.common.noClusters")}
               action={
                 <Link href={`${base}/new`}>
                   <Button>
-                    <Icon name="plus" /> Criar cluster
+                    <Icon name="plus" /> {t("k8s.common.createCluster")}
                   </Button>
                 </Link>
               }
             >
-              Crie um cluster nas VMs da plataforma, ou peça ao administrador para vincular um existente.
+              {t("k8s.list.emptyTenant")}
             </Empty>
           )
         ) : (
           <>
-            <Toolbar count={`${rows.length} de ${data.length} clusters`}>
-              <SearchInput value={filter} onChange={setFilter} placeholder={admin ? "Filtrar por nome ou cliente…" : undefined} />
-              <Select aria-label="Saúde" value={health} onChange={(e) => setHealth(e.target.value)}>
+            <Toolbar count={t("k8s.list.count", { shown: rows.length, total: data.length })}>
+              <SearchInput value={filter} onChange={setFilter} placeholder={admin ? t("k8s.list.filterPlaceholder") : undefined} />
+              <Select aria-label={t("k8s.list.health")} value={health} onChange={(e) => setHealth(e.target.value)}>
                 {HEALTH_FILTER.map((h) => (
                   <option key={h.value} value={h.value}>
-                    {h.label}
+                    {t(h.label)}
                   </option>
                 ))}
               </Select>
@@ -227,17 +231,17 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
                 <thead className={tbl.thead}>
                   <tr>
                     <th className={tbl.th}>Cluster</th>
-                    {admin && <th className={`${tbl.th} ${WIDE.client}`}>Cliente</th>}
-                    <th className={tbl.th}>Saúde</th>
-                    <th className={`${tbl.th} ${WIDE.counts}`}>Nós</th>
+                    {admin && <th className={`${tbl.th} ${WIDE.client}`}>{t("k8s.common.client")}</th>}
+                    <th className={tbl.th}>{t("k8s.list.health")}</th>
+                    <th className={`${tbl.th} ${WIDE.counts}`}>{t("k8s.common.nodes")}</th>
                     <th className={`${tbl.th} ${WIDE.counts}`}>Pods</th>
-                    <th className={`${tbl.th} ${NARROW.usage}`}>Uso</th>
+                    <th className={`${tbl.th} ${NARROW.usage}`}>{t("k8s.list.usage")}</th>
                     <th className={`${tbl.th} ${WIDE.usage}`}>CPU</th>
-                    <th className={`${tbl.th} ${WIDE.usage}`}>Memória</th>
-                    <th className={tbl.th}>Certificado</th>
+                    <th className={`${tbl.th} ${WIDE.usage}`}>{t("k8s.common.memory")}</th>
+                    <th className={tbl.th}>{t("k8s.common.certificate")}</th>
                     {admin && (
                       <th className={tbl.th}>
-                        <span className="sr-only">Ações</span>
+                        <span className="sr-only">{t("k8s.common.actions")}</span>
                       </th>
                     )}
                   </tr>
@@ -289,22 +293,24 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
                           )}
                           {s && (
                             <div className={`text-xs tabular-nums text-slate-600 dark:text-slate-400 ${NARROW.counts}`}>
-                              {s.nodes_ready}/{s.nodes} nós · {s.pods} pods
-                              {s.pods_problem > 0 && <span className="text-rose-600 dark:text-rose-400"> ({s.pods_problem} com problema)</span>}
+                              {t("k8s.list.nodesPods", { ready: s.nodes_ready, total: s.nodes, pods: s.pods })}
+                              {s.pods_problem > 0 && (
+                                <span className="text-rose-600 dark:text-rose-400">{t("k8s.list.withProblemsParen", { count: s.pods_problem })}</span>
+                              )}
                             </div>
                           )}
-                          {s && <div className="text-xs text-slate-500">lido {ago(s.ok_at)}</div>}
+                          {s && <div className="text-xs text-slate-500">{t("k8s.common.readAgo", { ago: ago(s.ok_at) })}</div>}
                         </td>
                         <td className={`${tbl.td} tabular-nums ${WIDE.counts}`}>{s ? `${s.nodes_ready}/${s.nodes}` : "—"}</td>
                         <td className={`${tbl.td} tabular-nums ${WIDE.counts}`}>
                           {s ? s.pods : "—"}
-                          {s && s.pods_problem > 0 && <div className="text-xs text-rose-600 dark:text-rose-400">{s.pods_problem} com problema</div>}
+                          {s && s.pods_problem > 0 && <div className="text-xs text-rose-600 dark:text-rose-400">{t("k8s.common.withProblems", { count: s.pods_problem })}</div>}
                         </td>
                         <td className={`${tbl.td} ${NARROW.usage}`}>
                           {s && s.nodes > 0 ? (
                             <div className="space-y-2">
                               <UsageMeter usage={s.cpu_usage} requests={s.cpu_requests} allocatable={s.cpu_allocatable} format={cores} what="CPU" stacked />
-                              <UsageMeter usage={s.mem_usage} requests={s.mem_requests} allocatable={s.mem_allocatable} format={bytes} what="Memória" stacked />
+                              <UsageMeter usage={s.mem_usage} requests={s.mem_requests} allocatable={s.mem_allocatable} format={bytes} what={t("k8s.common.memory")} stacked />
                             </div>
                           ) : (
                             "—"
@@ -319,7 +325,7 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
                         </td>
                         <td className={`${tbl.td} ${WIDE.usage}`}>
                           {s && s.nodes > 0 ? (
-                            <UsageMeter usage={s.mem_usage} requests={s.mem_requests} allocatable={s.mem_allocatable} format={bytes} what="Memória" stacked />
+                            <UsageMeter usage={s.mem_usage} requests={s.mem_requests} allocatable={s.mem_allocatable} format={bytes} what={t("k8s.common.memory")} stacked />
                           ) : (
                             "—"
                           )}
@@ -331,7 +337,7 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
                             {c.days_left !== null && ` · ${daysText(c.days_left)}`}
                           </div>
                           {c.dates_differ && (
-                            <div className="text-xs font-medium text-amber-700 dark:text-amber-300">⚠ tabela e certificado diferentes</div>
+                            <div className="text-xs font-medium text-amber-700 dark:text-amber-300">{t("k8s.list.datesDiffer")}</div>
                           )}
                         </td>
                         {admin && (
@@ -340,10 +346,10 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
                               <DownloadKubeconfig c={c} labelClassName="hidden @7xl:inline" />
                               {c.source !== "managed" && (
                               <Menu
-                                ariaLabel={`Ações de ${c.name}`}
+                                ariaLabel={t("k8s.list.actionsOf", { name: c.name })}
                                 items={[
                                   {
-                                    label: c.tenant_id ? "Trocar cliente vinculado" : "Vincular a um cliente",
+                                    label: t(c.tenant_id ? "k8s.common.changeTenant" : "k8s.common.linkTenant"),
                                     onClick: () => setLinking(c),
                                   },
                                 ]}
@@ -358,12 +364,12 @@ export function K8sClusterList({ mode }: { mode: K8sMode }) {
                 </tbody>
               </table>
             </div>
-            {rows.length === 0 && data.length > 0 && <Empty>Nenhum cluster com esses filtros.</Empty>}
+            {rows.length === 0 && data.length > 0 && <Empty>{t("k8s.list.noMatch")}</Empty>}
           </>
         )}
       </Card>
       <Alert variant="info">
-        CPU e memória: uso real quando o cluster tem metrics-server; sem ele, o quanto os pods reservaram (requests).
+        {t("k8s.list.metricsNote")}
       </Alert>
       {admin && <AddClusterDialog open={adding} onClose={() => setAdding(false)} />}
       <LinkTenantDialog cluster={linking} onClose={() => setLinking(null)} />

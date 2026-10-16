@@ -22,7 +22,10 @@ class User(UUIDPk, Timestamps, Base):
     """Global (not tenant-scoped). E-mail is stored lower-cased."""
 
     __tablename__ = "users"
-    __table_args__ = (CheckConstraint("email = lower(email)", name="email_lowercase"),)
+    __table_args__ = (
+        CheckConstraint("email = lower(email)", name="email_lowercase"),
+        CheckConstraint("locale IN ('pt-BR', 'en')", name="locale_known"),
+    )
 
     email: Mapped[str] = mapped_column(Text, unique=True)
     display_name: Mapped[str] = mapped_column(Text)
@@ -33,6 +36,8 @@ class User(UUIDPk, Timestamps, Base):
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # interface and e-mail language (the user's choice, kept across devices)
+    locale: Mapped[str] = mapped_column(Text, server_default="pt-BR")
 
 
 class Permission(Base):

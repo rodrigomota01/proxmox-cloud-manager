@@ -13,29 +13,31 @@ import { PageHeader, ResourceIcon, SearchInput, StatTile, Toolbar } from "@/comp
 import { Alert, Badge, Button, Card, Empty, ErrorBox, Select, Status, formatBytes, tbl } from "@/components/ui";
 import { Allocation, Meter, SortHeader, mib, ratioLabel, uptime, useSorted } from "@/components/viz";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useT, type MessageKey } from "@/lib/i18n";
 
 type Node = Schemas["NodeOut"];
 type SortKey = "name" | "cpu" | "memory" | "disk" | "vcpu" | "ram" | "vms";
 
 const memRatio = (n: Node) => (n.memory_bytes ? n.memory_used_bytes / n.memory_bytes : 0);
 const diskRatio = (n: Node) => (n.root_disk_bytes ? n.root_disk_used_bytes / n.root_disk_bytes : 0);
-const ROOT_DISK_HINT = "Sistema de arquivos raiz do hypervisor (SO e logs). O disco das VMs fica na aba Storage.";
 const vcpuRatio = (n: Node) => (n.cpu_count ? n.vcpus_allocated / n.cpu_count : 0);
 const ramRatio = (n: Node) => (n.memory_bytes ? (n.memory_allocated_mb * 1024 ** 2) / n.memory_bytes : 0);
 
 function NodeStatus({ status }: { status: string }) {
-  if (status === "online") return <Status tone="ok">Online</Status>;
-  if (status === "offline") return <Status tone="error">Offline</Status>;
-  return <Status tone="unknown">Desconhecido</Status>;
+  const t = useT();
+  if (status === "online") return <Status tone="ok">{t("infra.common.online")}</Status>;
+  if (status === "offline") return <Status tone="error">{t("infra.common.offline")}</Status>;
+  return <Status tone="unknown">{t("status.unknown")}</Status>;
 }
 
-const TABS = [
-  { key: "nodes", label: "Nodes" },
-  { key: "storage", label: "Storage" },
-] as const;
+const TABS: readonly { key: "nodes" | "storage"; label: MessageKey }[] = [
+  { key: "nodes", label: "infra.nodes.tabNodes" },
+  { key: "storage", label: "infra.nodes.tabStorage" },
+];
 type Tab = (typeof TABS)[number]["key"];
 
 function Totals({ nodes }: { nodes: Node[] }) {
+  const t = useT();
   const online = nodes.filter((n) => n.status === "online");
   const cores = online.reduce((a, n) => a + n.cpu_count, 0);
   const vcpus = online.reduce((a, n) => a + n.vcpus_allocated, 0);
@@ -46,23 +48,32 @@ function Totals({ nodes }: { nodes: Node[] }) {
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <StatTile
         icon="server"
-        label="Hypervisors online"
-        value={`${online.length} de ${nodes.length}`}
+        label={t("infra.nodes.hypervisorsOnline")}
+        value={t("infra.common.countOf", { shown: online.length, total: nodes.length })}
         tone={online.length < nodes.length ? "warn" : "ok"}
-        hint={online.length < nodes.length ? `${nodes.length - online.length} fora do ar` : "todos online"}
+        hint={
+          online.length < nodes.length
+            ? t("infra.nodes.down", { count: nodes.length - online.length })
+            : t("infra.nodes.allOnline")
+        }
       />
-      <StatTile icon="dashboard" label="CPU em uso" value={`${Math.round(cpuWeighted * 100)}%`} hint={`${cores} núcleos físicos`} />
+      <StatTile
+        icon="dashboard"
+        label={t("infra.usage.cpuInUse")}
+        value={`${Math.round(cpuWeighted * 100)}%`}
+        hint={t("infra.nodes.physicalCores", { count: cores })}
+      />
       <StatTile
         icon="layers"
-        label="Memória em uso"
+        label={t("infra.usage.memoryInUse")}
         value={mem ? `${Math.round((memUsed / mem) * 100)}%` : "—"}
-        hint={`${formatBytes(memUsed)} de ${formatBytes(mem)}`}
+        hint={t("infra.nodes.memoryOf", { used: formatBytes(memUsed), total: formatBytes(mem) })}
       />
       <StatTile
         icon="monitor"
-        label="vCPUs configuradas / núcleos"
+        label={t("infra.nodes.vcpusOverCores")}
         value={`${vcpus} / ${cores}`}
-        hint={cores ? `sobrecomprometimento ${ratioLabel(vcpus / cores)}` : undefined}
+        hint={cores ? t("infra.nodes.overcommit", { ratio: ratioLabel(vcpus / cores) }) : undefined}
       />
     </div>
   );
@@ -70,6 +81,7 @@ function Totals({ nodes }: { nodes: Node[] }) {
 
 /** Connections with no node yet: just added, waiting for the first sync, or a bad token. */
 function PendingConnections({ nodes }: { nodes: Node[] }) {
+  const t = useT();
   const clusters = useQuery({
     queryKey: ["admin", "clusters"],
     queryFn: async () => unwrap(await api.GET("/api/v1/admin/clusters")),
@@ -78,7 +90,7 @@ function PendingConnections({ nodes }: { nodes: Node[] }) {
   const pending = (clusters.data ?? []).filter((c) => !nodes.some((n) => n.cluster_id === c.id));
   if (pending.length === 0) return null;
   return (
-    <Alert variant="warning" title={`${pending.length} conexão(ões) aguardando sincronização`}>
+    <Alert variant="warning" title={t("infra.nodes.pendingTitle", { count: pending.length })}>
       <ul className="mt-1 space-y-1.5">
         {pending.map((c) => (
           <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -87,7 +99,7 @@ function PendingConnections({ nodes }: { nodes: Node[] }) {
             </Link>
             <span className="font-mono text-xs opacity-75">{c.api_url}</span>
             <ClusterStatus status={c.status} />
-            {!c.has_credentials && <Badge tone="amber">sem token</Badge>}
+            {!c.has_credentials && <Badge tone="amber">{t("infra.nodes.noToken")}</Badge>}
             {c.last_error && <span className="w-full text-xs text-rose-700 dark:text-rose-300">{c.last_error}</span>}
           </li>
         ))}
@@ -97,6 +109,7 @@ function PendingConnections({ nodes }: { nodes: Node[] }) {
 }
 
 export default function NodesPage() {
+  const t = useT();
   const router = useRouter();
   const params = useSearchParams();
   const tab: Tab = params.get("tab") === "storage" ? "storage" : "nodes";
@@ -113,11 +126,11 @@ export default function NodesPage() {
     refetchInterval: 60_000,
   });
   const [region, setRegion] = useState("");
-  const regionNames = [...new Set((nodes.data ?? []).map((n) => n.region_name ?? "Sem região"))].sort();
+  const regionNames = [...new Set((nodes.data ?? []).map((n) => n.region_name ?? t("infra.common.noRegion")))].sort();
   const needle = q.trim().toLowerCase();
   const visible = (nodes.data ?? []).filter(
     (n) =>
-      (!region || (n.region_name ?? "Sem região") === region) &&
+      (!region || (n.region_name ?? t("infra.common.noRegion")) === region) &&
       (!needle || n.name.toLowerCase().includes(needle) || n.cluster_name.toLowerCase().includes(needle)),
   );
   const storageRows = (storage.data ?? []).filter(
@@ -138,8 +151,8 @@ export default function NodesPage() {
   );
 
   const regionSelect = (
-    <Select aria-label="Região" value={region} onChange={(e) => setRegion(e.target.value)}>
-      <option value="">Todas as regiões</option>
+    <Select aria-label={t("infra.common.region")} value={region} onChange={(e) => setRegion(e.target.value)}>
+      <option value="">{t("infra.nodes.allRegions")}</option>
       {regionNames.map((r) => (
         <option key={r} value={r}>
           {r}
@@ -151,20 +164,21 @@ export default function NodesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Hypervisors"
-        breadcrumbs={[{ label: "Infraestrutura" }, { label: "Hypervisors" }]}
-        description="Servidores Proxmox integrados: consumo real, alocação das VMs e storage."
+        title={t("nav.hypervisors")}
+        breadcrumbs={[{ label: t("nav.infrastructure") }, { label: t("nav.hypervisors") }]}
+        description={t("infra.nodes.description")}
         actions={
           <Button onClick={() => setAdding(true)}>
-            <Icon name="plus" /> Adicionar hypervisor
+            <Icon name="plus" /> {t("infra.nodes.addHypervisor")}
           </Button>
         }
-        tabs={TABS.map((t) => ({
-          ...t,
-          count: t.key === "nodes" ? nodes.data?.length : storage.data?.length,
+        tabs={TABS.map((x) => ({
+          key: x.key,
+          label: t(x.label),
+          count: x.key === "nodes" ? nodes.data?.length : storage.data?.length,
         }))}
         activeTab={tab}
-        onTab={(t) => router.replace(t === "nodes" ? "/admin/nodes" : `/admin/nodes?tab=${t}`)}
+        onTab={(k) => router.replace(k === "nodes" ? "/admin/nodes" : `/admin/nodes?tab=${k}`)}
       />
       <AddHypervisorDialog
         open={adding}
@@ -177,39 +191,39 @@ export default function NodesPage() {
 
       {tab === "nodes" && (
         <Card flush>
-          <Toolbar count={nodes.data ? `${visible.length} de ${nodes.data.length}` : undefined}>
-            <SearchInput value={q} onChange={setQ} placeholder="Filtrar por nome…" />
+          <Toolbar count={nodes.data ? t("infra.common.countOf", { shown: visible.length, total: nodes.data.length }) : undefined}>
+            <SearchInput value={q} onChange={setQ} placeholder={t("infra.nodes.filterByName")} />
             {regionSelect}
           </Toolbar>
           {nodes.data?.length === 0 ? (
             <Empty
               icon="server"
-              title="Nenhum node sincronizado ainda"
+              title={t("infra.nodes.emptyTitle")}
               action={
                 <Button onClick={() => setAdding(true)}>
-                  <Icon name="plus" /> Adicionar hypervisor
+                  <Icon name="plus" /> {t("infra.nodes.addHypervisor")}
                 </Button>
               }
             >
-              Adicione um servidor Proxmox; ele aparece aqui após a primeira sincronização.
+              {t("infra.nodes.emptyBody")}
             </Empty>
           ) : nodes.data && visible.length === 0 ? (
-            <Empty>Nenhum hypervisor corresponde ao filtro.</Empty>
+            <Empty>{t("infra.nodes.noMatch")}</Empty>
           ) : (
             !!nodes.data?.length && (
               <div className={tbl.wrap}>
                 <table className={tbl.table}>
                   <thead className={tbl.thead}>
                     <tr>
-                      <SortHeader label="Node" k="name" sort={sort} toggle={toggle} />
-                      <th className={tbl.th}>Status</th>
-                      <SortHeader label="CPU em uso" k="cpu" sort={sort} toggle={toggle} />
-                      <SortHeader label="Memória em uso" k="memory" sort={sort} toggle={toggle} />
-                      <SortHeader label="Disco raiz" k="disk" sort={sort} toggle={toggle} />
-                      <SortHeader label="vCPUs configuradas" k="vcpu" sort={sort} toggle={toggle} />
-                      <SortHeader label="RAM configurada" k="ram" sort={sort} toggle={toggle} />
+                      <SortHeader label={t("infra.common.node")} k="name" sort={sort} toggle={toggle} />
+                      <th className={tbl.th}>{t("infra.common.status")}</th>
+                      <SortHeader label={t("infra.usage.cpuInUse")} k="cpu" sort={sort} toggle={toggle} />
+                      <SortHeader label={t("infra.usage.memoryInUse")} k="memory" sort={sort} toggle={toggle} />
+                      <SortHeader label={t("infra.usage.rootDisk")} k="disk" sort={sort} toggle={toggle} />
+                      <SortHeader label={t("infra.usage.vcpusConfigured")} k="vcpu" sort={sort} toggle={toggle} />
+                      <SortHeader label={t("infra.usage.ramConfigured")} k="ram" sort={sort} toggle={toggle} />
                       <SortHeader label="VMs" k="vms" sort={sort} toggle={toggle} align="right" />
-                      <th className={`${tbl.th} text-right`}>Ligado há</th>
+                      <th className={`${tbl.th} text-right`}>{t("infra.usage.uptime")}</th>
                     </tr>
                   </thead>
                   <tbody className={tbl.tbody}>
@@ -228,7 +242,7 @@ export default function NodesPage() {
                               </Link>
                             </div>
                             <div className="mt-0.5 pl-7 text-xs text-slate-500">
-                              {n.region_name ? `${n.region_name} · ${n.zone_name}` : "sem zona"}
+                              {n.region_name ? `${n.region_name} · ${n.zone_name}` : t("infra.common.noZone")}
                             </div>
                           </td>
                           <td className={tbl.td}>
@@ -236,18 +250,21 @@ export default function NodesPage() {
                             {failingDisks(n.disks).length > 0 && (
                               <div className="mt-0.5">
                                 <Status tone="warn">
-                                  {failingDisks(n.disks).length} disco(s) com SMART {failingDisks(n.disks)[0].health}
+                                  {t("infra.nodes.smartFailing", {
+                                    count: failingDisks(n.disks).length,
+                                    health: failingDisks(n.disks)[0].health ?? "",
+                                  })}
                                 </Status>
                               </div>
                             )}
                           </td>
-                          <td className={tbl.td}>{online ? <Meter value={n.cpu_usage} title={`CPU de ${n.name}`} /> : "—"}</td>
+                          <td className={tbl.td}>{online ? <Meter value={n.cpu_usage} title={t("infra.nodes.cpuOf", { name: n.name })} /> : "—"}</td>
                           <td className={tbl.td}>
                             {online ? (
                               <Meter
                                 value={memRatio(n)}
                                 label={`${formatBytes(n.memory_used_bytes)} / ${formatBytes(n.memory_bytes)}`}
-                                title={`Memória de ${n.name}`}
+                                title={t("infra.nodes.memoryOfNode", { name: n.name })}
                               />
                             ) : (
                               "—"
@@ -258,7 +275,7 @@ export default function NodesPage() {
                               <Meter
                                 value={diskRatio(n)}
                                 label={`${formatBytes(n.root_disk_used_bytes)} / ${formatBytes(n.root_disk_bytes)}`}
-                                title={ROOT_DISK_HINT}
+                                title={t("infra.nodes.rootDiskHint")}
                               />
                             ) : (
                               "—"
@@ -268,14 +285,14 @@ export default function NodesPage() {
                             <Allocation
                               ratio={vcpuRatio(n)}
                               label={`${n.vcpus_allocated} / ${n.cpu_count}`}
-                              title="vCPUs configuradas nas VMs sobre os núcleos físicos. Não é consumo: acima de 1× é normal em CPU."
+                              title={t("infra.usage.vcpuHint")}
                             />
                           </td>
                           <td className={tbl.td}>
                             <Allocation
                               ratio={ramRatio(n)}
                               label={`${mib(n.memory_allocated_mb)} / ${formatBytes(n.memory_bytes)}`}
-                              title="RAM configurada nas VMs sobre a RAM física. Acima de 1× há risco de falta de memória se todas usarem o máximo."
+                              title={t("infra.nodes.ramHint")}
                               warnAbove={1}
                             />
                           </td>
@@ -295,19 +312,18 @@ export default function NodesPage() {
             )
           )}
           <p className="border-t border-slate-100 px-5 py-3 text-xs text-slate-500 dark:border-slate-800">
-            “Em uso” é o consumo real medido pelo Proxmox. “Configuradas” é o que as VMs receberam
-            (não é consumo): acima de 1× é sobrecomprometimento, comum em CPU e arriscado em memória (⚠).
+            {t("infra.nodes.footnote")}
           </p>
         </Card>
       )}
 
       {tab === "storage" && (
         <Card flush>
-          <Toolbar count={storage.data ? `${storageRows.length} de ${storage.data.length}` : undefined}>
-            <SearchInput value={q} onChange={setQ} placeholder="Filtrar por storage ou node…" />
+          <Toolbar count={storage.data ? t("infra.common.countOf", { shown: storageRows.length, total: storage.data.length }) : undefined}>
+            <SearchInput value={q} onChange={setQ} placeholder={t("infra.nodes.filterStorage")} />
           </Toolbar>
           {storage.data?.length === 0 && (
-            <Empty icon="layers">Nenhum storage visível ao token (precisa de Datastore.Audit no storage).</Empty>
+            <Empty icon="layers">{t("infra.nodes.noStorage")}</Empty>
           )}
           {!!storage.data?.length && (
             <div className={tbl.wrap}>
@@ -315,10 +331,10 @@ export default function NodesPage() {
                 <thead className={tbl.thead}>
                   <tr>
                     <th className={tbl.th}>Storage</th>
-                    <th className={tbl.th}>Node</th>
-                    <th className={tbl.th}>Tipo</th>
-                    <th className={tbl.th}>Status</th>
-                    <th className={tbl.th}>Uso</th>
+                    <th className={tbl.th}>{t("infra.common.node")}</th>
+                    <th className={tbl.th}>{t("infra.common.type")}</th>
+                    <th className={tbl.th}>{t("infra.common.status")}</th>
+                    <th className={tbl.th}>{t("infra.common.usage")}</th>
                   </tr>
                 </thead>
                 <tbody className={tbl.tbody}>
@@ -328,16 +344,16 @@ export default function NodesPage() {
                       <td className={tbl.td}>{s.node}</td>
                       <td className={tbl.td}>
                         {s.type}
-                        {s.shared && <span className="ml-1 text-xs text-slate-500">(compartilhado)</span>}
+                        {s.shared && <span className="ml-1 text-xs text-slate-500">{t("infra.common.shared")}</span>}
                       </td>
                       <td className={tbl.td}>
-                        {s.active ? <Status tone="ok">Ativo</Status> : <Status tone="error">Inativo</Status>}
+                        {s.active ? <Status tone="ok">{t("infra.common.active")}</Status> : <Status tone="error">{t("infra.common.inactive")}</Status>}
                       </td>
                       <td className={tbl.td}>
                         <Meter
                           value={s.total_bytes ? s.used_bytes / s.total_bytes : 0}
                           label={`${formatBytes(s.used_bytes)} / ${formatBytes(s.total_bytes)}`}
-                          title={`Uso de ${s.name}`}
+                          title={t("infra.common.usageOf", { name: s.name })}
                         />
                       </td>
                     </tr>

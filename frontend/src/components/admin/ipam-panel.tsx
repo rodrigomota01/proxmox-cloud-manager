@@ -7,34 +7,24 @@ import { relativeTime } from "@/components/activity";
 import { Toolbar } from "@/components/page";
 import { Alert, Badge, Button, Card, Empty, ErrorBox, Field, Input, Spinner, Status, type StatusTone, tbl } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useT, type MessageKey } from "@/lib/i18n";
 import { useJob } from "@/lib/jobs";
 
 type Address = Schemas["AddressOut"];
 
-const STATUS: Record<string, { label: string; tone: StatusTone; hint: string }> = {
-  free: { label: "livre", tone: "ok", hint: "Livre no cadastro e nenhuma VM usa." },
-  in_use: { label: "em uso", tone: "info", hint: "Marcado em uso e uma VM deste servidor usa (IP ou MAC)." },
-  detached: {
-    label: "VM sem este IP",
-    tone: "warn",
-    hint: "Marcado para uma VM que existe, mas ela não tem o IP configurado. Comum com NAT/load balancer: confira antes de liberar.",
-  },
-  stale: {
-    label: "sem VM",
-    tone: "warn",
-    hint: "Marcado em uso, mas nenhuma VM deste servidor usa nem tem o nome registrado. Candidato a liberar.",
-  },
-  conflict: {
-    label: "conflito",
-    tone: "error",
-    hint: "Livre no cadastro, mas uma VM usa: a próxima alocação desse IP colidiria. Marque como em uso no cadastro.",
-  },
-  unverified: { label: "não verificado", tone: "unknown", hint: "As placas de rede das VMs ainda não foram lidas." },
+const STATUS: Record<string, { label: MessageKey; tone: StatusTone; hint: MessageKey }> = {
+  free: { label: "infra.ipam.status.free", tone: "ok", hint: "infra.ipam.status.freeHint" },
+  in_use: { label: "infra.ipam.status.inUse", tone: "info", hint: "infra.ipam.status.inUseHint" },
+  detached: { label: "infra.ipam.status.detached", tone: "warn", hint: "infra.ipam.status.detachedHint" },
+  stale: { label: "infra.ipam.status.stale", tone: "warn", hint: "infra.ipam.status.staleHint" },
+  conflict: { label: "infra.ipam.status.conflict", tone: "error", hint: "infra.ipam.status.conflictHint" },
+  unverified: { label: "infra.ipam.status.unverified", tone: "unknown", hint: "infra.ipam.status.unverifiedHint" },
 };
 const ORDER = ["conflict", "stale", "detached", "free", "in_use", "unverified"];
 
 /** Sync state of the legacy IPAM (MySQL awf_ip_pool) and a manual refresh. */
 function IpamSync() {
+  const t = useT();
   const [jobId, setJobId] = useState<string | null>(null);
   const status = useQuery({
     queryKey: ["admin", "ipam"],
@@ -54,15 +44,17 @@ function IpamSync() {
         {!s
           ? "…"
           : !s.configured
-            ? "Cadastro de IPs (MySQL) não configurado: defina CM_IPAM_MYSQL_URL."
-            : `Cadastro de IPs (MySQL): ${s.addresses} IPs, ${s.integrated} em servidores integrados${
-                s.last_synced_at ? ` · sincronizado ${relativeTime(s.last_synced_at)}` : ""
-              }.`}
+            ? t("infra.ipam.notConfigured")
+            : t("infra.ipam.summary", {
+                addresses: s.addresses,
+                integrated: s.integrated,
+                synced: s.last_synced_at ? t("infra.ipam.syncedAgo", { when: relativeTime(s.last_synced_at) }) : "",
+              })}
         {done && job?.status === "failed" && <span className="ml-2 text-rose-600">{job.error_message}</span>}
       </span>
       {s?.configured && (
         <Button variant="secondary" disabled={running} onClick={() => sync.mutate()}>
-          {running ? <Spinner /> : null} Sincronizar agora
+          {running ? <Spinner /> : null} {t("infra.ipam.syncNow")}
         </Button>
       )}
     </div>
@@ -70,6 +62,7 @@ function IpamSync() {
 }
 
 function Networks({ clusterId, report }: { clusterId: string; report: Schemas["IpamReportOut"] }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["admin", "ipam-report", clusterId] });
   const add = useMutation({
@@ -91,8 +84,8 @@ function Networks({ clusterId, report }: { clusterId: string; report: Schemas["I
     `${n.cidr} · gateway ${n.gateway}${n.vlan ? ` · VLAN ${n.vlan}` : ""}${n.bridge ? ` · ${n.bridge}` : ""}`;
   return (
     <Card
-      title="Redes deste servidor"
-      description="O cadastro não guarda gateway, máscara nem VLAN. Aqui fica como configurar os IPs de cada faixa nas VMs novas. IPs com /31 não precisam: o gateway é o par do /31."
+      title={t("infra.ipam.networksTitle")}
+      description={t("infra.ipam.networksDesc")}
     >
       <ErrorBox message={add.isError ? errorMessage(add.error) : remove.isError ? errorMessage(remove.error) : null} />
       <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
@@ -100,7 +93,7 @@ function Networks({ clusterId, report }: { clusterId: string; report: Schemas["I
           <li key={n.id} className="flex items-center justify-between gap-3 py-2">
             <span className="font-mono text-xs">{line(n)}</span>
             <Button variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate(n.id!)}>
-              Remover
+              {t("infra.common.remove")}
             </Button>
           </li>
         ))}
@@ -108,7 +101,7 @@ function Networks({ clusterId, report }: { clusterId: string; report: Schemas["I
           <li key={n.cidr} className="flex items-center justify-between gap-3 py-2">
             <span>
               <span className="font-mono text-xs">{line(n)}</span>{" "}
-              <Badge tone="amber">detectada em {n.guests} VM(s)</Badge>
+              <Badge tone="amber">{t("infra.ipam.detectedIn", { count: n.guests ?? 0 })}</Badge>
             </span>
             <Button
               variant="secondary"
@@ -117,13 +110,13 @@ function Networks({ clusterId, report }: { clusterId: string; report: Schemas["I
                 add.mutate({ cidr: n.cidr, gateway: n.gateway, vlan: n.vlan ?? null, bridge: n.bridge ?? null })
               }
             >
-              Confirmar
+              {t("infra.ipam.confirm")}
             </Button>
           </li>
         ))}
         {!report.networks.length && !report.suggestions.length && (
           <li className="py-2">
-            <Empty icon="globe">Nenhuma rede configurada.</Empty>
+            <Empty icon="globe">{t("infra.ipam.noNetworks")}</Empty>
           </li>
         )}
       </ul>
@@ -145,7 +138,7 @@ function Networks({ clusterId, report }: { clusterId: string; report: Schemas["I
           );
         }}
       >
-        <Field label="Rede">
+        <Field label={t("infra.ipam.network")}>
           <Input name="cidr" required placeholder="177.54.151.0/24" />
         </Field>
         <Field label="Gateway">
@@ -158,7 +151,7 @@ function Networks({ clusterId, report }: { clusterId: string; report: Schemas["I
           <Input name="bridge" placeholder="vmbr0" />
         </Field>
         <Button type="submit" variant="secondary" disabled={add.isPending}>
-          Adicionar
+          {t("infra.common.add")}
         </Button>
       </form>
     </Card>
@@ -167,6 +160,7 @@ function Networks({ clusterId, report }: { clusterId: string; report: Schemas["I
 
 /** Addresses of one server: what the IPAM says vs. what its guests really use. */
 export function IpamPanel({ clusterId, onGuest }: { clusterId: string; onGuest?: (id: string) => string }) {
+  const t = useT();
   const [filter, setFilter] = useState("");
   const report = useQuery({
     queryKey: ["admin", "ipam-report", clusterId],
@@ -184,10 +178,16 @@ export function IpamPanel({ clusterId, onGuest }: { clusterId: string; onGuest?:
       <ErrorBox message={report.isError ? errorMessage(report.error) : null} />
       {r && (
         <>
-          <Card title="IPs do cadastro neste servidor" flush>
-            <Toolbar count={`${shown.length} IP(s)`}>
+          <Card title={t("infra.ipam.addressesTitle")} flush>
+            <Toolbar count={t("infra.ipam.ipCount", { count: shown.length })}>
               <div className="flex flex-wrap gap-2 text-xs">
-                {[["", `Todos (${r.addresses.length})`], ...ORDER.filter((k) => r.counts[k]).map((k) => [k, `${STATUS[k].label} (${r.counts[k]})`])].map(
+                {[
+                  ["", t("infra.ipam.all", { count: r.addresses.length })],
+                  ...ORDER.filter((k) => r.counts[k]).map((k) => [
+                    k,
+                    t("infra.ipam.filterCount", { label: t(STATUS[k].label), count: r.counts[k] }),
+                  ]),
+                ].map(
                   ([key, label]) => (
                     <button
                       key={key}
@@ -205,16 +205,16 @@ export function IpamPanel({ clusterId, onGuest }: { clusterId: string; onGuest?:
               </div>
             </Toolbar>
             {shown.length === 0 ? (
-              <Empty>Nenhum IP do cadastro está associado a este servidor (pve_node_owner).</Empty>
+              <Empty>{t("infra.ipam.noAddresses")}</Empty>
             ) : (
               <div className={tbl.wrap}>
                 <table className={tbl.table}>
                   <thead className={tbl.thead}>
                     <tr>
                       <th className={tbl.th}>IP</th>
-                      <th className={tbl.th}>Situação</th>
-                      <th className={tbl.th}>No cadastro</th>
-                      <th className={tbl.th}>No Proxmox</th>
+                      <th className={tbl.th}>{t("infra.common.situation")}</th>
+                      <th className={tbl.th}>{t("infra.ipam.inRegistry")}</th>
+                      <th className={tbl.th}>{t("infra.ipam.inProxmox")}</th>
                     </tr>
                   </thead>
                   <tbody className={tbl.tbody}>
@@ -225,8 +225,11 @@ export function IpamPanel({ clusterId, onGuest }: { clusterId: string; onGuest?:
                           {a.prefix != null && <span className="text-slate-500">/{a.prefix}</span>}
                         </td>
                         <td className={tbl.td}>
-                          <Status tone={STATUS[a.status]?.tone ?? "unknown"} title={STATUS[a.status]?.hint}>
-                            {STATUS[a.status]?.label ?? a.status}
+                          <Status
+                            tone={STATUS[a.status]?.tone ?? "unknown"}
+                            title={STATUS[a.status] ? t(STATUS[a.status].hint) : undefined}
+                          >
+                            {STATUS[a.status] ? t(STATUS[a.status].label) : a.status}
                           </Status>
                         </td>
                         <td className={`${tbl.td} text-xs`}>
@@ -243,10 +246,10 @@ export function IpamPanel({ clusterId, onGuest }: { clusterId: string; onGuest?:
                               ) : (
                                 a.guest.name
                               )}
-                              {!a.guest.managed && <span className="text-slate-500"> · não adotada</span>}
+                              {!a.guest.managed && <span className="text-slate-500">{t("infra.ipam.notAdopted")}</span>}
                               {a.mac_mismatch && (
-                                <div className="text-amber-700 dark:text-amber-300" title="MAC da placa difere do cadastro">
-                                  MAC na VM: <span className="font-mono">{a.mac_mismatch}</span>
+                                <div className="text-amber-700 dark:text-amber-300" title={t("infra.ipam.macMismatch")}>
+                                  {t("infra.ipam.macOnVm")} <span className="font-mono">{a.mac_mismatch}</span>
                                 </div>
                               )}
                             </>
@@ -262,15 +265,14 @@ export function IpamPanel({ clusterId, onGuest }: { clusterId: string; onGuest?:
             )}
             {!r.nics_known && (
               <p className="px-5 py-3 text-xs text-slate-500">
-                As placas de rede das VMs ainda não foram lidas; a verificação aparece após a próxima sincronização.
+                {t("infra.ipam.nicsUnknown")}
               </p>
             )}
           </Card>
           {r.unregistered.length > 0 && (
-            <Card title={`IPs públicos fora do cadastro (${r.unregistered.length})`}>
+            <Card title={t("infra.ipam.unregisteredTitle", { count: r.unregistered.length })}>
               <Alert variant="warning">
-                Configurados em VMs deste servidor, mas ausentes do cadastro: cadastre-os para não serem oferecidos a
-                outra VM.
+                {t("infra.ipam.unregisteredBody")}
               </Alert>
               <ul className="mt-3 divide-y divide-slate-100 text-sm dark:divide-slate-800">
                 {r.unregistered.map((u) => (

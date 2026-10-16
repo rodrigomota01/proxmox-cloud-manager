@@ -4095,6 +4095,11 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Locale
+             * @enum {string}
+             */
+            locale: "pt-BR" | "en";
             /** Platform Roles */
             platform_roles: string[];
             /** Tenants */
@@ -4477,10 +4482,25 @@ export interface components {
                 [key: string]: string;
             };
         };
-        /** ProfileUpdate */
-        ProfileUpdate: {
+        /** ProfileOut */
+        ProfileOut: {
             /** Display Name */
             display_name: string;
+            /**
+             * Locale
+             * @enum {string}
+             */
+            locale: "pt-BR" | "en";
+        };
+        /**
+         * ProfileUpdate
+         * @description Absent field: unchanged.
+         */
+        ProfileUpdate: {
+            /** Display Name */
+            display_name?: string | null;
+            /** Locale */
+            locale?: ("pt-BR" | "en") | null;
         };
         /** ProjectCostOut */
         ProjectCostOut: {
@@ -8481,9 +8501,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
+                    "application/json": components["schemas"]["ProfileOut"];
                 };
             };
             /** @description Validation Error */

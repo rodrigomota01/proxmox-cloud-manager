@@ -8,6 +8,8 @@
  * already rotated. Within a tab, concurrent callers share one in-flight refresh.
  */
 
+import { translate } from "@/lib/i18n";
+
 const AUTH = "/api/v1/auth";
 const LOCK = "cm-auth-refresh";
 const CSRF = { "X-Requested-With": "cloud-manager" };
@@ -77,10 +79,10 @@ export async function login(email: string, password: string): Promise<LoginResul
   const retryAfter = Number(res.headers.get("retry-after")) || undefined;
   const message =
     res.status === 429
-      ? `Muitas tentativas. Tente novamente em ${retryAfter ?? 60}s.`
+      ? translate("auth.tooManyAttempts", { seconds: retryAfter ?? 60 })
       : res.status === 401
-        ? "E-mail ou senha inválidos."
-        : "Não foi possível entrar. Tente novamente.";
+        ? translate("auth.invalidCredentials")
+        : translate("auth.signInFailed");
   return { ok: false, status: res.status, message, retryAfter };
 }
 

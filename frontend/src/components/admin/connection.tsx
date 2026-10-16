@@ -31,12 +31,14 @@ import {
   tbl,
 } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 import { useJob } from "@/lib/jobs";
 import { useAdminZones } from "@/lib/queries";
 
 type AdminInstance = Schemas["AdminInstanceOut"];
 
 function CredentialsCard({ cluster }: { cluster: Schemas["ClusterOut"] }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
   const save = useMutation({
@@ -62,15 +64,18 @@ function CredentialsCard({ cluster }: { cluster: Schemas["ClusterOut"] }) {
 
   return (
     <Card
-      title="Credencial (API token)"
+      title={t("infra.connection.credentialTitle")}
       description={
         cluster.has_credentials
-          ? `Token ${cluster.token_id}, atualizado em ${formatDate(cluster.credentials_rotated_at)}. O secret nunca é exibido; envie um novo para trocar.`
-          : "Nenhuma credencial cadastrada."
+          ? t("infra.connection.credentialDesc", {
+              token: cluster.token_id ?? "",
+              date: formatDate(cluster.credentials_rotated_at),
+            })
+          : t("infra.connection.noCredential")
       }
     >
       <form onSubmit={submit} className="space-y-3">
-        <Field label="Token ID" hint="usuario@realm!token">
+        <Field label="Token ID" hint={t("infra.connection.tokenIdHint")}>
           <Input name="token_id" required defaultValue={cluster.token_id ?? "cloudmgr@pve!cm"} />
         </Field>
         <Field label="Secret">
@@ -79,9 +84,9 @@ function CredentialsCard({ cluster }: { cluster: Schemas["ClusterOut"] }) {
         <ErrorBox message={save.isError ? errorMessage(save.error) : null} />
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={save.isPending}>
-            Salvar credencial
+            {t("infra.connection.saveCredential")}
           </Button>
-          {saved && <span className="text-sm text-emerald-600 dark:text-emerald-400">Salva (cifrada).</span>}
+          {saved && <span className="text-sm text-emerald-600 dark:text-emerald-400">{t("infra.connection.savedEncrypted")}</span>}
         </div>
       </form>
     </Card>
@@ -89,6 +94,7 @@ function CredentialsCard({ cluster }: { cluster: Schemas["ClusterOut"] }) {
 }
 
 function BulkAdoptDialog({ ids, onClose, onDone }: { ids: string[]; onClose: () => void; onDone: () => void }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [tenantId, setTenantId] = useState("");
   const open = ids.length > 0;
@@ -117,7 +123,7 @@ function BulkAdoptDialog({ ids, onClose, onDone }: { ids: string[]; onClose: () 
     },
   });
   return (
-    <Dialog open={open} onClose={onClose} title={`Adotar ${ids.length} instância(s)`}>
+    <Dialog open={open} onClose={onClose} title={t("infra.connection.bulkAdoptTitle", { count: ids.length })}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -126,12 +132,12 @@ function BulkAdoptDialog({ ids, onClose, onDone }: { ids: string[]; onClose: () 
         className="space-y-4"
       >
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Todas passam a pertencer ao projeto escolhido e ficam visíveis para os membros dele.
+          {t("infra.connection.bulkAdoptBody")}
         </p>
-        <Field label="Cliente (tenant)">
+        <Field label={t("infra.connection.clientTenant")}>
           <Select className="w-full" required value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
             <option value="" disabled>
-              Selecione…
+              {t("infra.common.selectPlaceholder")}
             </option>
             {tenants.data?.map((t) => (
               <option key={t.id} value={t.id}>
@@ -140,10 +146,14 @@ function BulkAdoptDialog({ ids, onClose, onDone }: { ids: string[]; onClose: () 
             ))}
           </Select>
         </Field>
-        <Field label="Projeto">
+        <Field label={t("infra.common.project")}>
           <Select className="w-full" name="project_id" required disabled={!projects.data} defaultValue="" key={tenantId}>
             <option value="" disabled>
-              {tenantId ? (projects.data?.length ? "Selecione…" : "O cliente não tem projetos") : "Escolha o cliente primeiro"}
+              {tenantId
+                ? projects.data?.length
+                  ? t("infra.common.selectPlaceholder")
+                  : t("infra.connection.clientHasNoProjects")
+                : t("infra.connection.chooseClientFirst")}
             </option>
             {projects.data?.map((p) => (
               <option key={p.id} value={p.id}>
@@ -155,10 +165,10 @@ function BulkAdoptDialog({ ids, onClose, onDone }: { ids: string[]; onClose: () 
         <ErrorBox message={adopt.isError ? errorMessage(adopt.error) : null} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
+            {t("infra.common.cancel")}
           </Button>
           <Button type="submit" disabled={adopt.isPending || !tenantId}>
-            Adotar
+            {t("infra.connection.adopt")}
           </Button>
         </div>
       </form>
@@ -167,6 +177,7 @@ function BulkAdoptDialog({ ids, onClose, onDone }: { ids: string[]; onClose: () 
 }
 
 function AdoptDialog({ instance, onClose }: { instance: AdminInstance | null; onClose: () => void }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [tenantId, setTenantId] = useState("");
   const tenants = useQuery({
@@ -211,15 +222,15 @@ function AdoptDialog({ instance, onClose }: { instance: AdminInstance | null; on
   }
 
   return (
-    <Dialog open={instance !== null} onClose={onClose} title={`Adotar ${instance?.provider_name ?? ""}`}>
+    <Dialog open={instance !== null} onClose={onClose} title={t("infra.connection.adoptTitle", { name: instance?.provider_name ?? "" })}>
       <form onSubmit={submit} className="space-y-4">
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          A instância passa a pertencer ao projeto escolhido e fica visível para os membros dele.
+          {t("infra.connection.adoptBody")}
         </p>
-        <Field label="Tenant">
+        <Field label={t("infra.common.tenant")}>
           <Select className="w-full" required value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
             <option value="" disabled>
-              Selecione…
+              {t("infra.common.selectPlaceholder")}
             </option>
             {tenants.data?.map((t) => (
               <option key={t.id} value={t.id}>
@@ -228,10 +239,10 @@ function AdoptDialog({ instance, onClose }: { instance: AdminInstance | null; on
             ))}
           </Select>
         </Field>
-        <Field label="Projeto">
+        <Field label={t("infra.common.project")}>
           <Select className="w-full" name="project_id" required disabled={!projects.data} defaultValue="">
             <option value="" disabled>
-              {tenantId ? "Selecione…" : "Escolha o tenant primeiro"}
+              {tenantId ? t("infra.common.selectPlaceholder") : t("infra.connection.chooseTenantFirst")}
             </option>
             {projects.data?.map((p) => (
               <option key={p.id} value={p.id}>
@@ -240,16 +251,16 @@ function AdoptDialog({ instance, onClose }: { instance: AdminInstance | null; on
             ))}
           </Select>
         </Field>
-        <Field label="Nome na plataforma (opcional)" hint="Padrão: o nome no Proxmox.">
+        <Field label={t("infra.connection.platformName")} hint={t("infra.connection.platformNameHint")}>
           <Input name="name" maxLength={64} placeholder={instance?.provider_name} />
         </Field>
         <ErrorBox message={adopt.isError ? errorMessage(adopt.error) : null} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
+            {t("infra.common.cancel")}
           </Button>
           <Button type="submit" disabled={adopt.isPending || !tenantId}>
-            Adotar
+            {t("infra.connection.adopt")}
           </Button>
         </div>
       </form>
@@ -259,6 +270,7 @@ function AdoptDialog({ instance, onClose }: { instance: AdminInstance | null; on
 
 /** Test / sync actions, settings, credential and sync history of one connection. */
 export function ConnectionSettings({ cluster: c, nodeCount }: { cluster: Schemas["ClusterOut"]; nodeCount: number }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [syncJob, setSyncJob] = useState<string | null>(null);
   const runs = useQuery({
@@ -288,87 +300,103 @@ export function ConnectionSettings({ cluster: c, nodeCount }: { cluster: Schemas
     <div className="space-y-4">
       {nodeCount > 1 && (
         <Alert variant="info">
-          Este servidor faz parte do cluster <strong>{c.name}</strong>: estas configurações valem para os{" "}
-          {nodeCount} servidores dele.
+          {t("infra.connection.clusterMemberBefore")}
+          <strong>{c.name}</strong>
+          {t("infra.connection.clusterMemberAfter", { count: nodeCount })}
         </Alert>
       )}
       {(!c.settings.pool || !c.zone_id) && (
-        <Alert variant="warning" title="Este servidor não recebe VMs novas">
-          Falta {!c.zone_id && !c.settings.pool ? "zona e pool de destino" : !c.zone_id ? "zona" : "pool de destino"}.
-          Ele continua sincronizado e monitorado, mas a zona não aparece em “Nova instância” até isso ser
-          preenchido abaixo (e haver templates dele em Imagens).
+        <Alert variant="warning" title={t("infra.connection.noNewVmsTitle")}>
+          {!c.zone_id && !c.settings.pool
+            ? t("infra.connection.missingZoneAndPool")
+            : !c.zone_id
+              ? t("infra.connection.missingZone")
+              : t("infra.connection.missingPool")}{" "}
+          {t("infra.connection.noNewVmsBody")}
         </Alert>
       )}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-5 py-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold">Conexão</span>
+          <span className="text-sm font-semibold">{t("infra.connection.connection")}</span>
           <ClusterStatus status={c.status} />
           {c.version && <span className="text-sm text-slate-500">Proxmox {c.version}</span>}
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" disabled={!c.has_credentials || test.isPending} onClick={() => test.mutate()}>
-            {test.isPending ? <Spinner /> : null} Testar conexão
+            {test.isPending ? <Spinner /> : null} {t("infra.connection.testConnection")}
           </Button>
           <Button disabled={!c.has_credentials || syncing} onClick={() => sync.mutate()}>
-            {syncing ? <Spinner /> : null} Sincronizar
+            {syncing ? <Spinner /> : null} {t("infra.connection.sync")}
           </Button>
         </div>
       </div>
 
       {test.data &&
         (test.data.ok ? (
-          <Alert variant="success" title="Conectado">
-            Proxmox {test.data.version}, {test.data.nodes_online}/{test.data.nodes_total} servidor(es) online,{" "}
-            {test.data.guests_visible} guest(s) visíveis ao token.
+          <Alert variant="success" title={t("infra.connection.connected")}>
+            {t("infra.connection.testResult", {
+              version: test.data.version ?? "",
+              online: test.data.nodes_online ?? 0,
+              total: test.data.nodes_total ?? 0,
+              guests: test.data.guests_visible ?? 0,
+            })}
           </Alert>
         ) : (
-          <ErrorBox message={`Falha na conexão: ${test.data.error}`} />
+          <ErrorBox message={t("infra.connection.connectionFailed", { error: test.data.error ?? "" })} />
         ))}
       <ErrorBox message={test.isError ? errorMessage(test.error) : null} />
       <ErrorBox message={sync.isError ? errorMessage(sync.error) : null} />
-      {job?.status === "failed" && <ErrorBox message={`Sincronização falhou: ${job.error_message}`} />}
+      {job?.status === "failed" && <ErrorBox message={t("infra.connection.syncFailed", { error: job.error_message ?? "" })} />}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="Configuração">
+        <Card title={t("infra.connection.configuration")}>
           <DescriptionList
             columns={1}
             items={[
-              ["Nome", <NameEditor key="n" clusterId={c.id} name={c.name} />],
-              ["URL da API", <span key="u" className="font-mono text-xs">{c.api_url}</span>],
-              ["TLS", c.insecure_skip_verify ? "sem verificação (dev)" : c.has_custom_ca ? "CA própria" : "CAs do sistema"],
-              ["Zona", <ZoneEditor key="z" clusterId={c.id} zoneId={c.zone_id ?? ""} />],
-              ["Pool de destino", <PoolEditor key="p" clusterId={c.id} pool={(c.settings.pool as string | undefined) ?? ""} />],
-              ["Último sync", formatDate(c.last_synced_at)],
-              !!c.last_error && ["Último erro", <span key="e" className="text-rose-600 dark:text-rose-400">{c.last_error}</span>],
+              [t("infra.common.name"), <NameEditor key="n" clusterId={c.id} name={c.name} />],
+              [t("infra.connection.apiUrl"), <span key="u" className="font-mono text-xs">{c.api_url}</span>],
+              ["TLS", c.insecure_skip_verify
+                  ? t("infra.connection.tlsInsecure")
+                  : c.has_custom_ca
+                    ? t("infra.connection.tlsCustomCa")
+                    : t("infra.connection.tlsSystem"),
+              ],
+              [t("infra.common.zone"), <ZoneEditor key="z" clusterId={c.id} zoneId={c.zone_id ?? ""} />],
+              [t("infra.connection.targetPool"), <PoolEditor key="p" clusterId={c.id} pool={(c.settings.pool as string | undefined) ?? ""} />],
+              [t("infra.connection.lastSync"), formatDate(c.last_synced_at)],
+              !!c.last_error && [t("infra.connection.lastError"), <span key="e" className="text-rose-600 dark:text-rose-400">{c.last_error}</span>],
             ]}
           />
         </Card>
         <CredentialsCard cluster={c} />
       </div>
 
-      <Card title="Sincronizações recentes" flush>
+      <Card title={t("infra.connection.recentSyncs")} flush>
         {runs.data?.length === 0 ? (
-          <Empty icon="history">Nenhuma sincronização ainda.</Empty>
+          <Empty icon="history">{t("infra.connection.noSyncs")}</Empty>
         ) : (
           <div className={tbl.wrap}>
             <table className={tbl.table}>
               <thead className={tbl.thead}>
                 <tr>
-                  <th className={tbl.th}>Início</th>
-                  <th className={tbl.th}>Origem</th>
-                  <th className={tbl.th}>Resultado</th>
-                  <th className={tbl.th}>Status</th>
+                  <th className={tbl.th}>{t("infra.connection.started")}</th>
+                  <th className={tbl.th}>{t("infra.connection.trigger")}</th>
+                  <th className={tbl.th}>{t("infra.connection.result")}</th>
+                  <th className={tbl.th}>{t("infra.common.status")}</th>
                 </tr>
               </thead>
               <tbody className={tbl.tbody}>
                 {runs.data?.map((r) => (
                   <tr key={r.id} className={tbl.tr}>
                     <td className={`${tbl.td} tabular-nums`}>{formatDate(r.started_at)}</td>
-                    <td className={tbl.td}>{r.trigger === "manual" ? "manual" : "automática"}</td>
+                    <td className={tbl.td}>{r.trigger === "manual" ? t("infra.connection.triggerManual") : t("infra.connection.triggerAuto")}</td>
                     <td className={`${tbl.td} text-xs`}>
                       {r.status === "succeeded" && (
                         <span className="text-slate-500">
-                          {String(r.stats.instances_seen ?? 0)} guests · {String(r.stats.discovered ?? 0)} novos
+                          {t("infra.connection.syncStats", {
+                            guests: String(r.stats.instances_seen ?? 0),
+                            discovered: String(r.stats.discovered ?? 0),
+                          })}
                         </span>
                       )}
                       {r.error && <span className="text-rose-600 dark:text-rose-400">{r.error}</span>}
@@ -390,6 +418,7 @@ export function ConnectionSettings({ cluster: c, nodeCount }: { cluster: Schemas
 /** Guests of a connection (optionally only those on one node): discovered ones to adopt
  * and the ones already managed. */
 export function ConnectionInstances({ clusterId, nodeName }: { clusterId: string; nodeName?: string }) {
+  const t = useT();
   const [adopting, setAdopting] = useState<AdminInstance | null>(null);
   const [tagFilter, setTagFilter] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -414,18 +443,18 @@ export function ConnectionInstances({ clusterId, nodeName }: { clusterId: string
       <ErrorBox message={instances.isError ? errorMessage(instances.error) : null} />
       <Card
         flush
-        title={`Descobertas (${discovered.length})`}
-        description="Guests que existem no Proxmox mas ainda não pertencem a nenhum cliente. Só administradores as veem. As que estão fora do pool gerenciado ficam somente leitura depois de adotadas: o cliente vê estado e métricas, sem ligar/desligar/excluir."
+        title={t("infra.connection.discovered", { count: discovered.length })}
+        description={t("infra.connection.discoveredDesc")}
         actions={
           selected.size > 0 && (
-            <Button onClick={() => setBulkAdopting(true)}>Adotar selecionadas ({selected.size})</Button>
+            <Button onClick={() => setBulkAdopting(true)}>{t("infra.connection.adoptSelected", { count: selected.size })}</Button>
           )
         }
       >
         {tagCounts.length > 0 && (
-          <Toolbar count={`${shown.length} de ${discovered.length}`}>
+          <Toolbar count={t("infra.common.countOf", { shown: shown.length, total: discovered.length })}>
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-slate-500">Filtrar por tag:</span>
+              <span className="text-slate-500">{t("infra.connection.filterByTag")}</span>
               {tagCounts.map(([tag, n]) => (
                 <button
                   key={tag}
@@ -441,14 +470,14 @@ export function ConnectionInstances({ clusterId, nodeName }: { clusterId: string
               ))}
               {tagFilter && (
                 <button className="text-brand-600 hover:underline dark:text-brand-400" onClick={() => setTagFilter("")}>
-                  limpar
+                  {t("infra.connection.clear")}
                 </button>
               )}
             </div>
           </Toolbar>
         )}
         {shown.length === 0 ? (
-          <Empty icon="checkCircle">Nada a adotar.</Empty>
+          <Empty icon="checkCircle">{t("infra.connection.nothingToAdopt")}</Empty>
         ) : (
           <InstanceTable
             rows={shown}
@@ -462,15 +491,15 @@ export function ConnectionInstances({ clusterId, nodeName }: { clusterId: string
             }
             action={(i) => (
               <Button variant="secondary" onClick={() => setAdopting(i)}>
-                Adotar
+                {t("infra.connection.adopt")}
               </Button>
             )}
           />
         )}
       </Card>
 
-      <Card flush title={`Gerenciadas (${managed.length})`}>
-        {managed.length === 0 ? <Empty icon="monitor">Nenhuma instância adotada.</Empty> : <InstanceTable rows={managed} />}
+      <Card flush title={t("infra.connection.managed", { count: managed.length })}>
+        {managed.length === 0 ? <Empty icon="monitor">{t("infra.connection.noManaged")}</Empty> : <InstanceTable rows={managed} />}
       </Card>
 
       <AdoptDialog instance={adopting} onClose={() => setAdopting(null)} />
@@ -488,6 +517,7 @@ export function ConnectionInstances({ clusterId, nodeName }: { clusterId: string
 
 /** The connection name is an admin label (tenants never see it); safe to change. */
 function NameEditor({ clusterId, name }: { clusterId: string; name: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(name);
@@ -509,7 +539,7 @@ function NameEditor({ clusterId, name }: { clusterId: string; name: string }) {
       <span className="flex items-center gap-2">
         <span className="font-medium">{name}</span>
         <Button variant="ghost" onClick={() => setEditing(true)}>
-          Renomear
+          {t("infra.connection.rename")}
         </Button>
       </span>
     );
@@ -522,12 +552,12 @@ function NameEditor({ clusterId, name }: { clusterId: string; name: string }) {
         save.mutate();
       }}
     >
-      <Input aria-label="Nome" className="w-48" value={value} maxLength={64} required autoFocus onChange={(e) => setValue(e.target.value)} />
+      <Input aria-label={t("infra.common.name")} className="w-48" value={value} maxLength={64} required autoFocus onChange={(e) => setValue(e.target.value)} />
       <Button type="submit" disabled={save.isPending || !value.trim() || value.trim() === name}>
-        Salvar
+        {t("infra.common.save")}
       </Button>
       <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
-        Cancelar
+        {t("infra.common.cancel")}
       </Button>
       {save.isError && <span className="text-xs text-rose-600">{errorMessage(save.error)}</span>}
     </form>
@@ -535,6 +565,7 @@ function NameEditor({ clusterId, name }: { clusterId: string; name: string }) {
 }
 
 function ZoneEditor({ clusterId, zoneId }: { clusterId: string; zoneId: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const zones = useAdminZones();
   const [value, setValue] = useState(zoneId);
@@ -550,8 +581,8 @@ function ZoneEditor({ clusterId, zoneId }: { clusterId: string; zoneId: string }
   });
   return (
     <span className="flex items-center gap-2">
-      <Select aria-label="Zona" value={value} onChange={(e) => setValue(e.target.value)}>
-        <option value="">Sem zona</option>
+      <Select aria-label={t("infra.common.zone")} value={value} onChange={(e) => setValue(e.target.value)}>
+        <option value="">{t("infra.common.noZoneOption")}</option>
         {zones.map((z) => (
           <option key={z.id} value={z.id}>
             {z.label}
@@ -559,7 +590,7 @@ function ZoneEditor({ clusterId, zoneId }: { clusterId: string; zoneId: string }
         ))}
       </Select>
       <Button variant="secondary" disabled={save.isPending || value === zoneId} onClick={() => save.mutate()}>
-        Salvar
+        {t("infra.common.save")}
       </Button>
       {save.isError && <span className="text-xs text-rose-600">{errorMessage(save.error)}</span>}
     </span>
@@ -567,6 +598,7 @@ function ZoneEditor({ clusterId, zoneId }: { clusterId: string; zoneId: string }
 }
 
 function PoolEditor({ clusterId, pool }: { clusterId: string; pool: string }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [value, setValue] = useState(pool);
   const save = useMutation({
@@ -582,14 +614,14 @@ function PoolEditor({ clusterId, pool }: { clusterId: string; pool: string }) {
   return (
     <span className="flex items-center gap-2">
       <Input
-        aria-label="Pool de destino"
+        aria-label={t("infra.connection.targetPool")}
         className="w-32"
         value={value}
-        placeholder="nenhum"
+        placeholder={t("infra.connection.none")}
         onChange={(e) => setValue(e.target.value)}
       />
       <Button variant="secondary" disabled={save.isPending || value === pool} onClick={() => save.mutate()}>
-        Salvar
+        {t("infra.common.save")}
       </Button>
       {save.isError && <span className="text-xs text-rose-600">{errorMessage(save.error)}</span>}
     </span>
@@ -607,6 +639,7 @@ function InstanceTable({
   selected?: Set<string>;
   onToggle?: (ids: string[], on: boolean) => void;
 }) {
+  const t = useT();
   const selectable = selected !== undefined && onToggle !== undefined;
   const allOn = selectable && rows.length > 0 && rows.every((r) => selected.has(r.id));
   return (
@@ -618,19 +651,19 @@ function InstanceTable({
               <th className={`${tbl.th} w-8`}>
                 <input
                   type="checkbox"
-                  aria-label="Selecionar todas"
+                  aria-label={t("infra.connection.selectAll")}
                   checked={allOn}
                   onChange={(e) => onToggle(rows.map((r) => r.id), e.target.checked)}
                 />
               </th>
             )}
             <th className={tbl.th}>VMID</th>
-            <th className={tbl.th}>Nome</th>
-            <th className={tbl.th}>Tags</th>
+            <th className={tbl.th}>{t("infra.common.name")}</th>
+            <th className={tbl.th}>{t("infra.connection.tags")}</th>
             <th className={tbl.th}>IP</th>
             <th className={tbl.th}>Pool</th>
-            <th className={tbl.th}>Estado</th>
-            <th className={tbl.th}>Recursos</th>
+            <th className={tbl.th}>{t("infra.connection.state")}</th>
+            <th className={tbl.th}>{t("infra.connection.resources")}</th>
             {action && <th className={tbl.th} />}
           </tr>
         </thead>
@@ -641,7 +674,7 @@ function InstanceTable({
                 <td className={`${tbl.td} w-8`}>
                   <input
                     type="checkbox"
-                    aria-label={`Selecionar ${i.provider_name}`}
+                    aria-label={t("infra.connection.selectOne", { name: i.provider_name })}
                     checked={selected.has(i.id)}
                     onChange={(e) => onToggle([i.id], e.target.checked)}
                   />
@@ -655,7 +688,7 @@ function InstanceTable({
                 </span>
                 {i.name !== i.provider_name && <span className="ml-1 text-xs text-slate-500">({i.provider_name})</span>}
                 <div className="text-xs text-slate-500">
-                  {i.kind === "vm" ? "VM" : "Container"} · {i.node}
+                  {i.kind === "vm" ? "VM" : t("infra.connection.container")} · {i.node}
                 </div>
               </td>
               <td className={tbl.td}>
@@ -670,7 +703,7 @@ function InstanceTable({
                 {i.pool ?? <span className="text-slate-400">—</span>}
                 {i.read_only && (
                   <div>
-                    <Badge tone="gray">somente leitura</Badge>
+                    <Badge tone="gray">{t("infra.connection.readOnly")}</Badge>
                   </div>
                 )}
               </td>
@@ -679,7 +712,9 @@ function InstanceTable({
               </td>
               <td className={`${tbl.td} whitespace-nowrap tabular-nums text-slate-600 dark:text-slate-400`}>
                 {i.vcpus} vCPU · {(i.memory_mb / 1024).toFixed(1)} GiB ·{" "}
-                <span title={i.volumes.map((v) => `${v.name}: ${formatBytes(v.size_bytes)} em ${v.storage}`).join("\n")}>
+                <span title={i.volumes
+                    .map((v) => t("infra.connection.volumeOn", { name: v.name, size: formatBytes(v.size_bytes), storage: v.storage }))
+                    .join("\n")}>
                   {volumesSummary(i.volumes, i.root_disk_gb)}
                 </span>
               </td>
@@ -704,6 +739,7 @@ export function AddHypervisorDialog({
   onClose: () => void;
   onCreated: (clusterId: string) => void;
 }) {
+  const t = useT();
   const zones = useAdminZones();
   const queryClient = useQueryClient();
   const [created, setCreated] = useState<string | null>(null);
@@ -751,29 +787,30 @@ export function AddHypervisorDialog({
   };
 
   return (
-    <Dialog open={open} onClose={close} title="Adicionar hypervisor">
+    <Dialog open={open} onClose={close} title={t("infra.nodes.addHypervisor")}>
       <form onSubmit={submit} className="space-y-4">
         <Alert variant="info">
-          Rode antes o <code>deploy/proxmox/setup-node.sh</code> no servidor: ele cria o usuário, o pool e o
-          token com o mínimo de permissões.
+          {t("infra.connection.addSetupBefore")}
+          <code>deploy/proxmox/setup-node.sh</code>
+          {t("infra.connection.addSetupAfter")}
         </Alert>
-        <Field label="Nome" hint="Rótulo para os admins, ex.: hv08. Os clientes não veem.">
+        <Field label={t("infra.common.name")} hint={t("infra.connection.nameHint")}>
           <Input name="name" required maxLength={64} placeholder="hv08" disabled={created !== null} />
         </Field>
-        <Field label="URL da API" hint="Ex.: https://hv08.exemplo.com:8006">
+        <Field label={t("infra.connection.apiUrl")} hint={t("infra.connection.apiUrlHint")}>
           <Input name="api_url" type="url" required placeholder="https://host:8006" disabled={created !== null} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Token ID" hint="usuario@realm!token">
+          <Field label="Token ID" hint={t("infra.connection.tokenIdHint")}>
             <Input name="token_id" required defaultValue="cloudmgr@pve!cm" />
           </Field>
-          <Field label="Secret" hint="Cole aqui; é guardado cifrado e nunca exibido.">
+          <Field label="Secret" hint={t("infra.connection.secretHint")}>
             <Input name="secret" type="password" autoComplete="off" required />
           </Field>
         </div>
-        <Field label="Zona" hint="Onde este servidor fica. Sem zona, ele é monitorado mas não recebe VMs novas.">
+        <Field label={t("infra.common.zone")} hint={t("infra.connection.zoneHint")}>
           <Select name="zone_id" className="w-full" defaultValue="" disabled={created !== null}>
-            <option value="">Sem zona</option>
+            <option value="">{t("infra.common.noZoneOption")}</option>
             {zones.map((z) => (
               <option key={z.id} value={z.id}>
                 {z.label}
@@ -781,25 +818,25 @@ export function AddHypervisorDialog({
             ))}
           </Select>
         </Field>
-        <Field label="Pool de destino" hint="Pool do Proxmox onde as VMs novas nascem (o escopo das ACLs do token), ex.: cloud-manager.">
+        <Field label={t("infra.connection.targetPool")} hint={t("infra.connection.poolHint")}>
           <Input name="pool" maxLength={64} pattern="[A-Za-z0-9._\-]+" placeholder="cloud-manager" disabled={created !== null} />
         </Field>
         <Field
-          label="CA própria (opcional)"
-          hint="PEM da CA do servidor (pve-root-ca.pem). Deixe vazio se o certificado for de uma CA pública, como Let's Encrypt."
+          label={t("infra.connection.customCa")}
+          hint={t("infra.connection.customCaHint")}
         >
           <Textarea name="ca_pem" rows={3} placeholder="-----BEGIN CERTIFICATE-----" disabled={created !== null} />
         </Field>
         {created && !add.isPending && (
-          <Alert variant="warning">O servidor já foi cadastrado; corrija o token e tente de novo.</Alert>
+          <Alert variant="warning">{t("infra.connection.alreadyCreated")}</Alert>
         )}
         <ErrorBox message={add.isError ? errorMessage(add.error) : null} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={close}>
-            Cancelar
+            {t("infra.common.cancel")}
           </Button>
           <Button type="submit" disabled={add.isPending}>
-            {add.isPending ? <Spinner /> : null} Adicionar
+            {add.isPending ? <Spinner /> : null} {t("infra.common.add")}
           </Button>
         </div>
       </form>

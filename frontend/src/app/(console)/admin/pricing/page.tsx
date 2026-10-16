@@ -7,14 +7,15 @@ import { Icon } from "@/components/icons";
 import { Menu, PageHeader, ResourceIcon } from "@/components/page";
 import { Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Select, formatDate, tbl } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
-import { money, RESOURCE_LABEL } from "@/lib/money";
+import { useT, type MessageKey } from "@/lib/i18n";
+import { money, resourceLabel } from "@/lib/money";
 
 const RESOURCES = ["vcpu", "memory_gb", "disk_gb", "instance"] as const;
-const HINT: Record<string, string> = {
-  vcpu: "por vCPU, com a instância ligada",
-  memory_gb: "por GiB de RAM, com a instância ligada",
-  disk_gb: "por GiB de disco alocado, sempre",
-  instance: "por instância existente, sempre",
+const HINT: Record<string, MessageKey> = {
+  vcpu: "costs.pricing.hint.vcpu",
+  memory_gb: "costs.pricing.hint.memoryGb",
+  disk_gb: "costs.pricing.hint.diskGb",
+  instance: "costs.pricing.hint.instance",
 };
 
 function pricesFrom(form: FormData): Schemas["PriceSet"] {
@@ -24,10 +25,11 @@ function pricesFrom(form: FormData): Schemas["PriceSet"] {
 }
 
 function PriceInputs({ prices, compact = false }: { prices?: Record<string, string>; compact?: boolean }) {
+  const t = useT();
   return (
     <div className={`grid gap-3 ${compact ? "sm:grid-cols-2" : "sm:grid-cols-4"}`}>
       {RESOURCES.map((r) => (
-        <Field key={r} label={`${RESOURCE_LABEL[r]} / mês`} hint={HINT[r]}>
+        <Field key={r} label={t("costs.pricing.perMonth", { resource: resourceLabel(r) })} hint={t(HINT[r])}>
           <Input
             name={r}
             inputMode="decimal"
@@ -42,6 +44,7 @@ function PriceInputs({ prices, compact = false }: { prices?: Record<string, stri
 }
 
 function TableEditor({ table }: { table: Schemas["PriceTableOut"] }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
   const [history, setHistory] = useState(false);
@@ -76,23 +79,29 @@ function TableEditor({ table }: { table: Schemas["PriceTableOut"] }) {
         <span className="flex items-center gap-2">
           <Icon name="tag" className="h-4 w-4 text-brand-600 dark:text-brand-400" />
           {table.name}
-          {table.is_default && <Badge tone="brand">padrão</Badge>}
+          {table.is_default && <Badge tone="brand">{t("costs.pricing.default")}</Badge>}
         </span>
       }
       description={
-        table.tenants.length > 0 ? `Usada por ${table.tenants.length} cliente(s)` : table.is_default ? "Vale para clientes sem tabela própria" : "Nenhum cliente usa esta tabela"
+        table.tenants.length > 0
+          ? t(table.tenants.length === 1 ? "costs.pricing.usedByOne" : "costs.pricing.usedByOther", {
+              count: table.tenants.length,
+            })
+          : table.is_default
+            ? t("costs.pricing.defaultFallback")
+            : t("costs.pricing.unused")
       }
       actions={
         <Menu
-          ariaLabel={`Ações da tabela ${table.name}`}
+          ariaLabel={t("costs.pricing.tableActions", { name: table.name })}
           items={[
-            !table.is_default && { label: "Tornar padrão", onClick: () => save.mutate({ is_default: true }) },
-            { label: history ? "Ocultar histórico" : "Histórico de preços", onClick: () => setHistory((h) => !h) },
+            !table.is_default && { label: t("costs.pricing.makeDefault"), onClick: () => save.mutate({ is_default: true }) },
+            { label: history ? t("costs.pricing.hideHistory") : t("costs.pricing.history"), onClick: () => setHistory((h) => !h) },
             !table.is_default &&
               table.tenants.length === 0 && {
-                label: "Excluir",
+                label: t("costs.pricing.delete"),
                 danger: true,
-                onClick: () => confirm(`Excluir a tabela "${table.name}"?`) && remove.mutate(),
+                onClick: () => confirm(t("costs.pricing.confirmDelete", { name: table.name })) && remove.mutate(),
               },
           ]}
         />
@@ -108,18 +117,18 @@ function TableEditor({ table }: { table: Schemas["PriceTableOut"] }) {
           save.mutate({ name: String(f.get("name")).trim(), prices: pricesFrom(f) });
         }}
       >
-        <Field label="Nome">
+        <Field label={t("costs.pricing.name")}>
           <Input name="name" required maxLength={100} defaultValue={table.name} className="max-w-sm" />
         </Field>
         <PriceInputs prices={table.prices} />
         <ErrorBox message={save.isError ? errorMessage(save.error) : remove.isError ? errorMessage(remove.error) : null} />
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" variant="secondary" disabled={save.isPending}>
-            Salvar
+            {t("costs.pricing.save")}
           </Button>
-          {saved && <span className="text-sm text-emerald-600 dark:text-emerald-400">Salvo. Novos preços valem a partir de agora.</span>}
+          {saved && <span className="text-sm text-emerald-600 dark:text-emerald-400">{t("costs.pricing.saved")}</span>}
           <Button type="button" variant="link" className="ml-auto" onClick={() => setHistory((h) => !h)}>
-            {history ? "Ocultar histórico" : "Histórico de preços"}
+            {history ? t("costs.pricing.hideHistory") : t("costs.pricing.history")}
           </Button>
         </div>
       </form>
@@ -128,16 +137,16 @@ function TableEditor({ table }: { table: Schemas["PriceTableOut"] }) {
           <table className={tbl.table}>
             <thead className={tbl.thead}>
               <tr>
-                <th className={tbl.th}>Desde</th>
-                <th className={tbl.th}>Recurso</th>
-                <th className={`${tbl.th} text-right`}>Preço/mês</th>
+                <th className={tbl.th}>{t("costs.pricing.since")}</th>
+                <th className={tbl.th}>{t("costs.pricing.resource")}</th>
+                <th className={`${tbl.th} text-right`}>{t("costs.pricing.pricePerMonth")}</th>
               </tr>
             </thead>
             <tbody className={tbl.tbody}>
               {table.history.map((h) => (
                 <tr key={`${h.resource}-${h.effective_from}`} className={tbl.tr}>
                   <td className={tbl.td}>{formatDate(h.effective_from)}</td>
-                  <td className={tbl.td}>{RESOURCE_LABEL[h.resource] ?? h.resource}</td>
+                  <td className={tbl.td}>{resourceLabel(h.resource)}</td>
                   <td className={`${tbl.td} text-right tabular-nums`}>{money(h.monthly_price, "BRL", true)}</td>
                 </tr>
               ))}
@@ -158,6 +167,7 @@ function NewTableDialog({
   onClose: () => void;
   makeDefault: boolean;
 }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const create = useMutation({
     mutationFn: async (body: Schemas["PriceTableCreate"]) =>
@@ -172,7 +182,7 @@ function NewTableDialog({
     onClose();
   };
   return (
-    <Dialog open={open} onClose={close} title="Nova tabela de preços">
+    <Dialog open={open} onClose={close} title={t("costs.pricing.newTableTitle")}>
       <form
         className="space-y-3"
         onSubmit={(e) => {
@@ -185,21 +195,21 @@ function NewTableDialog({
           });
         }}
       >
-        <Field label="Nome" hint="Ex.: um contrato com desconto para um cliente.">
+        <Field label={t("costs.pricing.name")} hint={t("costs.pricing.nameHint")}>
           <Input name="name" required maxLength={100} />
         </Field>
         <PriceInputs compact />
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="is_default" defaultChecked={makeDefault} />
-          Usar como tabela padrão
+          {t("costs.pricing.useAsDefault")}
         </label>
         <ErrorBox message={create.isError ? errorMessage(create.error) : null} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={close}>
-            Cancelar
+            {t("costs.pricing.cancel")}
           </Button>
           <Button type="submit" disabled={create.isPending}>
-            Criar
+            {t("costs.pricing.create")}
           </Button>
         </div>
       </form>
@@ -209,13 +219,14 @@ function NewTableDialog({
 
 type CostVisibility = Schemas["TenantCostOut"]["cost_visibility"];
 
-const COST_VISIBILITY: { value: CostVisibility; label: string }[] = [
-  { value: "full", label: "Custos e uso de recursos" },
-  { value: "usage", label: "Somente uso de recursos (sem valores)" },
-  { value: "none", label: "Oculto" },
+const COST_VISIBILITY: { value: CostVisibility; label: MessageKey }[] = [
+  { value: "full", label: "costs.pricing.visibility.full" },
+  { value: "usage", label: "costs.pricing.visibility.usage" },
+  { value: "none", label: "costs.pricing.visibility.none" },
 ];
 
 function TenantAssignments({ tables }: { tables: Schemas["PriceTableOut"][] }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const summary = useQuery({
     queryKey: ["admin", "billing", "summary", "current"],
@@ -244,12 +255,12 @@ function TenantAssignments({ tables }: { tables: Schemas["PriceTableOut"][] }) {
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "billing"] }),
   });
-  const def = tables.find((t) => t.is_default);
+  const def = tables.find((tb) => tb.is_default);
   const error = [assign, visibility, summary].find((q) => q.isError)?.error;
   return (
     <Card
-      title="Por cliente"
-      description="Clientes sem tabela própria usam a padrão; a troca vale a partir de agora e o que já foi acumulado mantém o preço da época. A visibilidade define o que os usuários do cliente veem em Custos."
+      title={t("costs.pricing.byClient")}
+      description={t("costs.pricing.byClientDescription")}
       flush
     >
       {error && (
@@ -258,37 +269,37 @@ function TenantAssignments({ tables }: { tables: Schemas["PriceTableOut"][] }) {
         </div>
       )}
       {summary.data?.tenants.length === 0 ? (
-        <Empty icon="building">Nenhum cliente.</Empty>
+        <Empty icon="building">{t("costs.pricing.noClients")}</Empty>
       ) : (
         <div className={tbl.wrap}>
           <table className={`${tbl.table} min-w-[40rem]`}>
             <thead className={tbl.thead}>
               <tr>
-                <th className={tbl.th}>Cliente</th>
-                <th className={tbl.th}>Tabela de preços</th>
-                <th className={tbl.th}>Visível para o cliente</th>
+                <th className={tbl.th}>{t("costs.pricing.client")}</th>
+                <th className={tbl.th}>{t("costs.pricing.priceTable")}</th>
+                <th className={tbl.th}>{t("costs.pricing.visibleToClient")}</th>
               </tr>
             </thead>
             <tbody className={tbl.tbody}>
-              {summary.data?.tenants.map((t) => (
-                <tr key={t.tenant_id} className={tbl.tr}>
+              {summary.data?.tenants.map((row) => (
+                <tr key={row.tenant_id} className={tbl.tr}>
                   <td className={tbl.td}>
                     <div className="flex items-start gap-2">
                       <ResourceIcon kind="tenant" className="mt-0.5" />
                       <div>
-                        <div className="font-medium">{t.name}</div>
-                        <div className="text-xs text-slate-500">{t.slug}</div>
+                        <div className="font-medium">{row.name}</div>
+                        <div className="text-xs text-slate-500">{row.slug}</div>
                       </div>
                     </div>
                   </td>
                   <td className={tbl.td}>
                     <Select
-                      aria-label={`Tabela de preços de ${t.name}`}
-                      value={t.custom_price_table ? (t.price_table_id ?? "") : ""}
+                      aria-label={t("costs.pricing.priceTableOf", { name: row.name })}
+                      value={row.custom_price_table ? (row.price_table_id ?? "") : ""}
                       disabled={assign.isPending}
-                      onChange={(e) => assign.mutate({ tenantId: t.tenant_id, tableId: e.target.value || null })}
+                      onChange={(e) => assign.mutate({ tenantId: row.tenant_id, tableId: e.target.value || null })}
                     >
-                      <option value="">Padrão{def ? ` (${def.name})` : ""}</option>
+                      <option value="">{def ? t("costs.pricing.defaultOptionNamed", { name: def.name }) : t("costs.pricing.defaultOption")}</option>
                       {tables
                         .filter((tb) => !tb.is_default)
                         .map((tb) => (
@@ -300,16 +311,16 @@ function TenantAssignments({ tables }: { tables: Schemas["PriceTableOut"][] }) {
                   </td>
                   <td className={tbl.td}>
                     <Select
-                      aria-label={`O que ${t.name} vê em Custos`}
-                      value={t.cost_visibility}
+                      aria-label={t("costs.pricing.visibilityOf", { name: row.name })}
+                      value={row.cost_visibility}
                       disabled={visibility.isPending}
                       onChange={(e) =>
-                        visibility.mutate({ tenantId: t.tenant_id, value: e.target.value as CostVisibility })
+                        visibility.mutate({ tenantId: row.tenant_id, value: e.target.value as CostVisibility })
                       }
                     >
                       {COST_VISIBILITY.map((v) => (
                         <option key={v.value} value={v.value}>
-                          {v.label}
+                          {t(v.label)}
                         </option>
                       ))}
                     </Select>
@@ -325,6 +336,7 @@ function TenantAssignments({ tables }: { tables: Schemas["PriceTableOut"][] }) {
 }
 
 export default function AdminPricingPage() {
+  const t = useT();
   const [creating, setCreating] = useState(false);
   const tables = useQuery({
     queryKey: ["admin", "price-tables"],
@@ -333,12 +345,12 @@ export default function AdminPricingPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Tabelas de preço"
-        breadcrumbs={[{ label: "Custos" }, { label: "Tabelas de preço" }]}
-        description="As VMs são precificadas pelos recursos alocados, com preço mensal (730 h) cobrado por segundo: vCPU e memória enquanto a instância está ligada; disco e taxa por instância enquanto ela existe."
+        title={t("costs.pricing.title")}
+        breadcrumbs={[{ label: t("costs.pricing.breadcrumb") }, { label: t("costs.pricing.title") }]}
+        description={t("costs.pricing.description")}
         actions={
           <Button onClick={() => setCreating(true)}>
-            <Icon name="plus" /> Nova tabela
+            <Icon name="plus" /> {t("costs.pricing.newTable")}
           </Button>
         }
       />
@@ -347,23 +359,23 @@ export default function AdminPricingPage() {
         <Card>
           <Empty
             icon="tag"
-            title="Nenhuma tabela de preços"
+            title={t("costs.pricing.emptyTitle")}
             action={
               <Button onClick={() => setCreating(true)}>
-                <Icon name="plus" /> Nova tabela
+                <Icon name="plus" /> {t("costs.pricing.newTable")}
               </Button>
             }
           >
-            Crie uma e torne-a padrão para começar a calcular custos.
+            {t("costs.pricing.emptyBody")}
           </Empty>
         </Card>
       )}
-      {tables.data?.map((t) => <TableEditor key={t.id} table={t} />)}
+      {tables.data?.map((table) => <TableEditor key={table.id} table={table} />)}
       {tables.data && <TenantAssignments tables={tables.data} />}
       <NewTableDialog
         open={creating}
         onClose={() => setCreating(false)}
-        makeDefault={!tables.data?.some((t) => t.is_default)}
+        makeDefault={!tables.data?.some((table) => table.is_default)}
       />
     </div>
   );

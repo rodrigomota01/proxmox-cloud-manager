@@ -1,9 +1,11 @@
 "use client";
 
+import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 
 /** Platform admins: the tenant chosen in the header, or the whole platform. */
 export function ScopeToggle() {
+  const t = useT();
   const { isPlatformAdmin, tenant, platformView, setPlatformView } = useSession();
   if (!isPlatformAdmin) return null;
   const option = (on: boolean, label: string) => (
@@ -22,9 +24,9 @@ export function ScopeToggle() {
     </button>
   );
   return (
-    <div className="inline-flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800" role="group" aria-label="Escopo">
-      {option(false, tenant ? `Cliente ${tenant.name}` : "Nenhum cliente")}
-      {option(true, "Toda a plataforma")}
+    <div className="inline-flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800" role="group" aria-label={t("compute.scope.label")}>
+      {option(false, tenant ? t("compute.scope.tenant", { name: tenant.name }) : t("header.noClient"))}
+      {option(true, t("compute.scope.platform"))}
     </div>
   );
 }

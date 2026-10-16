@@ -11,20 +11,22 @@ import { DescriptionList, PageHeader } from "@/components/page";
 import { Card, ErrorBox, Status, formatBytes } from "@/components/ui";
 import { Allocation, Meter, mib, uptime } from "@/components/viz";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
+import { useT, type MessageKey } from "@/lib/i18n";
 
 const TABS = [
-  { key: "overview", label: "Visão geral" },
-  { key: "vms", label: "VMs" },
-  { key: "ips", label: "IPs" },
-  { key: "config", label: "Configuração" },
-] as const;
+  { key: "overview", label: "infra.node.tabOverview" },
+  { key: "vms", label: "infra.node.tabVms" },
+  { key: "ips", label: "infra.node.tabIps" },
+  { key: "config", label: "infra.node.tabConfig" },
+] as const satisfies readonly { key: string; label: MessageKey }[];
 type Tab = (typeof TABS)[number]["key"];
 
 export default function NodeDetailPage() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const params = useSearchParams();
-  const tab: Tab = TABS.some((t) => t.key === params.get("tab")) ? (params.get("tab") as Tab) : "overview";
+  const tab: Tab = TABS.some((x) => x.key === params.get("tab")) ? (params.get("tab") as Tab) : "overview";
   const nodes = useQuery({
     queryKey: ["admin", "nodes"],
     queryFn: async () => unwrap(await api.GET("/api/v1/admin/nodes")),
@@ -52,65 +54,65 @@ export default function NodeDetailPage() {
   const multi = siblings > 1;
 
   const rows: [string, React.ReactNode][] = [
-    ...(multi ? ([["Cluster", n.cluster_name]] as [string, React.ReactNode][]) : []),
-    ["Zona", n.region_name ? `${n.region_name} · ${n.zone_name}` : "sem zona"],
-    ["Nome no Proxmox", n.name],
-    ["Ligado há", online ? uptime(n.uptime_seconds) : "—"],
-    ["CPU em uso", online ? <Meter value={n.cpu_usage} title="CPU" /> : "—"],
+    ...(multi ? ([[t("infra.node.cluster"), n.cluster_name]] as [string, React.ReactNode][]) : []),
+    [t("infra.common.zone"), n.region_name ? `${n.region_name} · ${n.zone_name}` : t("infra.common.noZone")],
+    [t("infra.node.proxmoxName"), n.name],
+    [t("infra.usage.uptime"), online ? uptime(n.uptime_seconds) : "—"],
+    [t("infra.usage.cpuInUse"), online ? <Meter value={n.cpu_usage} title="CPU" /> : "—"],
     [
-      "Memória em uso",
+      t("infra.usage.memoryInUse"),
       online ? (
         <Meter
           value={n.memory_bytes ? n.memory_used_bytes / n.memory_bytes : 0}
           label={`${formatBytes(n.memory_used_bytes)} / ${formatBytes(n.memory_bytes)}`}
-          title="Memória"
+          title={t("infra.node.memory")}
         />
       ) : (
         "—"
       ),
     ],
     [
-      "Disco raiz",
+      t("infra.usage.rootDisk"),
       online && n.root_disk_bytes ? (
         <Meter
           value={n.root_disk_used_bytes / n.root_disk_bytes}
           label={`${formatBytes(n.root_disk_used_bytes)} / ${formatBytes(n.root_disk_bytes)}`}
-          title="Sistema de arquivos raiz do hypervisor (SO e logs). O disco das VMs fica nos storages."
+          title={t("infra.node.rootDiskHint")}
         />
       ) : (
         "—"
       ),
     ],
     [
-      "vCPUs configuradas",
+      t("infra.usage.vcpusConfigured"),
       <Allocation
         key="v"
         ratio={n.cpu_count ? n.vcpus_allocated / n.cpu_count : 0}
-        label={`${n.vcpus_allocated} / ${n.cpu_count} núcleos`}
-        title="vCPUs configuradas nas VMs sobre os núcleos físicos. Não é consumo: acima de 1× é normal em CPU."
+        label={t("infra.node.cores", { used: n.vcpus_allocated, total: n.cpu_count })}
+        title={t("infra.usage.vcpuHint")}
       />,
     ],
     [
-      "RAM configurada",
+      t("infra.usage.ramConfigured"),
       <Allocation
         key="r"
         ratio={n.memory_bytes ? (n.memory_allocated_mb * 1024 ** 2) / n.memory_bytes : 0}
         label={`${mib(n.memory_allocated_mb)} / ${formatBytes(n.memory_bytes)}`}
-        title="RAM configurada nas VMs sobre a RAM física. Acima de 1× há risco se todas usarem o máximo."
+        title={t("infra.node.ramHint")}
         warnAbove={1}
       />,
     ],
-    ["VMs ligadas", `${n.instances_running} de ${n.instances_total}`],
+    [t("infra.node.vmsRunning"), t("infra.node.vmsRunningValue", { running: n.instances_running, total: n.instances_total })],
   ];
 
   const title = multi ? n.name : n.cluster_name;
   const status =
     n.status === "online" ? (
-      <Status tone="ok">Online</Status>
+      <Status tone="ok">{t("infra.common.online")}</Status>
     ) : n.status === "offline" ? (
-      <Status tone="error">Offline</Status>
+      <Status tone="error">{t("infra.common.offline")}</Status>
     ) : (
-      <Status tone="unknown">Desconhecido</Status>
+      <Status tone="unknown">{t("status.unknown")}</Status>
     );
 
   return (
@@ -119,15 +121,15 @@ export default function NodeDetailPage() {
         title={title}
         kind="hypervisor"
         status={status}
-        breadcrumbs={[{ label: "Infraestrutura" }, { label: "Hypervisors", href: "/admin/nodes" }, { label: title }]}
-        tabs={TABS}
+        breadcrumbs={[{ label: t("nav.infrastructure") }, { label: t("nav.hypervisors"), href: "/admin/nodes" }, { label: title }]}
+        tabs={TABS.map((x) => ({ key: x.key, label: t(x.label) }))}
         activeTab={tab}
-        onTab={(t) => router.replace(t === "overview" ? `/admin/nodes/${id}` : `/admin/nodes/${id}?tab=${t}`)}
+        onTab={(k) => router.replace(k === "overview" ? `/admin/nodes/${id}` : `/admin/nodes/${id}?tab=${k}`)}
       >
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          {n.region_name ? `${n.region_name} · ${n.zone_name}` : "sem zona"}
-          {multi && ` · cluster ${n.cluster_name}`}
-          {!multi && n.name !== n.cluster_name && ` · nome no Proxmox: ${n.name}`}
+          {n.region_name ? `${n.region_name} · ${n.zone_name}` : t("infra.common.noZone")}
+          {multi && t("infra.node.clusterSuffix", { name: n.cluster_name })}
+          {!multi && n.name !== n.cluster_name && t("infra.node.proxmoxNameSuffix", { name: n.name })}
           {cluster.data?.version && ` · Proxmox ${cluster.data.version}`}
         </p>
       </PageHeader>
@@ -136,7 +138,7 @@ export default function NodeDetailPage() {
       {tab === "config" && cluster.data && <ConnectionSettings cluster={cluster.data} nodeCount={siblings} />}
       {tab === "overview" && (
         <>
-          <Card title="Detalhes">
+          <Card title={t("infra.node.details")}>
             <DescriptionList columns={3} items={rows} />
           </Card>
           {online && <NodeMetrics nodeId={n.id} />}

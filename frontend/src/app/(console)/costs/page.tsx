@@ -13,13 +13,15 @@ import { ScopeToggle } from "@/components/scope-toggle";
 import { Alert, Badge, Button, Card, Empty, ErrorBox, PowerBadge, Select, tbl } from "@/components/ui";
 import { mib } from "@/components/viz";
 import { api, ApiError, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
-import { money, monthLabel, num, recentMonths, RESOURCE_LABEL } from "@/lib/money";
+import { money, monthLabel, num, recentMonths, resourceLabel } from "@/lib/money";
 import { useCostVisibility, useProjectNames } from "@/lib/queries";
 import { usePermissions, useSession } from "@/lib/session";
+import { getLocale, useT, type MessageKey } from "@/lib/i18n";
 
 function MonthPicker({ value, onChange }: { value: string; onChange: (m: string) => void }) {
+  const t = useT();
   return (
-    <Select aria-label="Mês" value={value} onChange={(e) => onChange(e.target.value)}>
+    <Select aria-label={t("costs.month")} value={value} onChange={(e) => onChange(e.target.value)}>
       {recentMonths().map((m) => (
         <option key={m} value={m}>
           {monthLabel(m)}
@@ -41,12 +43,12 @@ function downloadCsv(name: string, rows: (string | number)[][]) {
   URL.revokeObjectURL(url);
 }
 
-const BREAKDOWN = [
-  { key: "vcpu", label: "vCPU" },
-  { key: "memory", label: "Memória" },
-  { key: "disk", label: "Disco" },
-  { key: "instance", label: "Taxa por instância" },
-] as const;
+const BREAKDOWN: { key: "vcpu" | "memory" | "disk" | "instance"; label: MessageKey }[] = [
+  { key: "vcpu", label: "costs.resources.vcpu" },
+  { key: "memory", label: "costs.breakdown.memory" },
+  { key: "disk", label: "costs.breakdown.disk" },
+  { key: "instance", label: "costs.resources.instance" },
+];
 
 /** The API reports only the user's projects without billing:view on the whole client. */
 function useProjectScoped(tenantId: string) {
@@ -58,6 +60,7 @@ function useProjectScoped(tenantId: string) {
 const denied403 = (count: number, err: unknown) => !(err instanceof ApiError && err.status === 403) && count < 2;
 
 function TenantCosts({ tenantId, month }: { tenantId: string; month: string }) {
+  const t = useT();
   const { tenant } = useSession();
   const projectScoped = useProjectScoped(tenantId);
   const projectNames = useProjectNames();
@@ -73,13 +76,16 @@ function TenantCosts({ tenantId, month }: { tenantId: string; month: string }) {
   const denied = summary.error instanceof ApiError && summary.error.status === 403;
 
   function exportCsv(data: Schemas["CostSummaryOut"]) {
-    downloadCsv(`custos-${tenant?.slug ?? "cliente"}-${data.month}.csv`, [
-      ["instancia", "projeto", "tipo", "vcpus", "memoria_mb", "disco_gb", "horas", "horas_ligada",
-        "custo_vcpu", "custo_memoria", "custo_disco", "custo_instancia", "total", "custo_atual_mensal", "excluida"],
+    const tenantSlug = tenant?.slug ?? t("costs.csv.fallbackSlug");
+    downloadCsv(t("costs.csv.costsFile", { tenant: tenantSlug, month: data.month }), [
+      [t("costs.csv.instance"), t("costs.csv.project"), t("costs.csv.kind"), "vcpus", t("costs.csv.memoryMb"),
+        t("costs.csv.diskGb"), t("costs.csv.hours"), t("costs.csv.runningHours"), t("costs.csv.costVcpu"),
+        t("costs.csv.costMemory"), t("costs.csv.costDisk"), t("costs.csv.costInstance"), "total",
+        t("costs.csv.runRateMonthly"), t("costs.csv.deleted")],
       ...data.instances.map((i) => [
         i.name, projectNames.get(i.project_id ?? "") ?? "", i.kind, i.vcpus, i.memory_mb, i.disk_gb,
         i.hours, i.running_hours, i.accrued.vcpu, i.accrued.memory, i.accrued.disk, i.accrued.instance,
-        i.accrued.total, i.run_rate_monthly, i.deleted ? "sim" : "não",
+        i.accrued.total, i.run_rate_monthly, i.deleted ? t("costs.csv.yes") : t("costs.csv.no"),
       ]),
     ]);
   }
@@ -90,13 +96,13 @@ function TenantCosts({ tenantId, month }: { tenantId: string; month: string }) {
   return (
     <>
       {denied ? (
-        <Alert variant="warning" title="Sem acesso">
-          Os custos ficam visíveis para quem tem algum papel no cliente ou em um dos seus projetos.
+        <Alert variant="warning" title={t("costs.noAccess")}>
+          {t("costs.tenant.noAccessBody")}
         </Alert>
       ) : (
         <ErrorBox message={summary.isError ? errorMessage(summary.error) : null} />
       )}
-      {s && projectScoped && <Alert variant="info">Mostrando os custos dos projetos em que você tem acesso.</Alert>}
+      {s && projectScoped && <Alert variant="info">{t("costs.tenant.projectScoped")}</Alert>}
       {s && (
         <>
           <CostTiles
@@ -110,20 +116,20 @@ function TenantCosts({ tenantId, month }: { tenantId: string; month: string }) {
           />
 
           <div className="grid gap-4 lg:grid-cols-3">
-            <Card title="Custo por dia" className="lg:col-span-2">
+            <Card title={t("costs.tenant.costPerDay")} className="lg:col-span-2">
               <DailyCostBars month={s.month} days={s.days} currency={cur} />
             </Card>
-            <Card title="Por recurso" flush>
+            <Card title={t("costs.tenant.byResource")} flush>
               <table className={tbl.table}>
                 <tbody className={tbl.tbody}>
                   {BREAKDOWN.map((b) => (
                     <tr key={b.key} className={tbl.tr}>
-                      <td className={tbl.td}>{b.label}</td>
+                      <td className={tbl.td}>{t(b.label)}</td>
                       <td className={`${tbl.td} text-right tabular-nums`}>{money(s.accrued[b.key], cur)}</td>
                     </tr>
                   ))}
                   <tr className="border-t border-slate-200 font-semibold dark:border-slate-700">
-                    <td className={tbl.td}>Total</td>
+                    <td className={tbl.td}>{t("costs.tenant.total")}</td>
                     <td className={`${tbl.td} text-right tabular-nums`}>{money(s.accrued.total, cur)}</td>
                   </tr>
                 </tbody>
@@ -131,17 +137,17 @@ function TenantCosts({ tenantId, month }: { tenantId: string; month: string }) {
             </Card>
           </div>
 
-          <Card title="Por projeto" flush>
+          <Card title={t("costs.tenant.byProject")} flush>
             {s.projects.length === 0 ? (
-              <Empty icon="folder">Nenhum custo neste mês.</Empty>
+              <Empty icon="folder">{t("costs.tenant.noCosts")}</Empty>
             ) : (
               <div className={tbl.wrap}>
                 <table className={tbl.table}>
                   <thead className={tbl.thead}>
                     <tr>
-                      <th className={tbl.th}>Projeto</th>
-                      <th className={`${tbl.th} text-right`}>No mês</th>
-                      {s.current && <th className={`${tbl.th} text-right`}>Custo atual/mês</th>}
+                      <th className={tbl.th}>{t("costs.table.project")}</th>
+                      <th className={`${tbl.th} text-right`}>{t("costs.table.thisMonth")}</th>
+                      {s.current && <th className={`${tbl.th} text-right`}>{t("costs.table.runRateMonth")}</th>}
                     </tr>
                   </thead>
                   <tbody className={tbl.tbody}>
@@ -154,7 +160,7 @@ function TenantCosts({ tenantId, month }: { tenantId: string; month: string }) {
                               {p.name}
                             </span>
                           ) : (
-                            <span className="text-slate-500">sem projeto</span>
+                            <span className="text-slate-500">{t("costs.noProject")}</span>
                           )}
                         </td>
                         <td className={`${tbl.td} text-right tabular-nums`}>{money(p.accrued, cur)}</td>
@@ -168,32 +174,32 @@ function TenantCosts({ tenantId, month }: { tenantId: string; month: string }) {
           </Card>
 
           <Card
-            title="Por instância"
+            title={t("costs.tenant.byInstance")}
             flush
             actions={
               s.instances.length > 0 && (
                 <Button variant="secondary" onClick={() => exportCsv(s)}>
-                  <Icon name="download" /> Exportar CSV
+                  <Icon name="download" /> {t("costs.exportCsv")}
                 </Button>
               )
             }
           >
             {s.instances.length === 0 ? (
-              <Empty icon="monitor">Nenhuma instância com custo neste mês.</Empty>
+              <Empty icon="monitor">{t("costs.tenant.noInstances")}</Empty>
             ) : (
               <>
-                <Toolbar count={`${instances.length} de ${s.instances.length} instâncias`}>
+                <Toolbar count={t("costs.tenant.instancesCount", { shown: instances.length, total: s.instances.length })}>
                   <SearchInput value={filter} onChange={setFilter} />
                 </Toolbar>
                 <div className={tbl.wrap}>
                   <table className={`${tbl.table} min-w-[44rem]`}>
                     <thead className={tbl.thead}>
                       <tr>
-                        <th className={tbl.th}>Instância</th>
-                        <th className={tbl.th}>Recursos</th>
-                        <th className={`${tbl.th} text-right`}>Horas (ligada)</th>
-                        <th className={`${tbl.th} text-right`}>No mês</th>
-                        {s.current && <th className={`${tbl.th} text-right`}>Custo atual/mês</th>}
+                        <th className={tbl.th}>{t("costs.tenant.instance")}</th>
+                        <th className={tbl.th}>{t("costs.tenant.resources")}</th>
+                        <th className={`${tbl.th} text-right`}>{t("costs.table.hoursRunning")}</th>
+                        <th className={`${tbl.th} text-right`}>{t("costs.table.thisMonth")}</th>
+                        {s.current && <th className={`${tbl.th} text-right`}>{t("costs.table.runRateMonth")}</th>}
                       </tr>
                     </thead>
                     <tbody className={tbl.tbody}>
@@ -212,7 +218,7 @@ function TenantCosts({ tenantId, month }: { tenantId: string; month: string }) {
                                 )}
                                 <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
                                   {projectNames.get(i.project_id ?? "") ?? ""}
-                                  {i.deleted ? <Badge>excluída</Badge> : <PowerBadge state={i.power_state} />}
+                                  {i.deleted ? <Badge>{t("costs.deleted")}</Badge> : <PowerBadge state={i.power_state} />}
                                 </div>
                               </div>
                             </div>
@@ -234,20 +240,24 @@ function TenantCosts({ tenantId, month }: { tenantId: string; month: string }) {
                     </tbody>
                   </table>
                 </div>
-                {instances.length === 0 && <Empty>Nenhuma instância com esse nome.</Empty>}
+                {instances.length === 0 && <Empty>{t("costs.tenant.noInstanceMatch")}</Empty>}
               </>
             )}
           </Card>
 
           <Card
-            title={`Tabela de preços${s.prices.price_table ? `: ${s.prices.price_table}` : ""}`}
-            description={`Preço mensal (${s.prices.hours_per_month} h) por unidade alocada, cobrado por segundo de uso. vCPU e memória só contam com a instância ligada; disco e taxa por instância enquanto ela existir.`}
+            title={
+              s.prices.price_table
+                ? t("costs.tenant.priceTableNamed", { name: s.prices.price_table })
+                : t("costs.tenant.priceTable")
+            }
+            description={t("costs.tenant.priceTableDescription", { hours: s.prices.hours_per_month })}
           >
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {Object.entries(s.prices.prices).map(([r, p]) => (
                 <div key={r} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
-                  <div className="text-xs text-slate-500">{RESOURCE_LABEL[r] ?? r}</div>
-                  <div className="font-semibold tabular-nums">{money(p, cur, true)}/mês</div>
+                  <div className="text-xs text-slate-500">{resourceLabel(r)}</div>
+                  <div className="font-semibold tabular-nums">{t("costs.tiles.perMonth", { value: money(p, cur, true) })}</div>
                 </div>
               ))}
             </div>
@@ -258,11 +268,12 @@ function TenantCosts({ tenantId, month }: { tenantId: string; month: string }) {
   );
 }
 
-const hrs = (v: string | number) => num(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+const hrs = (v: string | number) => num(v).toLocaleString(getLocale(), { maximumFractionDigits: 1 });
 
 /** Consumed and allocated resources, without prices: the client's VMs (same project
  * rules as the costs) and the Kubernetes clusters linked to it. */
 function TenantUsage({ tenantId, month }: { tenantId: string; month: string }) {
+  const t = useT();
   const { tenant } = useSession();
   const projectScoped = useProjectScoped(tenantId);
   const projectNames = useProjectNames();
@@ -279,12 +290,15 @@ function TenantUsage({ tenantId, month }: { tenantId: string; month: string }) {
   const instances = (u?.instances ?? []).filter((i) => !q || i.name.toLowerCase().includes(q));
 
   function exportCsv(data: Schemas["UsageReportOut"]) {
-    downloadCsv(`uso-${tenant?.slug ?? "cliente"}-${data.month}.csv`, [
-      ["instancia", "projeto", "tipo", "vcpus", "memoria_mb", "disco_gb", "horas", "horas_ligada",
-        "vcpu_horas", "memoria_gib_horas", "disco_gib_horas", "excluida"],
+    const tenantSlug = tenant?.slug ?? t("costs.csv.fallbackSlug");
+    downloadCsv(t("costs.csv.usageFile", { tenant: tenantSlug, month: data.month }), [
+      [t("costs.csv.instance"), t("costs.csv.project"), t("costs.csv.kind"), "vcpus", t("costs.csv.memoryMb"),
+        t("costs.csv.diskGb"), t("costs.csv.hours"), t("costs.csv.runningHours"), t("costs.csv.vcpuHours"),
+        t("costs.csv.memoryGibHours"), t("costs.csv.diskGibHours"), t("costs.csv.deleted")],
       ...data.instances.map((i) => [
         i.name, projectNames.get(i.project_id ?? "") ?? "", i.kind, i.vcpus, i.memory_mb, i.disk_gb,
-        i.hours, i.running_hours, i.vcpu_hours, i.memory_gib_hours, i.disk_gib_hours, i.deleted ? "sim" : "não",
+        i.hours, i.running_hours, i.vcpu_hours, i.memory_gib_hours, i.disk_gib_hours,
+        i.deleted ? t("costs.csv.yes") : t("costs.csv.no"),
       ]),
     ]);
   }
@@ -292,46 +306,50 @@ function TenantUsage({ tenantId, month }: { tenantId: string; month: string }) {
   return (
     <>
       {denied ? (
-        <Alert variant="warning" title="Sem acesso">
-          O consumo fica visível para quem tem algum papel no cliente ou em um dos seus projetos.
+        <Alert variant="warning" title={t("costs.noAccess")}>
+          {t("costs.usage.noAccessBody")}
         </Alert>
       ) : (
         <ErrorBox message={usage.isError ? errorMessage(usage.error) : null} />
       )}
-      {u && projectScoped && <Alert variant="info">Mostrando as VMs dos projetos em que você tem acesso.</Alert>}
+      {u && projectScoped && <Alert variant="info">{t("costs.usage.projectScoped")}</Alert>}
       {u && (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatTile
               icon="monitor"
-              label="Alocado agora"
+              label={t("costs.usage.allocatedNow")}
               value={`${u.allocated.vcpus} vCPU · ${mib(u.allocated.memory_mb)}`}
-              hint={`${u.allocated.disk_gb} GiB de disco · ${u.allocated.instances} VMs (${u.allocated.running} ligadas)`}
+              hint={t("costs.usage.allocatedHint", {
+                disk: u.allocated.disk_gb,
+                instances: u.allocated.instances,
+                running: u.allocated.running,
+              })}
             />
-            <StatTile icon="dashboard" label="vCPU·hora no mês" value={hrs(u.consumed.vcpu_hours)} hint="enquanto ligadas" />
-            <StatTile icon="layers" label="Memória (GiB·hora)" value={hrs(u.consumed.memory_gib_hours)} hint="enquanto ligadas" />
-            <StatTile icon="server" label="Disco (GiB·hora)" value={hrs(u.consumed.disk_gib_hours)} hint="enquanto existirem" />
+            <StatTile icon="dashboard" label={t("costs.usage.vcpuHoursMonth")} value={hrs(u.consumed.vcpu_hours)} hint={t("costs.usage.whileRunning")} />
+            <StatTile icon="layers" label={t("costs.usage.memoryHours")} value={hrs(u.consumed.memory_gib_hours)} hint={t("costs.usage.whileRunning")} />
+            <StatTile icon="server" label={t("costs.usage.diskHours")} value={hrs(u.consumed.disk_gib_hours)} hint={t("costs.usage.whileExisting")} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-3">
-            <Card title="vCPU·hora por dia" className="lg:col-span-2">
+            <Card title={t("costs.usage.vcpuHoursPerDay")} className="lg:col-span-2">
               <DailyBars
                 month={u.month}
                 days={u.days.map((d) => ({ date: d.date, value: num(d.vcpu_hours) }))}
                 format={(v) => `${hrs(v)} vCPU·h`}
-                what="vCPU·hora"
+                what={t("costs.usage.vcpuHour")}
               />
             </Card>
-            <Card title="Por projeto" flush>
+            <Card title={t("costs.tenant.byProject")} flush>
               {u.projects.length === 0 ? (
-                <Empty icon="folder">Nenhum consumo neste mês.</Empty>
+                <Empty icon="folder">{t("costs.usage.noUsage")}</Empty>
               ) : (
                 <table className={tbl.table}>
                   <thead className={tbl.thead}>
                     <tr>
-                      <th className={tbl.th}>Projeto</th>
+                      <th className={tbl.th}>{t("costs.table.project")}</th>
                       <th className={`${tbl.th} text-right`}>vCPU·h</th>
-                      <th className={`${tbl.th} text-right`}>GiB·h RAM</th>
+                      <th className={`${tbl.th} text-right`}>{t("costs.usage.ramHours")}</th>
                     </tr>
                   </thead>
                   <tbody className={tbl.tbody}>
@@ -344,9 +362,9 @@ function TenantUsage({ tenantId, month }: { tenantId: string; month: string }) {
                               {p.name}
                             </span>
                           ) : (
-                            <span className="text-slate-500">sem projeto</span>
+                            <span className="text-slate-500">{t("costs.noProject")}</span>
                           )}
-                          <div className="text-xs text-slate-500">{p.instances} VMs</div>
+                          <div className="text-xs text-slate-500">{t("costs.usage.vmsCount", { count: p.instances })}</div>
                         </td>
                         <td className={`${tbl.td} text-right tabular-nums`}>{hrs(p.vcpu_hours)}</td>
                         <td className={`${tbl.td} text-right tabular-nums`}>{hrs(p.memory_gib_hours)}</td>
@@ -359,22 +377,22 @@ function TenantUsage({ tenantId, month }: { tenantId: string; month: string }) {
           </div>
 
           <Card
-            title="Máquinas virtuais"
-            description="Recursos alocados a cada VM e o consumo no mês: vCPU e memória contam com a VM ligada; disco enquanto ela existir."
+            title={t("costs.usage.vmsTitle")}
+            description={t("costs.usage.vmsDescription")}
             flush
             actions={
               u.instances.length > 0 && (
                 <Button variant="secondary" onClick={() => exportCsv(u)}>
-                  <Icon name="download" /> Exportar CSV
+                  <Icon name="download" /> {t("costs.exportCsv")}
                 </Button>
               )
             }
           >
             {u.instances.length === 0 ? (
-              <Empty icon="monitor">Nenhuma VM neste mês.</Empty>
+              <Empty icon="monitor">{t("costs.usage.noVms")}</Empty>
             ) : (
               <>
-                <Toolbar count={`${instances.length} de ${u.instances.length} VMs`}>
+                <Toolbar count={t("costs.usage.vmsFiltered", { shown: instances.length, total: u.instances.length })}>
                   <SearchInput value={filter} onChange={setFilter} />
                 </Toolbar>
                 <div className={tbl.wrap}>
@@ -382,11 +400,11 @@ function TenantUsage({ tenantId, month }: { tenantId: string; month: string }) {
                     <thead className={tbl.thead}>
                       <tr>
                         <th className={tbl.th}>VM</th>
-                        <th className={tbl.th}>Alocado</th>
-                        <th className={`${tbl.th} text-right`}>Horas (ligada)</th>
+                        <th className={tbl.th}>{t("costs.usage.allocated")}</th>
+                        <th className={`${tbl.th} text-right`}>{t("costs.table.hoursRunning")}</th>
                         <th className={`${tbl.th} text-right`}>vCPU·h</th>
-                        <th className={`${tbl.th} text-right`}>GiB·h RAM</th>
-                        <th className={`${tbl.th} text-right`}>GiB·h disco</th>
+                        <th className={`${tbl.th} text-right`}>{t("costs.usage.ramHours")}</th>
+                        <th className={`${tbl.th} text-right`}>{t("costs.usage.diskGibHours")}</th>
                       </tr>
                     </thead>
                     <tbody className={tbl.tbody}>
@@ -405,7 +423,7 @@ function TenantUsage({ tenantId, month }: { tenantId: string; month: string }) {
                                 )}
                                 <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
                                   {projectNames.get(i.project_id ?? "") ?? ""}
-                                  {i.deleted ? <Badge>excluída</Badge> : <PowerBadge state={i.power_state} />}
+                                  {i.deleted ? <Badge>{t("costs.deleted")}</Badge> : <PowerBadge state={i.power_state} />}
                                 </div>
                               </div>
                             </div>
@@ -424,15 +442,15 @@ function TenantUsage({ tenantId, month }: { tenantId: string; month: string }) {
                     </tbody>
                   </table>
                 </div>
-                {instances.length === 0 && <Empty>Nenhuma VM com esse nome.</Empty>}
+                {instances.length === 0 && <Empty>{t("costs.usage.noVmMatch")}</Empty>}
               </>
             )}
           </Card>
 
           {u.clusters.length > 0 && (
             <Card
-              title="Clusters Kubernetes"
-              description="Capacidade alocada e consumo na última coleta. Sem metrics-server, mostra o que os pods reservaram."
+              title={t("costs.usage.clustersTitle")}
+              description={t("costs.usage.clustersDescription")}
               flush
             >
               <div className={tbl.wrap}>
@@ -440,10 +458,10 @@ function TenantUsage({ tenantId, month }: { tenantId: string; month: string }) {
                   <thead className={tbl.thead}>
                     <tr>
                       <th className={tbl.th}>Cluster</th>
-                      <th className={tbl.th}>Saúde</th>
-                      <th className={`${tbl.th} text-right`}>Nós</th>
-                      <th className={tbl.th}>CPU (cores)</th>
-                      <th className={tbl.th}>Memória</th>
+                      <th className={tbl.th}>{t("costs.usage.health")}</th>
+                      <th className={`${tbl.th} text-right`}>{t("costs.usage.nodes")}</th>
+                      <th className={tbl.th}>{t("costs.usage.cpuCores")}</th>
+                      <th className={tbl.th}>{t("costs.usage.memory")}</th>
                       <th className={`${tbl.th} text-right`}>Pods</th>
                     </tr>
                   </thead>
@@ -457,7 +475,7 @@ function TenantUsage({ tenantId, month }: { tenantId: string; month: string }) {
                               <Link href={`/kubernetes/${c.cluster_id}`} className={tbl.link}>
                                 {c.name}
                               </Link>
-                              <div className="text-xs text-slate-500">coletado {ago(c.collected_at)}</div>
+                              <div className="text-xs text-slate-500">{t("costs.usage.collected", { ago: ago(c.collected_at) })}</div>
                             </div>
                           </div>
                         </td>
@@ -482,7 +500,7 @@ function TenantUsage({ tenantId, month }: { tenantId: string; month: string }) {
                             requests={c.mem_requests}
                             allocatable={c.mem_allocatable}
                             format={bytes}
-                            what="Memória"
+                            what={t("costs.usage.memory")}
                           />
                         </td>
                         <td className={`${tbl.td} text-right tabular-nums`}>{c.pods}</td>
@@ -500,13 +518,14 @@ function TenantUsage({ tenantId, month }: { tenantId: string; month: string }) {
 }
 
 type View = "costs" | "usage";
-const VIEW_TABS = [
-  { key: "costs", label: "Custos" },
-  { key: "usage", label: "Uso de recursos" },
-] as const;
+const VIEW_TABS: { key: View; label: MessageKey }[] = [
+  { key: "costs", label: "costs.billing.costs" },
+  { key: "usage", label: "costs.billing.resourceUsage" },
+];
 
 /** A client's billing as its visibility allows: costs + usage, usage only, or nothing. */
 function TenantBilling({ tenantId }: { tenantId: string }) {
+  const t = useT();
   const { tenant } = useSession();
   const visibility = useCostVisibility();
   const [month, setMonth] = useState(recentMonths(1)[0]);
@@ -516,11 +535,14 @@ function TenantBilling({ tenantId }: { tenantId: string }) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={full ? "Custos e uso" : "Uso de recursos"}
-        breadcrumbs={[{ label: full ? "Custos" : "Consumo" }, { label: tenant?.name ?? "Cliente" }]}
+        title={full ? t("costs.billing.costsAndUsage") : t("costs.billing.resourceUsage")}
+        breadcrumbs={[
+          { label: full ? t("costs.billing.costs") : t("costs.billing.consumption") },
+          { label: tenant?.name ?? t("costs.billing.client") },
+        ]}
         description={
           <>
-            Cliente <strong className="font-medium text-slate-900 dark:text-slate-100">{tenant?.name}</strong> ·{" "}
+            {t("costs.billing.client")} <strong className="font-medium text-slate-900 dark:text-slate-100">{tenant?.name}</strong> ·{" "}
             {monthLabel(month)}
           </>
         }
@@ -532,13 +554,13 @@ function TenantBilling({ tenantId }: { tenantId: string }) {
             </>
           )
         }
-        tabs={full ? VIEW_TABS : undefined}
+        tabs={full ? VIEW_TABS.map((tab) => ({ key: tab.key, label: t(tab.label) })) : undefined}
         activeTab={shown}
         onTab={setView}
       />
       {visibility === "none" && (
-        <Alert variant="info" title="Indisponível">
-          Os custos e o consumo deste cliente não estão disponíveis no console.
+        <Alert variant="info" title={t("costs.billing.unavailable")}>
+          {t("costs.billing.unavailableBody")}
         </Alert>
       )}
       {visibility &&
@@ -554,6 +576,7 @@ function TenantBilling({ tenantId }: { tenantId: string }) {
 
 /** Platform admins: cost of every client; picking one opens its detail. */
 function PlatformCosts() {
+  const t = useT();
   const { selectTenant } = useSession();
   const [month, setMonth] = useState(recentMonths(1)[0]);
   const [filter, setFilter] = useState("");
@@ -566,14 +589,14 @@ function PlatformCosts() {
   const cur = s?.currency ?? "BRL";
   const q = filter.trim().toLowerCase();
   const tenants = (s?.tenants ?? []).filter(
-    (t) => !q || t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q),
+    (row) => !q || row.name.toLowerCase().includes(q) || row.slug.toLowerCase().includes(q),
   );
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Custos"
-        breadcrumbs={[{ label: "Custos" }, { label: "Toda a plataforma" }]}
-        description={<>Toda a plataforma · {monthLabel(month)}</>}
+        title={t("costs.platform.title")}
+        breadcrumbs={[{ label: t("costs.platform.title") }, { label: t("costs.platform.wholePlatform") }]}
+        description={<>{t("costs.platform.wholePlatform")} · {monthLabel(month)}</>}
         actions={
           <>
             <MonthPicker value={month} onChange={setMonth} />
@@ -593,79 +616,80 @@ function PlatformCosts() {
             current={s.current}
             month={s.month}
           />
-          <Card title="Custo por dia">
+          <Card title={t("costs.tenant.costPerDay")}>
             <DailyCostBars month={s.month} days={s.days} currency={cur} />
           </Card>
           <Card
-            title="Custo por cliente"
+            title={t("costs.preview.perClient")}
             flush
             actions={
               <Button
                 variant="secondary"
                 onClick={() =>
-                  downloadCsv(`custos-clientes-${s.month}.csv`, [
-                    ["cliente", "identificador", "tabela_de_precos", "no_mes", "custo_atual_mensal", "previsao"],
-                    ...s.tenants.map((t) => [t.name, t.slug, t.price_table ?? "", t.accrued, t.run_rate_monthly, t.forecast ?? ""]),
+                  downloadCsv(t("costs.csv.clientsFile", { month: s.month }), [
+                    [t("costs.csv.client"), t("costs.csv.slug"), t("costs.csv.priceTable"), t("costs.csv.accrued"),
+                      t("costs.csv.runRateMonthly"), t("costs.csv.forecast")],
+                    ...s.tenants.map((row) => [row.name, row.slug, row.price_table ?? "", row.accrued, row.run_rate_monthly, row.forecast ?? ""]),
                   ])
                 }
               >
-                <Icon name="download" /> Exportar CSV
+                <Icon name="download" /> {t("costs.exportCsv")}
               </Button>
             }
           >
             {s.tenants.length === 0 ? (
-              <Empty icon="building">Nenhum cliente.</Empty>
+              <Empty icon="building">{t("costs.platform.noClients")}</Empty>
             ) : (
               <>
-                <Toolbar count={`${tenants.length} de ${s.tenants.length} clientes`}>
-                  <SearchInput value={filter} onChange={setFilter} placeholder="Filtrar cliente…" />
+                <Toolbar count={t("costs.platform.clientsCount", { shown: tenants.length, total: s.tenants.length })}>
+                  <SearchInput value={filter} onChange={setFilter} placeholder={t("costs.platform.filterClient")} />
                 </Toolbar>
                 <div className={tbl.wrap}>
                   <table className={`${tbl.table} min-w-[40rem]`}>
                     <thead className={tbl.thead}>
                       <tr>
-                        <th className={tbl.th}>Cliente</th>
-                        <th className={tbl.th}>Tabela de preços</th>
-                        <th className={`${tbl.th} text-right`}>No mês</th>
-                        {s.current && <th className={`${tbl.th} text-right`}>Custo atual/mês</th>}
-                        {s.current && <th className={`${tbl.th} text-right`}>Previsão</th>}
+                        <th className={tbl.th}>{t("costs.table.client")}</th>
+                        <th className={tbl.th}>{t("costs.table.priceTable")}</th>
+                        <th className={`${tbl.th} text-right`}>{t("costs.table.thisMonth")}</th>
+                        {s.current && <th className={`${tbl.th} text-right`}>{t("costs.table.runRateMonth")}</th>}
+                        {s.current && <th className={`${tbl.th} text-right`}>{t("costs.table.forecast")}</th>}
                         <th className={tbl.th}>
-                          <span className="sr-only">Ações</span>
+                          <span className="sr-only">{t("common.actions")}</span>
                         </th>
                       </tr>
                     </thead>
                     <tbody className={tbl.tbody}>
-                      {tenants.map((t) => (
-                        <tr key={t.tenant_id} className={tbl.tr}>
+                      {tenants.map((row) => (
+                        <tr key={row.tenant_id} className={tbl.tr}>
                           <td className={tbl.td}>
                             <div className="flex items-start gap-2">
                               <ResourceIcon kind="tenant" className="mt-0.5" />
                               <div>
-                                <button type="button" onClick={() => selectTenant(t.tenant_id)} className={tbl.link}>
-                                  {t.name}
+                                <button type="button" onClick={() => selectTenant(row.tenant_id)} className={tbl.link}>
+                                  {row.name}
                                 </button>
-                                <div className="text-xs text-slate-500">{t.slug}</div>
+                                <div className="text-xs text-slate-500">{row.slug}</div>
                               </div>
                             </div>
                           </td>
                           <td className={`${tbl.td} text-slate-600 dark:text-slate-400`}>
-                            {t.price_table ?? "—"}
-                            {!t.custom_price_table && t.price_table && <span className="text-xs"> (padrão)</span>}
-                            {t.cost_visibility !== "full" && (
+                            {row.price_table ?? "—"}
+                            {!row.custom_price_table && row.price_table && <span className="text-xs"> {t("costs.platform.default")}</span>}
+                            {row.cost_visibility !== "full" && (
                               <div className="mt-0.5">
                                 <Badge tone="amber">
-                                  {t.cost_visibility === "usage" ? "cliente vê só o uso" : "oculto para o cliente"}
+                                  {row.cost_visibility === "usage" ? t("costs.platform.usageOnly") : t("costs.platform.hidden")}
                                 </Badge>
                               </div>
                             )}
                           </td>
-                          <td className={`${tbl.td} text-right font-medium tabular-nums`}>{money(t.accrued, cur)}</td>
-                          {s.current && <td className={`${tbl.td} text-right tabular-nums`}>{money(t.run_rate_monthly, cur)}</td>}
-                          {s.current && <td className={`${tbl.td} text-right tabular-nums`}>{money(t.forecast, cur)}</td>}
+                          <td className={`${tbl.td} text-right font-medium tabular-nums`}>{money(row.accrued, cur)}</td>
+                          {s.current && <td className={`${tbl.td} text-right tabular-nums`}>{money(row.run_rate_monthly, cur)}</td>}
+                          {s.current && <td className={`${tbl.td} text-right tabular-nums`}>{money(row.forecast, cur)}</td>}
                           <td className={`${tbl.td} w-12 text-right`}>
                             <Menu
-                              ariaLabel={`Ações de ${t.name}`}
-                              items={[{ label: "Detalhar custos", onClick: () => selectTenant(t.tenant_id) }]}
+                              ariaLabel={t("costs.platform.actionsFor", { name: row.name })}
+                              items={[{ label: t("costs.platform.drillDown"), onClick: () => selectTenant(row.tenant_id) }]}
                             />
                           </td>
                         </tr>
@@ -673,7 +697,7 @@ function PlatformCosts() {
                     </tbody>
                   </table>
                 </div>
-                {tenants.length === 0 && <Empty>Nenhum cliente com esse nome.</Empty>}
+                {tenants.length === 0 && <Empty>{t("costs.platform.noClientMatch")}</Empty>}
               </>
             )}
           </Card>

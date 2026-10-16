@@ -9,10 +9,12 @@ import { Menu, PageHeader, SearchInput, Toolbar } from "@/components/page";
 import { Button, Card, Dialog, Empty, ErrorBox, Field, Input, formatDate, tbl } from "@/components/ui";
 import { UserStatus } from "@/components/user-status";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 
 function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const t = useT();
   const create = useMutation({
     mutationFn: async (body: { email: string; display_name: string }) =>
       unwrap(await api.POST("/api/v1/admin/users", { body })),
@@ -22,7 +24,7 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
     },
   });
   return (
-    <Dialog open={open} onClose={onClose} title="Novo usuário">
+    <Dialog open={open} onClose={onClose} title={t("access.users.newUser")}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -32,21 +34,21 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: () => voi
         className="space-y-3"
       >
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          O usuário recebe por e-mail um link para definir a senha.
+          {t("access.users.inviteHint")}
         </p>
-        <Field label="E-mail">
+        <Field label={t("access.common.email")}>
           <Input name="email" type="email" required />
         </Field>
-        <Field label="Nome">
+        <Field label={t("access.common.name")}>
           <Input name="display_name" required maxLength={100} />
         </Field>
         <ErrorBox message={create.isError ? errorMessage(create.error) : null} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
+            {t("access.common.cancel")}
           </Button>
           <Button type="submit" disabled={create.isPending}>
-            Convidar
+            {t("access.common.invite")}
           </Button>
         </div>
       </form>
@@ -75,6 +77,7 @@ function Avatar({ name }: { name: string }) {
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const t = useT();
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const users = useInfiniteQuery({
@@ -93,18 +96,18 @@ export default function AdminUsersPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Usuários"
-        description="Contas de todos os clientes e administradores da plataforma."
-        actions={<Button onClick={() => setCreating(true)}>Novo usuário</Button>}
+        title={t("access.users.title")}
+        description={t("access.users.description")}
+        actions={<Button onClick={() => setCreating(true)}>{t("access.users.newUser")}</Button>}
       />
       <ErrorBox message={users.isError ? errorMessage(users.error) : null} />
       <Card flush>
-        <Toolbar count={users.isSuccess ? `${items.length}${users.hasNextPage ? "+" : ""} usuários` : undefined}>
-          <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nome ou e-mail…" className="w-72" />
+        <Toolbar count={users.isSuccess ? t("access.users.count", { count: `${items.length}${users.hasNextPage ? "+" : ""}` }) : undefined}>
+          <SearchInput value={search} onChange={setSearch} placeholder={t("access.users.searchPlaceholder")} className="w-72" />
         </Toolbar>
         {users.isSuccess && items.length === 0 && (
-          <Empty title="Nenhum usuário encontrado" icon="users">
-            {search ? "Nenhuma conta corresponde à busca." : "Convide o primeiro usuário."}
+          <Empty title={t("access.users.emptyTitle")} icon="users">
+            {search ? t("access.users.emptyNoMatch") : t("access.users.emptyInvite")}
           </Empty>
         )}
         {items.length > 0 && (
@@ -112,11 +115,11 @@ export default function AdminUsersPage() {
             <table className={tbl.table}>
               <thead className={tbl.thead}>
                 <tr>
-                  <th className={tbl.th}>Nome</th>
-                  <th className={tbl.th}>Situação</th>
-                  <th className={tbl.th}>Último acesso</th>
+                  <th className={tbl.th}>{t("access.common.name")}</th>
+                  <th className={tbl.th}>{t("access.common.status")}</th>
+                  <th className={tbl.th}>{t("access.common.lastLogin")}</th>
                   <th className={tbl.th}>
-                    <span className="sr-only">Ações</span>
+                    <span className="sr-only">{t("common.actions")}</span>
                   </th>
                 </tr>
               </thead>
@@ -142,8 +145,8 @@ export default function AdminUsersPage() {
                     </td>
                     <td className={`${tbl.td} text-right`}>
                       <Menu
-                        ariaLabel={`Ações de ${u.display_name}`}
-                        items={[{ label: "Ver detalhes", onClick: () => router.push(`/admin/users/${u.id}`) }]}
+                        ariaLabel={t("access.common.actionsFor", { name: u.display_name })}
+                        items={[{ label: t("access.users.viewDetails"), onClick: () => router.push(`/admin/users/${u.id}`) }]}
                       />
                     </td>
                   </tr>
@@ -155,7 +158,7 @@ export default function AdminUsersPage() {
         {users.hasNextPage && (
           <div className="border-t border-slate-200 py-3 text-center dark:border-slate-800">
             <Button variant="secondary" onClick={() => users.fetchNextPage()}>
-              Carregar mais
+              {t("access.common.loadMore")}
             </Button>
           </div>
         )}

@@ -20,7 +20,7 @@ from app.api.deps import (
 )
 from app.audit import service as audit
 from app.auth.models import Session
-from app.auth.schemas import Email, NewPassword
+from app.auth.schemas import Email, Locale, NewPassword
 from app.auth.service import AuthService
 from app.core.errors import NotFound
 from app.core.pagination import PageParams, page_params, paginate
@@ -53,7 +53,15 @@ class Input(BaseModel):
 
 
 class ProfileUpdate(Input):
-    display_name: DisplayName
+    """Absent field: unchanged."""
+
+    display_name: DisplayName | None = None
+    locale: Locale | None = None
+
+
+class ProfileOut(BaseModel):
+    display_name: str
+    locale: Locale
 
 
 class PasswordChange(Input):
@@ -74,14 +82,19 @@ class SessionOut(BaseModel):
 @router.patch("/me", tags=["me"])
 async def update_profile(
     body: ProfileUpdate, principal: CurrentPrincipal, db: DbSession
-) -> dict[str, str]:
+) -> ProfileOut:
     user = await db.get_one(User, principal.user_id)
-    old, user.display_name = user.display_name, body.display_name
-    await audit.record(
-        db, "PROFILE_UPDATE", actor_user_id=user.id, resource_type="user", resource_id=user.id,
-        details={"display_name": {"from": old, "to": body.display_name}},
-    )
-    return {"display_name": user.display_name}
+    changes = {}
+    for field, value in body.model_dump(exclude_none=True).items():
+        if getattr(user, field) != value:
+            changes[field] = {"from": getattr(user, field), "to": value}
+            setattr(user, field, value)
+    if changes:
+        await audit.record(
+            db, "PROFILE_UPDATE", actor_user_id=user.id, resource_type="user",
+            resource_id=user.id, details=changes,
+        )
+    return ProfileOut(display_name=user.display_name, locale=user.locale)
 
 
 @router.post("/me/password", status_code=status.HTTP_204_NO_CONTENT, tags=["me"])

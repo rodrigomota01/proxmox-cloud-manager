@@ -9,31 +9,33 @@ import { DescriptionList, Menu, PageHeader, ResourceIcon } from "@/components/pa
 import { Alert, Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, formatDate, tbl } from "@/components/ui";
 import { UserStatus } from "@/components/user-status";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useT, type MessageKey } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 
-const PLATFORM_ROLES = [
-  { name: "SUPER_ADMIN", label: "Super admin", hint: "Tudo, inclusive gerenciar administradores." },
-  { name: "PLATFORM_ADMIN", label: "Admin da plataforma", hint: "Clusters, imagens, tenants, quotas, usuários." },
-  { name: "READ_ONLY", label: "Somente leitura", hint: "Vê todos os tenants, não altera nada." },
+const PLATFORM_ROLES: { name: string; label: MessageKey; hint: MessageKey }[] = [
+  { name: "SUPER_ADMIN", label: "access.roles.superAdmin", hint: "access.user.superAdminHint" },
+  { name: "PLATFORM_ADMIN", label: "access.roles.platformAdmin", hint: "access.user.platformAdminHint" },
+  { name: "READ_ONLY", label: "access.roles.readOnly", hint: "access.user.readOnlyHint" },
 ];
 
 type Detail = Schemas["AdminUserDetail"];
 
 const TABS = [
-  { key: "details", label: "Detalhes" },
-  { key: "roles", label: "Papéis" },
-  { key: "tenants", label: "Clientes" },
-] as const;
+  { key: "details", label: "access.user.tabDetails" },
+  { key: "roles", label: "access.user.tabRoles" },
+  { key: "tenants", label: "access.user.tabTenants" },
+] as const satisfies readonly { key: string; label: MessageKey }[];
 type Tab = (typeof TABS)[number]["key"];
 
-const roleName = (r: string) => PLATFORM_ROLES.find((p) => p.name === r)?.label ?? r;
+const roleKey = (r: string) => PLATFORM_ROLES.find((p) => p.name === r)?.label;
 
 export default function AdminUserPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const params = useSearchParams();
-  const tab: Tab = TABS.some((t) => t.key === params.get("tab")) ? (params.get("tab") as Tab) : "details";
+  const tab: Tab = TABS.some((tb) => tb.key === params.get("tab")) ? (params.get("tab") as Tab) : "details";
   const { me } = useSession();
+  const t = useT();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<string | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
@@ -55,7 +57,7 @@ export default function AdminUserPage() {
     mutationFn: async (body: Schemas["UserUpdate"]) =>
       unwrap(await api.PATCH("/api/v1/admin/users/{user_id}", { params: { path: { user_id: id } }, body })),
     onSuccess: (data) => {
-      setMessage("Salvo.");
+      setMessage(t("access.common.saved"));
       refresh(data);
     },
   });
@@ -63,7 +65,7 @@ export default function AdminUserPage() {
     mutationFn: async () =>
       unwrap(await api.POST("/api/v1/admin/users/{user_id}/unlock", { params: { path: { user_id: id } } })),
     onSuccess: (data) => {
-      setMessage("Desbloqueado.");
+      setMessage(t("access.user.unlocked"));
       refresh(data);
     },
   });
@@ -72,7 +74,7 @@ export default function AdminUserPage() {
       unwrap(
         await api.POST("/api/v1/admin/users/{user_id}/password-reset", { params: { path: { user_id: id } } }),
       ),
-    onSuccess: () => setMessage("Link de redefinição enviado por e-mail."),
+    onSuccess: () => setMessage(t("access.user.resetSent")),
   });
   const revoke = useMutation({
     mutationFn: async () =>
@@ -80,7 +82,11 @@ export default function AdminUserPage() {
         await api.POST("/api/v1/admin/users/{user_id}/sessions/revoke", { params: { path: { user_id: id } } }),
       ),
     onSuccess: (r) => {
-      setMessage(`${r.sessions_revoked} sessão(ões) encerrada(s).`);
+      setMessage(
+        t(r.sessions_revoked === 1 ? "access.user.sessionsRevokedOne" : "access.user.sessionsRevokedOther", {
+          count: r.sessions_revoked,
+        }),
+      );
       refresh();
     },
   });
@@ -93,7 +99,7 @@ export default function AdminUserPage() {
         }),
       ),
     onSuccess: () => {
-      setMessage("Papéis atualizados.");
+      setMessage(t("access.user.rolesUpdated"));
       refresh();
     },
   });
@@ -103,36 +109,40 @@ export default function AdminUserPage() {
   if (user.isError) return <ErrorBox message={errorMessage(user.error)} />;
   if (!u) return null;
 
-  const tabs = TABS.map((t) => (t.key === "tenants" ? { ...t, count: u.memberships.length } : t));
+  const tabs = TABS.map((tb) => ({
+    key: tb.key,
+    label: t(tb.label),
+    ...(tb.key === "tenants" ? { count: u.memberships.length } : {}),
+  }));
 
   return (
     <div className="space-y-4">
       <PageHeader
-        breadcrumbs={[{ label: "Usuários", href: "/admin/users" }, { label: u.display_name }]}
+        breadcrumbs={[{ label: t("access.users.title"), href: "/admin/users" }, { label: u.display_name }]}
         kind="user"
         title={u.display_name}
         status={<UserStatus user={u} />}
         tabs={tabs}
         activeTab={tab}
-        onTab={(t) => router.replace(t === "details" ? `/admin/users/${id}` : `/admin/users/${id}?tab=${t}`)}
+        onTab={(k) => router.replace(k === "details" ? `/admin/users/${id}` : `/admin/users/${id}?tab=${k}`)}
         actions={
           <>
             {u.is_active ? (
               <Button variant="danger" disabled={isSelf} onClick={() => setConfirmDeactivate(true)}>
-                Desativar
+                {t("access.user.deactivate")}
               </Button>
             ) : (
               <Button disabled={isSelf} onClick={() => update.mutate({ is_active: true })}>
-                Reativar
+                {t("access.user.reactivate")}
               </Button>
             )}
             {!isSelf && (
               <Menu
-                label="Ações"
+                label={t("access.user.actions")}
                 items={[
-                  u.locked && { label: "Desbloquear", onClick: () => unlock.mutate() },
-                  { label: "Enviar redefinição de senha", disabled: !u.is_active, onClick: () => reset.mutate() },
-                  { label: "Encerrar sessões", disabled: u.active_sessions === 0, onClick: () => revoke.mutate() },
+                  u.locked && { label: t("access.user.unlock"), onClick: () => unlock.mutate() },
+                  { label: t("access.user.sendReset"), disabled: !u.is_active, onClick: () => reset.mutate() },
+                  { label: t("access.user.revokeSessions"), disabled: u.active_sessions === 0, onClick: () => revoke.mutate() },
                 ]}
               />
             )}
@@ -143,17 +153,17 @@ export default function AdminUserPage() {
           <span>{u.email}</span>
           {u.platform_roles.map((r) => (
             <Badge key={r} tone="brand">
-              {roleName(r)}
+              {roleKey(r) ? t(roleKey(r)!) : r}
             </Badge>
           ))}
         </div>
       </PageHeader>
 
       {isSelf && (
-        <Alert variant="warning" title="Esta é a sua conta">
-          Para alterar seus dados ou senha, use{" "}
+        <Alert variant="warning" title={t("access.user.selfTitle")}>
+          {t("access.user.selfBefore")}{" "}
           <Link href="/perfil" className="font-medium underline">
-            Meu perfil
+            {t("access.user.selfLink")}
           </Link>
           .
         </Alert>
@@ -165,7 +175,7 @@ export default function AdminUserPage() {
 
       {tab === "details" && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Card title="Dados">
+          <Card title={t("access.user.dataCard")}>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -178,27 +188,27 @@ export default function AdminUserPage() {
               }}
               className="space-y-3"
             >
-              <Field label="Nome">
+              <Field label={t("access.common.name")}>
                 <Input name="display_name" required maxLength={100} defaultValue={u.display_name} disabled={isSelf} />
               </Field>
-              <Field label="E-mail">
+              <Field label={t("access.common.email")}>
                 <Input name="email" type="email" required defaultValue={u.email} disabled={isSelf} />
               </Field>
               <Button type="submit" disabled={isSelf || update.isPending}>
-                Salvar
+                {t("access.common.save")}
               </Button>
             </form>
           </Card>
 
-          <Card title="Acesso">
+          <Card title={t("access.user.accessCard")}>
             <DescriptionList
               items={[
-                ["Situação", <UserStatus key="s" user={u} />],
-                ["Sessões ativas", u.active_sessions],
-                ["Último acesso", formatDate(u.last_login_at)],
-                ["Criado em", formatDate(u.created_at)],
-                ["Bloqueado", u.locked ? "Sim (excesso de tentativas)" : "Não"],
-                ["Convite", u.invited ? "Pendente: ainda não definiu a senha" : "Aceito"],
+                [t("access.common.status"), <UserStatus key="s" user={u} />],
+                [t("access.user.activeSessions"), u.active_sessions],
+                [t("access.common.lastLogin"), formatDate(u.last_login_at)],
+                [t("access.common.createdAt"), formatDate(u.created_at)],
+                [t("access.user.locked"), u.locked ? t("access.user.lockedYes") : t("access.user.no")],
+                [t("access.user.invitation"), u.invited ? t("access.user.invitationPending") : t("access.user.invitationAccepted")],
               ]}
             />
           </Card>
@@ -206,10 +216,10 @@ export default function AdminUserPage() {
       )}
 
       {tab === "roles" && (
-        <Card title="Papéis de plataforma" description="Valem em toda a plataforma, acima dos papéis de cada cliente.">
+        <Card title={t("access.user.platformRoles")} description={t("access.user.platformRolesDescription")}>
           {!isSuperAdmin && (
             <div className="mb-4">
-              <Alert variant="info">Só um super admin altera papéis de plataforma.</Alert>
+              <Alert variant="info">{t("access.user.onlySuperAdmin")}</Alert>
             </div>
           )}
           <form
@@ -234,13 +244,13 @@ export default function AdminUserPage() {
                   className="mt-1"
                 />
                 <span>
-                  <span className="font-medium">{r.label}</span>
-                  <span className="block text-xs text-slate-500">{r.hint}</span>
+                  <span className="font-medium">{t(r.label)}</span>
+                  <span className="block text-xs text-slate-500">{t(r.hint)}</span>
                 </span>
               </label>
             ))}
             <Button type="submit" disabled={!isSuperAdmin || isSelf || roles.isPending}>
-              Salvar papéis
+              {t("access.user.saveRoles")}
             </Button>
           </form>
         </Card>
@@ -249,16 +259,16 @@ export default function AdminUserPage() {
       {tab === "tenants" && (
         <Card flush>
           {u.memberships.length === 0 ? (
-            <Empty title="Sem clientes" icon="building">
-              Não é membro de nenhum cliente.
+            <Empty title={t("access.user.noTenantsTitle")} icon="building">
+              {t("access.user.noTenants")}
             </Empty>
           ) : (
             <div className={tbl.wrap}>
               <table className={tbl.table}>
                 <thead className={tbl.thead}>
                   <tr>
-                    <th className={tbl.th}>Cliente</th>
-                    <th className={tbl.th}>Identificador</th>
+                    <th className={tbl.th}>{t("access.user.tenant")}</th>
+                    <th className={tbl.th}>{t("access.common.identifier")}</th>
                   </tr>
                 </thead>
                 <tbody className={tbl.tbody}>
@@ -280,14 +290,13 @@ export default function AdminUserPage() {
         </Card>
       )}
 
-      <Dialog open={confirmDeactivate} onClose={() => setConfirmDeactivate(false)} title="Desativar usuário">
+      <Dialog open={confirmDeactivate} onClose={() => setConfirmDeactivate(false)} title={t("access.user.deactivateTitle")}>
         <p className="text-sm">
-          <strong>{u.display_name}</strong> perde o acesso imediatamente: todas as sessões são encerradas e o
-          login passa a ser recusado. Dá para reativar depois.
+          <strong>{u.display_name}</strong> {t("access.user.deactivateBody")}
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setConfirmDeactivate(false)}>
-            Cancelar
+            {t("access.common.cancel")}
           </Button>
           <Button
             variant="danger"
@@ -297,7 +306,7 @@ export default function AdminUserPage() {
               update.mutate({ is_active: false });
             }}
           >
-            Desativar
+            {t("access.user.deactivate")}
           </Button>
         </div>
       </Dialog>

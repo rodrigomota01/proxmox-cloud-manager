@@ -2,18 +2,26 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 import { Icon } from "@/components/icons";
 import { Button, Card, Dialog, ErrorBox, Field, Input, Select, Status, type StatusTone, formatBytes } from "@/components/ui";
 import { Meter } from "@/components/viz";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { type MessageKey, translate, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 
 export type K8sCluster = Schemas["K8sClusterOut"];
 /** admin: /admin/kubernetes (every cluster); tenant: /kubernetes (the client's, read-only) */
 export type K8sMode = "admin" | "tenant";
 export type K8sSummary = Schemas["K8sSummaryOut"];
+
+/** A translated text with elements in its `{placeholders}` (bold names, code). */
+export function rich(text: string, parts: Record<string, React.ReactNode>): React.ReactNode {
+  return text.split(/\{(\w+)\}/).map((piece, i) => (
+    <Fragment key={i}>{i % 2 ? (parts[piece] ?? `{${piece}}`) : piece}</Fragment>
+  ));
+}
 
 /** "2026-10-13" -> "13/10/2026" (a calendar date: no timezone shift). */
 export function day(value: string | null | undefined): string {
@@ -44,6 +52,7 @@ export function UsageMeter({
   what: string;
   stacked?: boolean;
 }) {
+  const t = useT();
   if (!allocatable) return <span className="text-xs text-slate-500">—</span>;
   const measured = usage !== null && usage !== undefined;
   const value = measured ? usage : requests;
@@ -51,60 +60,64 @@ export function UsageMeter({
     <Meter
       value={value / allocatable}
       label={`${format(value)} / ${format(allocatable)}`}
-      title={measured ? `${what} em uso` : `${what} reservada pelos pods (sem metrics-server)`}
+      title={t(measured ? "k8s.usage.inUse" : "k8s.usage.reserved", { what })}
       stacked={stacked}
     />
   );
 }
 
-const EXPIRY: Record<K8sCluster["status"], { tone: StatusTone; label: string }> = {
-  expired: { tone: "error", label: "Vencido" },
-  critical: { tone: "error", label: "Vence em breve" },
-  warning: { tone: "warn", label: "Vence em até 30 dias" },
-  ok: { tone: "ok", label: "Em dia" },
-  unknown: { tone: "unknown", label: "Sem data" },
+const EXPIRY: Record<K8sCluster["status"], { tone: StatusTone; label: MessageKey }> = {
+  expired: { tone: "error", label: "k8s.expiry.expired" },
+  critical: { tone: "error", label: "k8s.expiry.critical" },
+  warning: { tone: "warn", label: "k8s.expiry.warning" },
+  ok: { tone: "ok", label: "k8s.expiry.ok" },
+  unknown: { tone: "unknown", label: "k8s.expiry.unknown" },
 };
 
 export function ExpiryBadge({ c }: { c: K8sCluster }) {
+  const t = useT();
   const s = EXPIRY[c.status];
-  return <Status tone={s.tone}>{s.label}</Status>;
+  return <Status tone={s.tone}>{t(s.label)}</Status>;
 }
 
-const HEALTH: Record<K8sSummary["health"], { tone: StatusTone; label: string; icon?: "ban" }> = {
-  healthy: { tone: "ok", label: "Saudável" },
-  warning: { tone: "warn", label: "Atenção" },
-  critical: { tone: "error", label: "Crítico" },
-  unreachable: { tone: "off", label: "Sem conexão", icon: "ban" },
+const HEALTH: Record<K8sSummary["health"], { tone: StatusTone; label: MessageKey; icon?: "ban" }> = {
+  healthy: { tone: "ok", label: "k8s.health.healthy" },
+  warning: { tone: "warn", label: "k8s.health.warning" },
+  critical: { tone: "error", label: "k8s.health.critical" },
+  unreachable: { tone: "off", label: "k8s.health.unreachable", icon: "ban" },
 };
 
 export function HealthBadge({ s }: { s: Pick<K8sSummary, "health"> | null | undefined }) {
-  if (!s) return <Status tone="unknown">Não coletado</Status>;
+  const t = useT();
+  if (!s) return <Status tone="unknown">{t("k8s.health.notCollected")}</Status>;
   const h = HEALTH[s.health];
   return (
     <Status tone={h.tone} icon={h.icon}>
-      {h.label}
+      {t(h.label)}
     </Status>
   );
 }
 
 export function daysText(days: number | null): string {
   if (days === null) return "";
-  if (days < 0) return `venceu há ${-days} dia${days === -1 ? "" : "s"}`;
-  if (days === 0) return "vence hoje";
-  return `em ${days} dia${days === 1 ? "" : "s"}`;
+  if (days < 0) return translate(days === -1 ? "k8s.expiry.expiredAgoOne" : "k8s.expiry.expiredAgoOther", { n: -days });
+  if (days === 0) return translate("k8s.expiry.today");
+  return translate(days === 1 ? "k8s.expiry.inOne" : "k8s.expiry.inOther", { n: days });
 }
 
-export function ago(iso: string | null | undefined): string {
-  if (!iso) return "nunca";
+/** Time since `iso`: "há 5 min" (`suffix`), or just "5 min" for an age column. */
+export function ago(iso: string | null | undefined, suffix = true): string {
+  if (!iso) return translate("k8s.time.never");
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 90) return "agora";
-  if (s < 5400) return `há ${Math.round(s / 60)} min`;
-  if (s < 172800) return `há ${Math.round(s / 3600)} h`;
-  return `há ${Math.round(s / 86400)} dias`;
+  if (s < 90) return translate("k8s.time.now");
+  if (s < 5400) return translate(suffix ? "k8s.time.minutesAgo" : "k8s.time.minutes", { n: Math.round(s / 60) });
+  if (s < 172800) return translate(suffix ? "k8s.time.hoursAgo" : "k8s.time.hours", { n: Math.round(s / 3600) });
+  return translate(suffix ? "k8s.time.daysAgo" : "k8s.time.days", { n: Math.round(s / 86400) });
 }
 
 /** Platform dashboard: clusters needing attention (health or certificate). */
 export function K8sAttentionPreview() {
+  const t = useT();
   const clusters = useQuery({
     queryKey: ["admin", "k8s-clusters"],
     queryFn: async () => unwrap(await api.GET("/api/v1/admin/kubernetes/clusters")),
@@ -118,10 +131,10 @@ export function K8sAttentionPreview() {
   if (!due.length) return null;
   return (
     <Card
-      title="Clusters Kubernetes que pedem atenção"
+      title={t("k8s.attention.title")}
       actions={
         <Link href="/admin/kubernetes" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
-          Ver clusters
+          {t("k8s.attention.viewClusters")}
         </Link>
       }
     >
@@ -140,7 +153,7 @@ export function K8sAttentionPreview() {
               )}
               {["expired", "critical", "warning"].includes(c.status) && (
                 <>
-                  <span className="text-xs">certificado {daysText(c.days_left)}</span>
+                  <span className="text-xs">{t("k8s.attention.certificate", { days: daysText(c.days_left) })}</span>
                   <ExpiryBadge c={c} />
                 </>
               )}
@@ -163,6 +176,7 @@ export function DownloadKubeconfig({
   tenant?: boolean;
   labelClassName?: string;
 }) {
+  const t = useT();
   const download = useMutation({
     mutationFn: async () => {
       const opts = { params: { path: { cluster_id: c.id } }, parseAs: "text" as const };
@@ -183,7 +197,7 @@ export function DownloadKubeconfig({
   if (tenant ? c.managed?.state !== "active" : !c.has_kubeconfig) {
     return (
       <span className="text-xs text-slate-500" title={c.kubeconfig_error ?? undefined}>
-        {c.kubeconfig_error ? "kubeconfig inválido" : "sem kubeconfig"}
+        {t(c.kubeconfig_error ? "k8s.kubeconfig.invalid" : "k8s.kubeconfig.missing")}
       </span>
     );
   }
@@ -191,11 +205,11 @@ export function DownloadKubeconfig({
     <span className="inline-flex items-center">
       <Button
         variant="secondary"
-        title="Baixar kubeconfig"
-        aria-label="Baixar kubeconfig"
+        title={t("k8s.kubeconfig.download")}
+        aria-label={t("k8s.kubeconfig.download")}
         disabled={download.isPending}
         onClick={() => {
-          if (confirm(`Baixar o kubeconfig de "${c.name}"? Ele dá acesso de administrador ao cluster e o download fica registrado na auditoria.`)) {
+          if (confirm(t("k8s.kubeconfig.confirm", { name: c.name }))) {
             download.mutate();
           }
         }}
@@ -209,6 +223,7 @@ export function DownloadKubeconfig({
 
 /** Platform admins: which client sees this cluster (read-only, never the kubeconfig). */
 export function LinkTenantDialog({ cluster, onClose }: { cluster: K8sCluster | null; onClose: () => void }) {
+  const t = useT();
   const { tenants } = useSession();
   const queryClient = useQueryClient();
   const link = useMutation({
@@ -231,7 +246,7 @@ export function LinkTenantDialog({ cluster, onClose }: { cluster: K8sCluster | n
     onClose();
   };
   return (
-    <Dialog open={cluster !== null} onClose={close} title={`Vincular ${cluster?.name ?? ""} a um cliente`}>
+    <Dialog open={cluster !== null} onClose={close} title={t("k8s.linkTenant.title", { name: cluster?.name ?? "" })}>
       {cluster && (
         <form
           key={cluster.id}
@@ -243,15 +258,14 @@ export function LinkTenantDialog({ cluster, onClose }: { cluster: K8sCluster | n
           }}
         >
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Os usuários do cliente passam a ver este cluster em <strong>Kubernetes</strong>: saúde, nós, namespaces,
-            workloads, pods e rotas. Só leitura, e o kubeconfig nunca aparece para eles.
+            {rich(t("k8s.linkTenant.intro"), { section: <strong>Kubernetes</strong> })}
           </p>
-          <Field label="Cliente">
+          <Field label={t("k8s.common.client")}>
             <Select name="tenant_id" defaultValue={cluster.tenant_id ?? ""} className="w-full">
-              <option value="">Nenhum (só a plataforma vê)</option>
-              {tenants.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
+              <option value="">{t("k8s.linkTenant.none")}</option>
+              {tenants.map((tn) => (
+                <option key={tn.id} value={tn.id}>
+                  {tn.name}
                 </option>
               ))}
             </Select>
@@ -259,10 +273,10 @@ export function LinkTenantDialog({ cluster, onClose }: { cluster: K8sCluster | n
           <ErrorBox message={link.isError ? errorMessage(link.error) : null} />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={close}>
-              Cancelar
+              {t("k8s.common.cancel")}
             </Button>
             <Button type="submit" disabled={link.isPending}>
-              Salvar
+              {t("k8s.common.save")}
             </Button>
           </div>
         </form>
@@ -273,34 +287,36 @@ export function LinkTenantDialog({ cluster, onClose }: { cluster: K8sCluster | n
 
 
 /** Steps of k8s.create, as recorded in state_message while provisioning. */
-export const K8S_STEPS: [string, string][] = [
-  ["queued", "Na fila"],
-  ["lb_ip", "Reservando o IP do load balancer"],
-  ["vms", "Criando as VMs"],
-  ["agent", "Aguardando as VMs ligarem"],
-  ["prepare", "Preparando os nós"],
-  ["init", "Iniciando o control plane (kubeadm)"],
-  ["join", "Adicionando os workers"],
-  ["addons", "Instalando Cilium, MetalLB, cert-manager e local-path"],
-  ["kubeconfig", "Guardando o kubeconfig"],
+export const K8S_STEPS: [string, MessageKey][] = [
+  ["queued", "k8s.steps.queued"],
+  ["lb_ip", "k8s.steps.lbIp"],
+  ["vms", "k8s.steps.vms"],
+  ["agent", "k8s.steps.agent"],
+  ["prepare", "k8s.steps.prepare"],
+  ["init", "k8s.steps.init"],
+  ["join", "k8s.steps.join"],
+  ["addons", "k8s.steps.addons"],
+  ["kubeconfig", "k8s.steps.kubeconfig"],
 ];
-const STEP_LABEL = Object.fromEntries(K8S_STEPS);
+const STEP_LABEL: Record<string, MessageKey> = Object.fromEntries(K8S_STEPS);
 
 /** Lifecycle of a cluster the platform created; nothing for an active one. */
 export function ManagedState({ c }: { c: K8sCluster }) {
+  const t = useT();
   const m = c.managed;
   if (!m || m.state === "active") return null;
-  if (m.state === "error") return <Status tone="error">Falhou</Status>;
-  if (m.state === "deleting") return <Status tone="progress">Excluindo</Status>;
+  if (m.state === "error") return <Status tone="error">{t("k8s.managed.failed")}</Status>;
+  if (m.state === "deleting") return <Status tone="progress">{t("k8s.managed.deleting")}</Status>;
   return (
     <Status tone="progress">
-      {m.state === "provisioning" ? STEP_LABEL[m.state_message ?? "queued"] ?? "Criando" : "Atualizando"}
+      {t(m.state === "provisioning" ? (STEP_LABEL[m.state_message ?? "queued"] ?? "k8s.managed.creating") : "k8s.managed.updating")}
     </Status>
   );
 }
 
 /** Destroys a cluster the platform created, with its VMs, after typing its name. */
 export function DestroyClusterButton({ c, admin, onDone }: { c: K8sCluster; admin: boolean; onDone: () => void }) {
+  const t = useT();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [confirmName, setConfirmName] = useState("");
@@ -330,9 +346,9 @@ export function DestroyClusterButton({ c, admin, onDone }: { c: K8sCluster; admi
   return (
     <>
       <Button variant="danger" onClick={() => setOpen(true)}>
-        Excluir
+        {t("k8s.destroy.button")}
       </Button>
-      <Dialog open={open} onClose={() => setOpen(false)} title="Excluir cluster">
+      <Dialog open={open} onClose={() => setOpen(false)} title={t("k8s.destroy.title")}>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -341,19 +357,18 @@ export function DestroyClusterButton({ c, admin, onDone }: { c: K8sCluster; admi
           className="space-y-4"
         >
           <p className="text-sm">
-            O cluster <strong>{c.name}</strong> e todas as VMs dele serão destruídos, com os dados dos volumes{" "}
-            <code>local-path</code>, e os IPs voltam a ficar livres. Isso não pode ser desfeito.
+            {rich(t("k8s.destroy.body"), { name: <strong>{c.name}</strong>, localPath: <code>local-path</code> })}
           </p>
-          <Field label={`Digite "${c.name}" para confirmar`}>
+          <Field label={t("k8s.destroy.confirmLabel", { name: c.name })}>
             <Input value={confirmName} onChange={(e) => setConfirmName(e.target.value)} autoComplete="off" />
           </Field>
           <ErrorBox message={destroy.isError ? errorMessage(destroy.error) : null} />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
-              Cancelar
+              {t("k8s.common.cancel")}
             </Button>
             <Button type="submit" variant="danger" disabled={confirmName !== c.name || destroy.isPending}>
-              Excluir cluster e VMs
+              {t("k8s.destroy.submit")}
             </Button>
           </div>
         </form>

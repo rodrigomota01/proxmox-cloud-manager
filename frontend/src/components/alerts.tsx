@@ -7,6 +7,7 @@ import { useState } from "react";
 import { relativeTime } from "@/components/activity";
 import { Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Select, Spinner, formatDate } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { translate, useT, type MessageKey } from "@/lib/i18n";
 import { useJob } from "@/lib/jobs";
 
 type Alert = Schemas["AlertOut"] & Partial<Pick<Schemas["AdminAlertOut"], "tenant_name">>;
@@ -14,14 +15,19 @@ type Rule = Schemas["AlertRuleOut"];
 type Channel = Schemas["ChannelOut"];
 type Mode = "tenant" | "platform";
 
-export const METRIC_LABEL: Record<string, string> = {
-  cpu: "CPU",
-  memory: "Memória",
-  disk: "Disco",
-  net_in: "Rede (entrada)",
-  net_out: "Rede (saída)",
+/** Message keys; translate where rendered. */
+export const METRIC_LABEL: Record<string, MessageKey> = {
+  cpu: "alerts.metric.cpu",
+  memory: "alerts.metric.memory",
+  disk: "alerts.metric.disk",
+  net_in: "alerts.metric.netIn",
+  net_out: "alerts.metric.netOut",
 };
-export const TARGET_LABEL: Record<string, string> = { instance: "VM", node: "Hypervisor", storage: "Storage" };
+export const TARGET_LABEL: Record<string, MessageKey> = {
+  instance: "alerts.target.instance",
+  node: "alerts.target.node",
+  storage: "alerts.target.storage",
+};
 const TARGET_METRICS: Record<string, string[]> = {
   instance: ["cpu", "memory", "disk", "net_in", "net_out"],
   node: ["cpu", "memory", "net_in", "net_out"],
@@ -39,15 +45,16 @@ const fromInput = (metric: string, value: number) => (isRatio(metric) ? value / 
 const unit = (metric: string) => (isRatio(metric) ? "%" : "Mbit/s");
 
 function duration(seconds: number): string {
-  if (!seconds) return "imediato";
+  if (!seconds) return translate("alerts.rule.immediate");
   return seconds % 60 ? `${seconds} s` : `${seconds / 60} min`;
 }
 
 export function SeverityBadge({ severity }: { severity: string }) {
+  const t = useT();
   return severity === "critical" ? (
-    <Badge tone="red">⚠ crítico</Badge>
+    <Badge tone="red">⚠ {t("alerts.severity.critical")}</Badge>
   ) : (
-    <Badge tone="amber">⚠ atenção</Badge>
+    <Badge tone="amber">⚠ {t("alerts.severity.warning")}</Badge>
   );
 }
 
@@ -56,14 +63,15 @@ export function AlertList({
   alerts,
   href,
   showTenant = false,
-  empty = "Nenhum alerta ativo.",
+  empty,
 }: {
   alerts: Alert[];
   href: (a: Alert) => string | null;
   showTenant?: boolean;
   empty?: string;
 }) {
-  if (alerts.length === 0) return <Empty>{empty}</Empty>;
+  const t = useT();
+  if (alerts.length === 0) return <Empty>{empty ?? t("alerts.list.empty")}</Empty>;
   return (
     <ul className="divide-y divide-slate-100 dark:divide-slate-800">
       {alerts.map((a) => {
@@ -79,19 +87,24 @@ export function AlertList({
           <li key={a.id} className="flex flex-wrap items-start justify-between gap-3 py-2.5 text-sm">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                {a.state === "firing" ? <SeverityBadge severity={a.severity} /> : <Badge tone="green">resolvido</Badge>}
-                <span className="text-slate-500">{TARGET_LABEL[a.resource_type]}</span> {name}
-                {showTenant && <span className="text-xs text-slate-500">· {a.tenant_name ?? "plataforma"}</span>}
+                {a.state === "firing" ? <SeverityBadge severity={a.severity} /> : <Badge tone="green">{t("alerts.list.resolved")}</Badge>}
+                <span className="text-slate-500">{t(TARGET_LABEL[a.resource_type])}</span> {name}
+                {showTenant && <span className="text-xs text-slate-500">· {a.tenant_name ?? t("alerts.list.platform")}</span>}
               </div>
               <div className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
-                {a.rule_name}: {METRIC_LABEL[a.metric]} {formatMetric(a.metric, a.value)} (limite{" "}
-                {formatMetric(a.metric, a.threshold)}, pico {formatMetric(a.metric, a.peak)})
+                {t("alerts.list.detail", {
+                  rule: a.rule_name,
+                  metric: t(METRIC_LABEL[a.metric]),
+                  value: formatMetric(a.metric, a.value),
+                  threshold: formatMetric(a.metric, a.threshold),
+                  peak: formatMetric(a.metric, a.peak),
+                })}
               </div>
             </div>
             <div className="text-right text-xs text-slate-500" title={formatDate(a.fired_at ?? a.started_at)}>
               {a.state === "resolved" && a.resolved_at
-                ? `resolvido ${relativeTime(a.resolved_at)}`
-                : `desde ${relativeTime(a.fired_at ?? a.started_at)}`}
+                ? t("alerts.list.resolvedAt", { time: relativeTime(a.resolved_at) })
+                : t("alerts.list.since", { time: relativeTime(a.fired_at ?? a.started_at) })}
             </div>
           </li>
         );
@@ -104,6 +117,7 @@ export function AlertList({
 
 function RuleDialog({ mode, open, onClose }: { mode: Mode; open: boolean; onClose: () => void }) {
   const queryClient = useQueryClient();
+  const t = useT();
   const [target, setTarget] = useState("instance");
   const [metric, setMetric] = useState("cpu");
   const create = useMutation({
@@ -117,7 +131,7 @@ function RuleDialog({ mode, open, onClose }: { mode: Mode; open: boolean; onClos
     },
   });
   return (
-    <Dialog open={open} onClose={onClose} title="Nova regra de alerta">
+    <Dialog open={open} onClose={onClose} title={t("alerts.rule.newTitle")}>
       <form
         className="space-y-3"
         onSubmit={(e) => {
@@ -133,12 +147,12 @@ function RuleDialog({ mode, open, onClose }: { mode: Mode; open: boolean; onClos
           });
         }}
       >
-        <Field label="Nome">
-          <Input name="name" required maxLength={100} placeholder="VM com CPU alta" />
+        <Field label={t("alerts.common.name")}>
+          <Input name="name" required maxLength={100} placeholder={t("alerts.rule.namePlaceholder")} />
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
           {mode === "platform" && (
-            <Field label="Recurso">
+            <Field label={t("alerts.rule.resource")}>
               <Select
                 className="w-full"
                 value={target}
@@ -147,24 +161,24 @@ function RuleDialog({ mode, open, onClose }: { mode: Mode; open: boolean; onClos
                   setMetric(TARGET_METRICS[e.target.value][0]);
                 }}
               >
-                {Object.keys(TARGET_METRICS).map((t) => (
-                  <option key={t} value={t}>
-                    {TARGET_LABEL[t]}
+                {Object.keys(TARGET_METRICS).map((k) => (
+                  <option key={k} value={k}>
+                    {t(TARGET_LABEL[k])}
                   </option>
                 ))}
               </Select>
             </Field>
           )}
-          <Field label="Métrica">
+          <Field label={t("alerts.rule.metric")}>
             <Select className="w-full" value={metric} onChange={(e) => setMetric(e.target.value)}>
               {TARGET_METRICS[target].map((m) => (
                 <option key={m} value={m}>
-                  {METRIC_LABEL[m]}
+                  {t(METRIC_LABEL[m])}
                 </option>
               ))}
             </Select>
           </Field>
-          <Field label={`Alerta acima de (${unit(metric)})`}>
+          <Field label={t("alerts.rule.threshold", { unit: unit(metric) })}>
             <Input
               name="threshold"
               type="number"
@@ -176,23 +190,23 @@ function RuleDialog({ mode, open, onClose }: { mode: Mode; open: boolean; onClos
               key={metric}
             />
           </Field>
-          <Field label="Por pelo menos (min)" hint="0 = alerta na hora">
+          <Field label={t("alerts.rule.duration")} hint={t("alerts.rule.durationHint")}>
             <Input name="duration" type="number" required min={0} max={10080} defaultValue={5} />
           </Field>
-          <Field label="Severidade">
+          <Field label={t("alerts.rule.severity")}>
             <Select name="severity" className="w-full" defaultValue="warning">
-              <option value="warning">Atenção</option>
-              <option value="critical">Crítico</option>
+              <option value="warning">{t("alerts.rule.warning")}</option>
+              <option value="critical">{t("alerts.rule.critical")}</option>
             </Select>
           </Field>
         </div>
         <ErrorBox message={create.isError ? errorMessage(create.error) : null} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
+            {t("alerts.common.cancel")}
           </Button>
           <Button type="submit" disabled={create.isPending}>
-            Criar regra
+            {t("alerts.rule.create")}
           </Button>
         </div>
       </form>
@@ -202,6 +216,7 @@ function RuleDialog({ mode, open, onClose }: { mode: Mode; open: boolean; onClos
 
 function RuleRow({ mode, rule }: { mode: Mode; rule: Rule }) {
   const queryClient = useQueryClient();
+  const t = useT();
   const [threshold, setThreshold] = useState(String(Math.round(toInput(rule.metric, rule.threshold) * 10) / 10));
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["alert-rules", mode] });
   const update = useMutation({
@@ -228,7 +243,8 @@ function RuleRow({ mode, rule }: { mode: Mode; rule: Rule }) {
       <td className="py-2 pr-3">
         <div className="font-medium">{rule.name}</div>
         <div className="text-xs text-slate-500">
-          {TARGET_LABEL[rule.target]} · {METRIC_LABEL[rule.metric]} · por {duration(rule.duration_seconds)}
+          {t(TARGET_LABEL[rule.target])} · {t(METRIC_LABEL[rule.metric])} ·{" "}
+          {t("alerts.rule.forDuration", { duration: duration(rule.duration_seconds) })}
         </div>
       </td>
       <td className="py-2 pr-3">
@@ -241,7 +257,7 @@ function RuleRow({ mode, rule }: { mode: Mode; rule: Rule }) {
         >
           <span className="text-xs text-slate-500">&gt;</span>
           <Input
-            aria-label={`Limite de ${rule.name}`}
+            aria-label={t("alerts.rule.thresholdOf", { name: rule.name })}
             className="w-20"
             type="number"
             step={isRatio(rule.metric) ? 1 : 0.1}
@@ -253,7 +269,7 @@ function RuleRow({ mode, rule }: { mode: Mode; rule: Rule }) {
           <span className="text-xs text-slate-500">{unit(rule.metric)}</span>
           {changed && (
             <Button type="submit" variant="secondary" disabled={update.isPending}>
-              Salvar
+              {t("alerts.common.save")}
             </Button>
           )}
         </form>
@@ -270,10 +286,10 @@ function RuleRow({ mode, rule }: { mode: Mode; rule: Rule }) {
               disabled={update.isPending}
               onChange={(e) => update.mutate({ enabled: e.target.checked })}
             />
-            ativa
+            {t("alerts.rule.enabled")}
           </label>
           <Button variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate()}>
-            Excluir
+            {t("alerts.common.delete")}
           </Button>
         </span>
         {(update.isError || remove.isError) && (
@@ -286,6 +302,7 @@ function RuleRow({ mode, rule }: { mode: Mode; rule: Rule }) {
 
 function ChannelDialog({ mode, open, onClose }: { mode: Mode; open: boolean; onClose: () => void }) {
   const queryClient = useQueryClient();
+  const t = useT();
   const [type, setType] = useState<"email" | "webhook">("email");
   const [secret, setSecret] = useState<string | null>(null);
   const create = useMutation({
@@ -305,17 +322,17 @@ function ChannelDialog({ mode, open, onClose }: { mode: Mode; open: boolean; onC
     onClose();
   };
   return (
-    <Dialog open={open} onClose={close} title="Novo canal de notificação">
+    <Dialog open={open} onClose={close} title={t("alerts.channel.newTitle")}>
       {secret ? (
         <div className="space-y-3 text-sm">
           <p>
-            Webhook criado. Cada envio leva <code>X-CM-Timestamp</code> e{" "}
-            <code>X-CM-Signature: sha256=HMAC(segredo, timestamp + &quot;.&quot; + corpo)</code>. Guarde o
-            segredo abaixo para verificar a assinatura: <strong>ele não será mostrado de novo</strong>.
+            {t("alerts.channel.secretBefore")} <code>X-CM-Timestamp</code> {t("alerts.channel.secretAnd")}{" "}
+            <code>{t("alerts.channel.signature")}</code>. {t("alerts.channel.secretKeep")}{" "}
+            <strong>{t("alerts.channel.secretOnce")}</strong>.
           </p>
           <code className="block break-all rounded-md bg-slate-100 p-2 text-xs dark:bg-slate-800">{secret}</code>
           <div className="flex justify-end">
-            <Button onClick={close}>Fechar</Button>
+            <Button onClick={close}>{t("alerts.common.close")}</Button>
           </div>
         </div>
       ) : (
@@ -341,37 +358,37 @@ function ChannelDialog({ mode, open, onClose }: { mode: Mode; open: boolean; onC
             );
           }}
         >
-          <Field label="Nome">
-            <Input name="name" required maxLength={100} placeholder="Equipe de operações" />
+          <Field label={t("alerts.common.name")}>
+            <Input name="name" required maxLength={100} placeholder={t("alerts.channel.namePlaceholder")} />
           </Field>
-          <Field label="Tipo">
+          <Field label={t("alerts.channel.type")}>
             <Select className="w-full" value={type} onChange={(e) => setType(e.target.value as "email" | "webhook")}>
-              <option value="email">E-mail</option>
-              <option value="webhook">Webhook (Slack, Teams, Discord, n8n...)</option>
+              <option value="email">{t("alerts.channel.email")}</option>
+              <option value="webhook">{t("alerts.channel.webhook")}</option>
             </Select>
           </Field>
           {type === "email" ? (
-            <Field label="Destinatários" hint="Até 10, separados por vírgula.">
-              <Input name="to" required placeholder="ops@empresa.com, noc@empresa.com" />
+            <Field label={t("alerts.channel.recipients")} hint={t("alerts.channel.recipientsHint")}>
+              <Input name="to" required placeholder={t("alerts.channel.recipientsPlaceholder")} />
             </Field>
           ) : (
-            <Field label="URL" hint="https; endereços internos (rede privada, localhost) são recusados.">
-              <Input name="url" type="url" required placeholder="https://hooks.exemplo.com/..." />
+            <Field label={t("alerts.channel.url")} hint={t("alerts.channel.urlHint")}>
+              <Input name="url" type="url" required placeholder={t("alerts.channel.urlPlaceholder")} />
             </Field>
           )}
-          <Field label="Enviar">
+          <Field label={t("alerts.channel.send")}>
             <Select name="min_severity" className="w-full" defaultValue="warning">
-              <option value="warning">Atenção e crítico</option>
-              <option value="critical">Só crítico</option>
+              <option value="warning">{t("alerts.channel.warningAndCritical")}</option>
+              <option value="critical">{t("alerts.channel.criticalOnly")}</option>
             </Select>
           </Field>
           <ErrorBox message={create.isError ? errorMessage(create.error) : null} />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={close}>
-              Cancelar
+              {t("alerts.common.cancel")}
             </Button>
             <Button type="submit" disabled={create.isPending}>
-              Criar canal
+              {t("alerts.channel.create")}
             </Button>
           </div>
         </form>
@@ -382,6 +399,7 @@ function ChannelDialog({ mode, open, onClose }: { mode: Mode; open: boolean; onC
 
 function ChannelRow({ mode, channel }: { mode: Mode; channel: Channel }) {
   const queryClient = useQueryClient();
+  const t = useT();
   const [jobId, setJobId] = useState<string | null>(null);
   const { job, done } = useJob(jobId, { admin: mode === "platform" });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["channels", mode] });
@@ -413,16 +431,16 @@ function ChannelRow({ mode, channel }: { mode: Mode; channel: Channel }) {
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-medium">{channel.name}</span>
-          <Badge>{channel.type === "email" ? "e-mail" : "webhook"}</Badge>
-          {channel.min_severity === "critical" && <Badge tone="red">só crítico</Badge>}
-          {!channel.enabled && <Badge tone="gray">pausado</Badge>}
+          <Badge>{channel.type === "email" ? t("alerts.channel.badgeEmail") : t("alerts.channel.badgeWebhook")}</Badge>
+          {channel.min_severity === "critical" && <Badge tone="red">{t("alerts.channel.badgeCriticalOnly")}</Badge>}
+          {!channel.enabled && <Badge tone="gray">{t("alerts.channel.paused")}</Badge>}
         </div>
         <div className="truncate text-xs text-slate-500">
           {channel.type === "email" ? channel.to.join(", ") : channel.url}
         </div>
-        {done && job?.status === "succeeded" && <div className="text-xs text-emerald-600">Teste enviado.</div>}
+        {done && job?.status === "succeeded" && <div className="text-xs text-emerald-600">{t("alerts.channel.testSent")}</div>}
         {done && job?.status === "failed" && (
-          <div className="text-xs text-rose-600">Teste falhou: {job.error_message}</div>
+          <div className="text-xs text-rose-600">{t("alerts.channel.testFailed", { error: job.error_message ?? "" })}</div>
         )}
         {(test.isError || update.isError || remove.isError) && (
           <div className="text-xs text-rose-600">{errorMessage(test.error ?? update.error ?? remove.error)}</div>
@@ -430,13 +448,13 @@ function ChannelRow({ mode, channel }: { mode: Mode; channel: Channel }) {
       </div>
       <div className="flex items-center gap-2">
         <Button variant="secondary" disabled={testing} onClick={() => test.mutate()}>
-          {testing ? <Spinner /> : null} Testar
+          {testing ? <Spinner /> : null} {t("alerts.channel.test")}
         </Button>
         <Button variant="ghost" onClick={() => update.mutate({ enabled: !channel.enabled })}>
-          {channel.enabled ? "Pausar" : "Ativar"}
+          {channel.enabled ? t("alerts.channel.pause") : t("alerts.channel.enable")}
         </Button>
         <Button variant="ghost" disabled={remove.isPending} onClick={() => remove.mutate()}>
-          Excluir
+          {t("alerts.common.delete")}
         </Button>
       </div>
     </li>
@@ -445,6 +463,7 @@ function ChannelRow({ mode, channel }: { mode: Mode; channel: Channel }) {
 
 /** Rules and channels of the tenant (its instances) or of the platform (everything). */
 export function AlertSettings({ mode }: { mode: Mode }) {
+  const t = useT();
   const [creatingRule, setCreatingRule] = useState(false);
   const [creatingChannel, setCreatingChannel] = useState(false);
   const rules = useQuery({
@@ -464,18 +483,17 @@ export function AlertSettings({ mode }: { mode: Mode }) {
   return (
     <div className="space-y-4">
       <Card
-        title="Regras"
-        actions={<Button onClick={() => setCreatingRule(true)}>Nova regra</Button>}
+        title={t("alerts.settings.rules")}
+        actions={<Button onClick={() => setCreatingRule(true)}>{t("alerts.settings.newRule")}</Button>}
       >
         <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
           {mode === "platform"
-            ? "Valem para todos os hypervisors, storages e VMs. Alertas em VMs de clientes também aparecem para eles e vão para os canais deles."
-            : "Valem para as VMs deste cliente, além das regras padrão da plataforma."}{" "}
-          O alerta dispara quando o valor fica acima do limite pelo tempo indicado, e é resolvido quando cai
-          abaixo de 95% do limite.
+            ? t("alerts.settings.platformScope")
+            : t("alerts.settings.tenantScope")}{" "}
+          {t("alerts.settings.rulesExplain")}
         </p>
         <ErrorBox message={rules.isError ? errorMessage(rules.error) : null} />
-        {rules.data?.length === 0 && <Empty>Nenhuma regra.</Empty>}
+        {rules.data?.length === 0 && <Empty>{t("alerts.settings.noRules")}</Empty>}
         {!!rules.data?.length && (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -489,15 +507,14 @@ export function AlertSettings({ mode }: { mode: Mode }) {
         )}
       </Card>
       <Card
-        title="Canais de notificação"
-        actions={<Button onClick={() => setCreatingChannel(true)}>Novo canal</Button>}
+        title={t("alerts.settings.channels")}
+        actions={<Button onClick={() => setCreatingChannel(true)}>{t("alerts.settings.newChannel")}</Button>}
       >
         <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
-          Recebem um aviso quando um alerta dispara e quando é resolvido. Os alertas também ficam visíveis na
-          plataforma, com ou sem canal.
+          {t("alerts.settings.channelsExplain")}
         </p>
         <ErrorBox message={channels.isError ? errorMessage(channels.error) : null} />
-        {channels.data?.length === 0 && <Empty>Nenhum canal: os alertas só aparecem na plataforma.</Empty>}
+        {channels.data?.length === 0 && <Empty>{t("alerts.settings.noChannels")}</Empty>}
         <ul className="divide-y divide-slate-100 dark:divide-slate-800">
           {channels.data?.map((c) => (
             <ChannelRow key={c.id} mode={mode} channel={c} />

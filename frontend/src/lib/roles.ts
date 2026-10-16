@@ -1,12 +1,16 @@
+import { translate, type MessageKey } from "@/lib/i18n";
+
 /** Role names (API) -> how people read them. Scope rules come from GET /roles. */
-export const ROLE_INFO: Record<string, { label: string; hint: string }> = {
-  TENANT_ADMIN: { label: "Admin do cliente", hint: "Tudo no cliente: projetos, membros e VMs." },
-  PROJECT_ADMIN: { label: "Admin do projeto", hint: "Membros e VMs de um projeto." },
-  USER: { label: "Usuário", hint: "Cria, opera e exclui VMs do projeto." },
-  OPERATOR: { label: "Operador", hint: "Liga, desliga e reinicia; não cria nem exclui." },
-  READ_ONLY: { label: "Somente leitura", hint: "Só visualiza." },
-  SUPER_ADMIN: { label: "Super admin", hint: "Plataforma inteira." },
-  PLATFORM_ADMIN: { label: "Admin da plataforma", hint: "Operação da plataforma." },
+export const ROLE_INFO: Record<string, { label: MessageKey; hint: MessageKey }> = {
+  TENANT_ADMIN: { label: "access.roles.tenantAdmin", hint: "access.roles.tenantAdminHint" },
+  PROJECT_ADMIN: { label: "access.roles.projectAdmin", hint: "access.roles.projectAdminHint" },
+  USER: { label: "access.roles.user", hint: "access.roles.userHint" },
+  OPERATOR: { label: "access.roles.operator", hint: "access.roles.operatorHint" },
+  READ_ONLY: { label: "access.roles.readOnly", hint: "access.roles.readOnlyHint" },
+  SUPER_ADMIN: { label: "access.roles.superAdmin", hint: "access.roles.superAdminHint" },
+  PLATFORM_ADMIN: { label: "access.roles.platformAdmin", hint: "access.roles.platformAdminHint" },
 };
 
-export const roleLabel = (name: string) => ROLE_INFO[name]?.label ?? name;
+/** Call while rendering: the text follows the current language. */
+export const roleLabel = (name: string) => (ROLE_INFO[name] ? translate(ROLE_INFO[name].label) : name);
+export const roleHint = (name: string) => (ROLE_INFO[name] ? translate(ROLE_INFO[name].hint) : undefined);

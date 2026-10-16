@@ -9,19 +9,22 @@ import { NoTenant } from "@/components/no-tenant";
 import { PageHeader } from "@/components/page";
 import { Alert, Button, Card, ErrorBox, Field, Input, Select } from "@/components/ui";
 import { api, ApiError, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useT, type MessageKey } from "@/lib/i18n";
 import { money, num } from "@/lib/money";
 import { useProjects } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 
 const MEMORY_OPTIONS = [1, 2, 4, 8, 16, 32]; // GiB
-const QUOTA_LABEL: Record<string, string> = {
-  instances: "Instâncias",
-  vcpus: "vCPUs",
-  memory_mb: "Memória (MiB)",
-  storage_gb: "Disco (GiB)",
+const QUOTA_LABEL: Record<string, MessageKey> = {
+  instances: "compute.create.quotaInstances",
+  vcpus: "compute.create.quotaVcpus",
+  memory_mb: "compute.create.quotaMemory",
+  storage_gb: "compute.create.quotaStorage",
 };
 
 export default function NewInstancePage() {
+  const t = useT();
+  const quotaLabel = (resource: string) => (QUOTA_LABEL[resource] ? t(QUOTA_LABEL[resource]) : resource);
   const router = useRouter();
   const { tenantId } = useSession();
   const projects = useProjects();
@@ -138,19 +141,19 @@ export default function NewInstancePage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Criar instância"
-        breadcrumbs={[{ label: "Máquinas virtuais", href: "/instances" }, { label: "Criar instância" }]}
-        description="Escolha onde a VM roda, a imagem, o tamanho, a rede e as chaves de acesso."
+        title={t("compute.create.title")}
+        breadcrumbs={[{ label: t("nav.vms"), href: "/instances" }, { label: t("compute.create.title") }]}
+        description={t("compute.create.description")}
       />
 
       <form onSubmit={submit} className="grid items-start gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <Card title="1. Localização" description="Região e zona onde a instância vai rodar.">
+          <Card title={t("compute.create.location")} description={t("compute.create.locationDesc")}>
             {regions.data?.length === 0 ? (
-              <Alert variant="warning">Nenhuma região disponível para criar instâncias. Peça a um administrador.</Alert>
+              <Alert variant="warning">{t("compute.create.noRegions")}</Alert>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Região">
+                <Field label={t("compute.create.region")}>
                   <Select
                     className="w-full"
                     required
@@ -163,7 +166,7 @@ export default function NewInstancePage() {
                     }}
                   >
                     <option value="" disabled>
-                      Selecione…
+                      {t("compute.create.select")}
                     </option>
                     {regions.data?.map((r) => (
                       <option key={r.id} value={r.id}>
@@ -172,7 +175,7 @@ export default function NewInstancePage() {
                     ))}
                   </Select>
                 </Field>
-                <Field label="Zona" hint="A plataforma escolhe o servidor dentro da zona.">
+                <Field label={t("compute.create.zone")} hint={t("compute.create.zoneHint")}>
                   <Select
                     className="w-full"
                     required
@@ -184,7 +187,7 @@ export default function NewInstancePage() {
                     }}
                   >
                     <option value="" disabled>
-                      {region ? "Selecione…" : "Escolha a região primeiro"}
+                      {region ? t("compute.create.select") : t("compute.create.pickRegionFirst")}
                     </option>
                     {region?.zones.map((z) => (
                       <option key={z.id} value={z.id}>
@@ -197,12 +200,12 @@ export default function NewInstancePage() {
             )}
           </Card>
 
-          <Card title="2. Básico" description="Projeto, nome e sistema operacional.">
+          <Card title={t("compute.create.basics")} description={t("compute.create.basicsDesc")}>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Projeto">
+              <Field label={t("compute.create.project")}>
                 <Select name="project_id" className="w-full" required defaultValue="">
                   <option value="" disabled>
-                    Selecione…
+                    {t("compute.create.select")}
                   </option>
                   {projects.data?.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -211,10 +214,10 @@ export default function NewInstancePage() {
                   ))}
                 </Select>
               </Field>
-              <Field label="Nome (hostname)" hint="Minúsculas, números e hífen.">
+              <Field label={t("compute.create.name")} hint={t("compute.create.nameHint")}>
                 <Input name="name" required pattern="[a-z]([a-z0-9\-]{0,61}[a-z0-9])?" placeholder="web-01" />
               </Field>
-              <Field label="Imagem">
+              <Field label={t("compute.create.image")}>
                 <Select
                   className="w-full"
                   required
@@ -223,7 +226,11 @@ export default function NewInstancePage() {
                   onChange={(e) => setImageId(e.target.value)}
                 >
                   <option value="" disabled>
-                    {!zoneId ? "Escolha a zona primeiro" : zoneImages.length ? "Selecione…" : "Nenhuma imagem nesta zona"}
+                    {!zoneId
+                      ? t("compute.create.pickZoneFirst")
+                      : zoneImages.length
+                        ? t("compute.create.select")
+                        : t("compute.create.noImages")}
                   </option>
                   {zoneImages.map((i) => (
                     <option key={i.id} value={i.id}>
@@ -232,15 +239,15 @@ export default function NewInstancePage() {
                   ))}
                 </Select>
               </Field>
-              <Field label="Usuário de acesso" hint="Criado pelo cloud-init com as suas chaves.">
+              <Field label={t("compute.create.user")} hint={t("compute.create.userHint")}>
                 <Input value={image?.default_user ?? ""} readOnly disabled />
               </Field>
             </div>
           </Card>
 
-          <Card title="3. Recursos" description="Tamanho da instância.">
+          <Card title={t("compute.create.resources")} description={t("compute.create.resourcesDesc")}>
             <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="vCPUs">
+              <Field label={t("compute.create.vcpus")}>
                 <Select className="w-full" value={vcpus} onChange={(e) => setVcpus(Number(e.target.value))}>
                   {[1, 2, 4, 8, 16].map((n) => (
                     <option key={n} value={n}>
@@ -249,7 +256,7 @@ export default function NewInstancePage() {
                   ))}
                 </Select>
               </Field>
-              <Field label="Memória">
+              <Field label={t("compute.create.memory")}>
                 <Select className="w-full" value={memoryGb} onChange={(e) => setMemoryGb(Number(e.target.value))}>
                   {MEMORY_OPTIONS.map((g) => (
                     <option key={g} value={g}>
@@ -258,7 +265,7 @@ export default function NewInstancePage() {
                   ))}
                 </Select>
               </Field>
-              <Field label="Disco (GiB)" hint={image ? `Mínimo: ${image.min_disk_gb} GiB` : undefined}>
+              <Field label={t("compute.create.disk")} hint={image ? t("compute.create.diskMin", { size: image.min_disk_gb }) : undefined}>
                 <Input
                   type="number"
                   min={image?.min_disk_gb ?? 1}
@@ -271,18 +278,22 @@ export default function NewInstancePage() {
             </div>
           </Card>
 
-          <Card title="4. Rede">
+          <Card title={t("compute.create.network")}>
             {fromIpam ? (
               <>
                 <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
-                  IPs livres no cadastro de IPs desta zona. O escolhido é reservado no cadastro ao
-                  criar e liberado ao excluir a instância; gateway, máscara e VLAN vêm da rede dele.
+                  {t("compute.create.ipamIntro")}
                 </p>
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="IP" hint={`${addresses.data!.length} livre(s)`}>
+                  <Field
+                    label={t("compute.create.ip")}
+                    hint={t(addresses.data!.length === 1 ? "compute.create.freeOne" : "compute.create.freeOther", {
+                      count: addresses.data!.length,
+                    })}
+                  >
                     <Select name="ipam_address_id" className="w-full" required defaultValue="" key={`${zoneId}-${imageId}`}>
                       <option value="" disabled>
-                        Selecione…
+                        {t("compute.create.select")}
                       </option>
                       {addresses.data!.map((a) => (
                         <option key={a.id} value={a.id}>
@@ -291,7 +302,7 @@ export default function NewInstancePage() {
                       ))}
                     </Select>
                   </Field>
-                  <Field label="DNS (opcional)" hint="Padrão: 8.8.8.8 1.1.1.1">
+                  <Field label={t("compute.create.dnsOptional")} hint={t("compute.create.dnsDefault")}>
                     <Input name="dns" placeholder="8.8.8.8 1.1.1.1" />
                   </Field>
                 </div>
@@ -299,18 +310,17 @@ export default function NewInstancePage() {
             ) : (
               <>
                 <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
-                  IP fixo configurado pelo cloud-init. Os servidores desta zona não têm IPs no cadastro:
-                  a plataforma impede IPs repetidos entre as instâncias dela, mas <strong>não</strong>{" "}
-                  detecta IPs usados fora dela. Confira com o responsável pela rede.
+                  {t("compute.create.staticIntroBefore")} <strong>{t("compute.create.staticIntroNot")}</strong>{" "}
+                  {t("compute.create.staticIntroAfter")}
                 </p>
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="Endereço/prefixo">
+                  <Field label={t("compute.create.address")}>
                     <Input name="address" required placeholder="203.0.113.10/28" />
                   </Field>
-                  <Field label="Gateway">
+                  <Field label={t("compute.create.gateway")}>
                     <Input name="gateway" required placeholder="203.0.113.14" />
                   </Field>
-                  <Field label="DNS (opcional)" hint="Até 3, separados por espaço.">
+                  <Field label={t("compute.create.dnsOptional")} hint={t("compute.create.dnsHint")}>
                     <Input name="dns" placeholder="1.1.1.1 8.8.8.8" />
                   </Field>
                 </div>
@@ -318,14 +328,14 @@ export default function NewInstancePage() {
             )}
           </Card>
 
-          <Card title="5. Chaves SSH" description="Pelo menos uma chave é necessária para acessar a instância.">
+          <Card title={t("compute.create.keys")} description={t("compute.create.keysDesc")}>
             {keys.data?.length === 0 ? (
               <p className="text-sm">
-                Você ainda não tem chaves.{" "}
+                {t("compute.create.noKeysBefore")}{" "}
                 <Link href="/ssh-keys" className="text-brand-600 hover:underline dark:text-brand-400">
-                  Adicione uma chave pública
+                  {t("compute.create.noKeysLink")}
                 </Link>{" "}
-                para acessar a instância.
+                {t("compute.create.noKeysAfter")}
               </p>
             ) : (
               <ul className="space-y-2">
@@ -352,13 +362,13 @@ export default function NewInstancePage() {
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-20">
-          <Card title="Resumo">
+          <Card title={t("compute.create.summary")}>
             <dl className="space-y-2 text-sm">
               {[
-                ["Zona", region?.zones.find((z) => z.id === zoneId)?.name ?? "—"],
-                ["Imagem", image?.name ?? "—"],
-                ["Tamanho", `${vcpus} vCPU · ${memoryGb} GiB · ${diskGb || "—"} GiB disco`],
-                ["Chaves SSH", selectedKeys.length || "nenhuma"],
+                [t("compute.create.sumZone"), region?.zones.find((z) => z.id === zoneId)?.name ?? "—"],
+                [t("compute.create.sumImage"), image?.name ?? "—"],
+                [t("compute.create.sumSize"), t("compute.create.sizeValue", { vcpus, memory: memoryGb, disk: diskGb || "—" })],
+                [t("compute.create.sumKeys"), selectedKeys.length || t("compute.create.noneKeys")],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between gap-3">
                   <dt className="text-slate-500">{label}</dt>
@@ -368,19 +378,21 @@ export default function NewInstancePage() {
             </dl>
             {estimate && estimate.running > 0 && (
               <div className="mt-4 rounded-md bg-brand-50 px-3 py-2 text-sm dark:bg-brand-950/50">
-                <div className="text-xs text-slate-600 dark:text-slate-400">Custo estimado</div>
+                <div className="text-xs text-slate-600 dark:text-slate-400">{t("compute.create.estimate")}</div>
                 <div className="text-lg font-semibold tabular-nums">
-                  {money(estimate.running, prices.data!.currency)}/mês
+                  {t("compute.create.perMonth", { amount: money(estimate.running, prices.data!.currency) })}
                 </div>
                 <div className="text-xs text-slate-600 dark:text-slate-400">
-                  ligada ({money(estimate.hourly, prices.data!.currency, true)}/hora) ·{" "}
-                  {money(estimate.stopped, prices.data!.currency)}/mês desligada
+                  {t("compute.create.estimateDetail", {
+                    hourly: money(estimate.hourly, prices.data!.currency, true),
+                    stopped: money(estimate.stopped, prices.data!.currency),
+                  })}
                 </div>
               </div>
             )}
             {quotas.data && (
               <div className="mt-4 space-y-1 text-xs">
-                <div className="font-semibold text-slate-700 dark:text-slate-300">Quota do cliente</div>
+                <div className="font-semibold text-slate-700 dark:text-slate-300">{t("compute.create.quota")}</div>
                 {quotas.data.map((q) => {
                   const over = overQuota.some((o) => o.resource === q.resource);
                   return (
@@ -388,9 +400,9 @@ export default function NewInstancePage() {
                       key={q.resource}
                       className={`flex justify-between ${over ? "font-medium text-rose-700 dark:text-rose-300" : "text-slate-600 dark:text-slate-400"}`}
                     >
-                      <span>{QUOTA_LABEL[q.resource] ?? q.resource}</span>
+                      <span>{quotaLabel(q.resource)}</span>
                       <span className="tabular-nums">
-                        {q.available} de {q.limit} livres
+                        {t("compute.create.quotaFree", { available: q.available, limit: q.limit })}
                       </span>
                     </div>
                   );
@@ -401,7 +413,7 @@ export default function NewInstancePage() {
               <ErrorBox message={create.isError ? errorMessage(create.error) : null} />
               {overQuota.length > 0 && (
                 <ErrorBox
-                  message={`Acima da quota: ${overQuota.map((o) => QUOTA_LABEL[o.resource] ?? o.resource).join(", ")}.`}
+                  message={t("compute.create.overQuota", { resources: overQuota.map((o) => quotaLabel(o.resource)).join(", ") })}
                 />
               )}
               <div className="flex gap-2">
@@ -410,11 +422,11 @@ export default function NewInstancePage() {
                   className="flex-1"
                   disabled={create.isPending || selectedKeys.length === 0 || !imageId || !zoneId || overQuota.length > 0}
                 >
-                  Criar instância
+                  {t("compute.create.submit")}
                 </Button>
                 <Link href="/instances">
                   <Button type="button" variant="secondary">
-                    Cancelar
+                    {t("compute.create.cancel")}
                   </Button>
                 </Link>
               </div>

@@ -7,6 +7,7 @@ import { Suspense, useState } from "react";
 
 import { Button, ErrorBox, Field, Input } from "@/components/ui";
 import { login } from "@/lib/auth/session";
+import { useT } from "@/lib/i18n";
 
 function safeNext(value: string | null): string {
   // only same-site paths: never redirect to another origin after login
@@ -17,6 +18,7 @@ function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const queryClient = useQueryClient();
+  const t = useT();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -38,19 +40,19 @@ function LoginForm() {
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <Field label="E-mail">
+      <Field label={t("auth.email")}>
         <Input name="email" type="email" autoComplete="username" required autoFocus />
       </Field>
-      <Field label="Senha">
+      <Field label={t("auth.password")}>
         <Input name="password" type="password" autoComplete="current-password" required />
       </Field>
       <ErrorBox message={error} />
       <Button type="submit" className="w-full" disabled={busy}>
-        {busy ? "Entrando…" : "Entrar"}
+        {busy ? t("auth.signingIn") : t("auth.signIn")}
       </Button>
       <p className="text-center text-sm">
         <Link href="/forgot-password" className="text-brand-600 hover:underline dark:text-brand-400">
-          Esqueci minha senha
+          {t("auth.forgotPassword")}
         </Link>
       </p>
     </form>

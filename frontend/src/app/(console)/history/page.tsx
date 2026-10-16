@@ -8,6 +8,7 @@ import { NoTenant } from "@/components/no-tenant";
 import { PageHeader } from "@/components/page";
 import { Button, Card, Empty, ErrorBox, Select } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 
 type JobType = "instance.power" | "instance.create" | "instance.delete";
@@ -15,6 +16,7 @@ type Status = "pending" | "running" | "succeeded" | "failed";
 
 export default function HistoryPage() {
   const { tenantId } = useSession();
+  const t = useT();
   const [type, setType] = useState<JobType | "">("");
   const [status, setStatus] = useState<Status | "">("");
 
@@ -45,23 +47,23 @@ export default function HistoryPage() {
   return (
     <>
       <PageHeader
-        title="Histórico de operações"
-        description="Tudo o que foi pedido à plataforma neste cliente: criação, energia e exclusão de instâncias."
+        title={t("alerts.history.title")}
+        description={t("alerts.history.description")}
         actions={
           <>
-            <Select aria-label="Tipo" value={type} onChange={(e) => setType(e.target.value as JobType | "")}>
+            <Select aria-label={t("alerts.history.type")} value={type} onChange={(e) => setType(e.target.value as JobType | "")}>
               {ACTIVITY_FILTERS.map((f) => (
                 <option key={f.value} value={f.value}>
-                  {f.label}
+                  {t(f.label)}
                 </option>
               ))}
             </Select>
-            <Select aria-label="Situação" value={status} onChange={(e) => setStatus(e.target.value as Status | "")}>
-              <option value="">Qualquer situação</option>
-              <option value="succeeded">Concluídas</option>
-              <option value="failed">Falharam</option>
-              <option value="running">Executando</option>
-              <option value="pending">Na fila</option>
+            <Select aria-label={t("alerts.history.status")} value={status} onChange={(e) => setStatus(e.target.value as Status | "")}>
+              <option value="">{t("alerts.history.anyStatus")}</option>
+              <option value="succeeded">{t("alerts.history.succeeded")}</option>
+              <option value="failed">{t("alerts.history.failed")}</option>
+              <option value="running">{t("alerts.history.running")}</option>
+              <option value="pending">{t("alerts.history.pending")}</option>
             </Select>
           </>
         }
@@ -69,7 +71,7 @@ export default function HistoryPage() {
       <div className="max-w-4xl space-y-4">
         <ErrorBox message={jobs.isError ? errorMessage(jobs.error) : null} />
         <Card>
-          {jobs.isSuccess && items.length === 0 && <Empty>Nenhuma operação encontrada.</Empty>}
+          {jobs.isSuccess && items.length === 0 && <Empty>{t("alerts.history.empty")}</Empty>}
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {items.map((job) => (
               <ActivityRow key={job.id} job={job} />
@@ -78,7 +80,7 @@ export default function HistoryPage() {
           {jobs.hasNextPage && (
             <div className="pt-4 text-center">
               <Button variant="secondary" onClick={() => jobs.fetchNextPage()} disabled={jobs.isFetchingNextPage}>
-                Carregar mais
+                {t("alerts.common.loadMore")}
               </Button>
             </div>
           )}

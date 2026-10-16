@@ -30,6 +30,9 @@ class ResetPasswordRequest(Input):
     new_password: NewPassword
 
 
+Locale = Literal["pt-BR", "en"]
+
+
 class UserOut(BaseModel):
     id: uuid.UUID
     email: str
@@ -54,5 +57,6 @@ class TenantSummary(BaseModel):
 
 
 class MeResponse(UserOut):
+    locale: Locale
     tenants: list[TenantSummary]
     platform_roles: list[str]

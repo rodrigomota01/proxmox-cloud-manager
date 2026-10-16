@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Icon, type IconName } from "@/components/icons";
 import { ProxmoxMark } from "@/components/proxmox";
+import { translate } from "@/lib/i18n";
 
 // --- resource icon ---------------------------------------------------------------------
 
@@ -62,7 +63,7 @@ export function Tabs<K extends string>({
   className?: string;
 }) {
   return (
-    <nav className={`flex gap-1 overflow-x-auto ${className}`} aria-label="Seções">
+    <nav className={`flex gap-1 overflow-x-auto ${className}`} aria-label={translate("common.sections")}>
       {tabs.map((t) => (
         <button
           key={t.key}
@@ -122,7 +123,7 @@ export function PageHeader<K extends string>({
       }`}
     >
       {breadcrumbs && breadcrumbs.length > 0 && (
-        <nav aria-label="Navegação estrutural" className="mb-2 flex flex-wrap items-center gap-1 text-sm">
+        <nav aria-label={translate("common.breadcrumbs")} className="mb-2 flex flex-wrap items-center gap-1 text-sm">
           {breadcrumbs.map((c, i) => (
             <span key={`${c.label}-${i}`} className="flex items-center gap-1">
               {i > 0 && <Icon name="chevronRight" className="h-3.5 w-3.5 text-slate-400" />}
@@ -169,7 +170,7 @@ export function Toolbar({ children, count }: { children?: React.ReactNode; count
 export function SearchInput({
   value,
   onChange,
-  placeholder = "Filtrar por nome…",
+  placeholder = translate("common.filterByName"),
   className = "w-64",
 }: {
   value: string;
@@ -281,7 +282,7 @@ export type MenuItem =
 export function Menu({
   items,
   label,
-  ariaLabel = "Ações",
+  ariaLabel = translate("common.actions"),
   align = "right",
 }: {
   items: (MenuItem | false | null | undefined)[];

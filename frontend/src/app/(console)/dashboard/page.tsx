@@ -14,10 +14,12 @@ import { ScopeToggle } from "@/components/scope-toggle";
 import { UsagePanel } from "@/components/usage-panel";
 import { pct } from "@/components/viz";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 
 /** Platform admins: every guest on every hypervisor, or one tenant's. */
 function PlatformOverview() {
+  const t = useT();
   const overview = useQuery({
     queryKey: ["admin", "overview"],
     queryFn: async () => unwrap(await api.GET("/api/v1/admin/overview")),
@@ -27,8 +29,8 @@ function PlatformOverview() {
   return (
     <section className="space-y-4">
       <PageHeader
-        title="Visão geral"
-        description="Toda a plataforma: hypervisors, VMs de todos os clientes, alertas e custos."
+        title={t("compute.dashboard.title")}
+        description={t("compute.dashboard.platformDesc")}
         actions={<ScopeToggle />}
       />
       <ErrorBox message={overview.isError ? errorMessage(overview.error) : null} />
@@ -38,32 +40,40 @@ function PlatformOverview() {
       {infra && (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatTile
-            label="Hypervisors online"
+            label={t("compute.dashboard.hypervisorsOnline")}
             icon="server"
             href="/admin/nodes"
             tone={infra.nodes_online < infra.nodes_total ? "warn" : "ok"}
-            value={`${infra.nodes_online} de ${infra.nodes_total}`}
+            value={t("compute.dashboard.ofTotal", { used: infra.nodes_online, total: infra.nodes_total })}
           />
-          <StatTile label="CPU dos hosts" icon="dashboard" value={pct(infra.cpu_usage)} hint={`${infra.cores} núcleos`} />
           <StatTile
-            label="Memória dos hosts"
+            label={t("compute.dashboard.hostCpu")}
+            icon="dashboard"
+            value={pct(infra.cpu_usage)}
+            hint={t("compute.dashboard.cores", { count: infra.cores })}
+          />
+          <StatTile
+            label={t("compute.dashboard.hostMemory")}
             icon="layers"
             value={infra.memory_bytes ? pct(infra.memory_used_bytes / infra.memory_bytes) : "—"}
-            hint={`${formatBytes(infra.memory_used_bytes)} de ${formatBytes(infra.memory_bytes)}`}
+            hint={t("compute.dashboard.ofTotal", { used: formatBytes(infra.memory_used_bytes), total: formatBytes(infra.memory_bytes) })}
           />
           <StatTile
-            label="Storage"
+            label={t("compute.dashboard.storage")}
             icon="folder"
             value={infra.storage_total_bytes ? pct(infra.storage_used_bytes / infra.storage_total_bytes) : "—"}
-            hint={`${formatBytes(infra.storage_used_bytes)} de ${formatBytes(infra.storage_total_bytes)}`}
+            hint={t("compute.dashboard.ofTotal", {
+              used: formatBytes(infra.storage_used_bytes),
+              total: formatBytes(infra.storage_total_bytes),
+            })}
           />
         </div>
       )}
       {overview.data && (
         <>
           <h2 className="pt-2 text-base font-semibold">
-            Utilização das VMs{" "}
-            <span className="text-sm font-normal text-slate-500">de todos os clientes, inclusive as não adotadas</span>
+            {t("compute.dashboard.vmUsage")}{" "}
+            <span className="text-sm font-normal text-slate-500">{t("compute.dashboard.vmUsageScope")}</span>
           </h2>
           <UsagePanel
             usage={overview.data.usage}
@@ -78,6 +88,7 @@ function PlatformOverview() {
 /** Firing alerts in view, most recent first; hidden when there are none. */
 /** scope.tenantId "" (admin only) = every alert on the platform. */
 function ActiveAlerts({ scope }: { scope: { admin: boolean; tenantId: string } }) {
+  const t = useT();
   const alerts = useQuery({
     queryKey: ["dashboard", "alerts", scope.admin, scope.tenantId],
     queryFn: async () =>
@@ -93,10 +104,10 @@ function ActiveAlerts({ scope }: { scope: { admin: boolean; tenantId: string } }
   if (!alerts.data?.length) return null;
   return (
     <Card
-      title="Alertas ativos"
+      title={t("compute.dashboard.activeAlerts")}
       actions={
         <Link href="/alerts" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
-          Ver todos
+          {t("compute.dashboard.viewAll")}
         </Link>
       }
     >
@@ -135,6 +146,7 @@ export default function DashboardPage() {
 }
 
 function TenantDashboard({ tenantId }: { tenantId: string }) {
+  const t = useT();
   const { tenant } = useSession();
   const summary = useQuery({
     queryKey: ["dashboard", tenantId],
@@ -151,28 +163,28 @@ function TenantDashboard({ tenantId }: { tenantId: string }) {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Visão geral"
-        description={tenant ? `Cliente ${tenant.name}: máquinas, consumo, alertas, custos e operações recentes.` : undefined}
+        title={t("compute.dashboard.title")}
+        description={tenant ? t("compute.dashboard.tenantDesc", { name: tenant.name }) : undefined}
         actions={<ScopeToggle />}
       />
       <ErrorBox message={summary.isError ? errorMessage(summary.error) : null} />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatTile label="Projetos" icon="folder" href="/projects" value={data?.projects ?? "—"} />
+        <StatTile label={t("compute.dashboard.projects")} icon="folder" href="/projects" value={data?.projects ?? "—"} />
         <StatTile
-          label="VMs"
+          label={t("compute.dashboard.vms")}
           icon="monitor"
           href="/instances"
           value={data ? count("vm") : "—"}
-          hint={data ? `${count("vm", "running")} ligadas` : undefined}
+          hint={data ? t("compute.dashboard.vmsRunning", { count: count("vm", "running") }) : undefined}
         />
         <StatTile
-          label="Containers"
+          label={t("compute.dashboard.containers")}
           icon="layers"
           href="/instances"
           value={data ? count("container") : "—"}
-          hint={data ? `${count("container", "running")} ligados` : undefined}
+          hint={data ? t("compute.dashboard.containersRunning", { count: count("container", "running") }) : undefined}
         />
-        <StatTile label="Operações em andamento" icon="history" href="/history" value={data?.active_jobs ?? "—"} />
+        <StatTile label={t("compute.dashboard.activeJobs")} icon="history" href="/history" value={data?.active_jobs ?? "—"} />
       </div>
 
       <ActiveAlerts scope={{ admin: false, tenantId }} />
@@ -180,14 +192,14 @@ function TenantDashboard({ tenantId }: { tenantId: string }) {
       <TenantUsage tenantId={tenantId} />
 
       <Card
-        title="Operações recentes"
+        title={t("compute.dashboard.recentOps")}
         actions={
           <Link href="/history" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
-            Ver histórico completo
+            {t("compute.dashboard.fullHistory")}
           </Link>
         }
       >
-        {data && data.recent_jobs.length === 0 && <Empty icon="history">Nenhuma operação ainda.</Empty>}
+        {data && data.recent_jobs.length === 0 && <Empty icon="history">{t("compute.dashboard.noOps")}</Empty>}
         <ul className="divide-y divide-slate-100 dark:divide-slate-800">
           {data?.recent_jobs.map((job) => (
             <ActivityRow key={job.id} job={job} />

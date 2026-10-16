@@ -4,6 +4,7 @@
 import { useEffect, useRef } from "react";
 
 import { Icon, type IconName } from "@/components/icons";
+import { getLocale, translate, useT, type MessageKey } from "@/lib/i18n";
 
 type Variant = "primary" | "secondary" | "danger" | "ghost" | "link";
 
@@ -163,47 +164,50 @@ export function Status({
   );
 }
 
-const power: Record<string, [StatusTone, string, IconName?]> = {
-  running: ["ok", "Ligada"],
-  stopped: ["off", "Desligada"],
-  paused: ["warn", "Pausada", "pauseCircle"],
-  unknown: ["unknown", "Desconhecido"],
+const power: Record<string, [StatusTone, MessageKey, IconName?]> = {
+  running: ["ok", "status.running"],
+  stopped: ["off", "status.stopped"],
+  paused: ["warn", "status.paused", "pauseCircle"],
+  unknown: ["unknown", "status.unknown"],
 };
 
 export function PowerBadge({ state }: { state: string }) {
-  const [tone, label, icon] = power[state] ?? ["unknown", state];
+  const t = useT();
+  const [tone, key, icon] = power[state] ?? ["unknown", null];
   return (
     <Status tone={tone} icon={icon}>
-      {label}
+      {key ? t(key) : state}
     </Status>
   );
 }
 
-const lifecycle: Record<string, [StatusTone, string]> = {
-  provisioning: ["progress", "Criando…"],
-  deleting: ["progress", "Excluindo…"],
-  error: ["error", "Erro"],
-  active: ["ok", "Ativa"],
+const lifecycle: Record<string, [StatusTone, MessageKey]> = {
+  provisioning: ["progress", "status.provisioning"],
+  deleting: ["progress", "status.deleting"],
+  error: ["error", "status.error"],
+  active: ["ok", "status.active"],
 };
 
 export function StateBadge({ state }: { state: string }) {
-  const [tone, label] = lifecycle[state] ?? ["unknown", state];
-  return <Status tone={tone}>{label}</Status>;
+  const t = useT();
+  const [tone, key] = lifecycle[state] ?? ["unknown", null];
+  return <Status tone={tone}>{key ? t(key) : state}</Status>;
 }
 
-const job: Record<string, [StatusTone, string, IconName?]> = {
-  pending: ["info", "Na fila", "history"],
-  running: ["progress", "Executando"],
-  succeeded: ["ok", "Concluído"],
-  failed: ["error", "Falhou"],
-  cancelled: ["off", "Cancelado"],
+const job: Record<string, [StatusTone, MessageKey, IconName?]> = {
+  pending: ["info", "status.pending", "history"],
+  running: ["progress", "status.jobRunning"],
+  succeeded: ["ok", "status.succeeded"],
+  failed: ["error", "status.failed"],
+  cancelled: ["off", "status.cancelled"],
 };
 
 export function JobBadge({ status }: { status: string }) {
-  const [tone, label, icon] = job[status] ?? ["unknown", status];
+  const t = useT();
+  const [tone, key, icon] = job[status] ?? ["unknown", null];
   return (
     <Status tone={tone} icon={icon}>
-      {label}
+      {key ? t(key) : status}
     </Status>
   );
 }
@@ -325,7 +329,7 @@ export function Dialog({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Fechar"
+          aria-label={translate("common.close")}
           className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100"
         >
           <Icon name="x" />
@@ -345,5 +349,5 @@ export function formatBytes(bytes: number): string {
 
 export function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
-  return new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "medium" });
+  return new Date(value).toLocaleString(getLocale(), { dateStyle: "short", timeStyle: "medium" });
 }

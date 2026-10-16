@@ -10,6 +10,7 @@ import type { K8sMode } from "@/components/k8s";
 import { PageHeader } from "@/components/page";
 import { Alert, Button, Card, ErrorBox, Field, Input, Select } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 
 type Pool = { name: string; count: number; vcpus: number; memoryGb: number; disk: number };
@@ -32,6 +33,7 @@ function SizeFields({
   minVcpus?: number;
   minMemoryGb?: number;
 }) {
+  const t = useT();
   return (
     <>
       <Field label="vCPUs">
@@ -43,7 +45,7 @@ function SizeFields({
           ))}
         </Select>
       </Field>
-      <Field label="Memória">
+      <Field label={t("k8s.common.memory")}>
         <Select className="w-full" value={value.memoryGb} onChange={(e) => onChange({ ...value, memoryGb: Number(e.target.value) })}>
           {MEMORY_OPTIONS.filter((g) => g >= minMemoryGb).map((g) => (
             <option key={g} value={g}>
@@ -52,7 +54,7 @@ function SizeFields({
           ))}
         </Select>
       </Field>
-      <Field label="Disco (GiB)" hint={`Mínimo: ${minDisk} GiB`}>
+      <Field label={t("k8s.create.disk")} hint={t("k8s.create.minDisk", { n: minDisk })}>
         <Input
           type="number"
           min={Math.max(minDisk, 10)}
@@ -69,6 +71,7 @@ function SizeFields({
 /** Creates a Kubernetes cluster on the platform's VMs (ADR-0018). Admins pick the client
  * first; every client-scoped query then runs in that client's scope. */
 export function K8sCreateForm({ mode }: { mode: K8sMode }) {
+  const t = useT();
   const admin = mode === "admin";
   const base = admin ? "/admin/kubernetes" : "/kubernetes";
   const router = useRouter();
@@ -211,16 +214,16 @@ export function K8sCreateForm({ mode }: { mode: K8sMode }) {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Criar cluster Kubernetes"
-        breadcrumbs={[{ label: "Kubernetes" }, { label: "Clusters", href: base }, { label: "Criar" }]}
-        description="A plataforma cria as VMs, instala o Kubernetes com kubeadm e entrega o cluster com Cilium (rede e Gateway API), MetalLB, cert-manager e local-path."
+        title={t("k8s.create.title")}
+        breadcrumbs={[{ label: "Kubernetes" }, { label: t("k8s.common.clusters"), href: base }, { label: t("k8s.create.breadcrumb") }]}
+        description={t("k8s.create.description")}
       />
       <form onSubmit={submit} className="grid items-start gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <Card title="1. Básico">
+          <Card title={t("k8s.create.basics")}>
             <div className="grid gap-4 sm:grid-cols-2">
               {admin && (
-                <Field label="Cliente" hint="O cluster, as VMs e a quota são deste cliente.">
+                <Field label={t("k8s.common.client")} hint={t("k8s.create.clientHint")}>
                   <Select
                     className="w-full"
                     required
@@ -234,23 +237,28 @@ export function K8sCreateForm({ mode }: { mode: K8sMode }) {
                     }}
                   >
                     <option value="" disabled>
-                      Selecione…
+                      {t("k8s.common.select")}
                     </option>
-                    {tenants.data?.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
+                    {tenants.data?.map((tn) => (
+                      <option key={tn.id} value={tn.id}>
+                        {tn.name}
                       </option>
                     ))}
                   </Select>
                 </Field>
               )}
-              <Field label="Nome do cluster" hint="Minúsculas, números e hífen (3 a 30). Vira o prefixo das VMs.">
-                <Input value={name} onChange={(e) => setName(e.target.value.toLowerCase())} required placeholder="producao" />
+              <Field label={t("k8s.create.clusterName")} hint={t("k8s.create.clusterNameHint")}>
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value.toLowerCase())}
+                  required
+                  placeholder={t("k8s.create.clusterNamePlaceholder")}
+                />
               </Field>
-              <Field label="Projeto" hint="As VMs dos nós ficam neste projeto.">
+              <Field label={t("k8s.create.project")} hint={t("k8s.create.projectHint")}>
                 <Select className="w-full" required disabled={!tenantId} value={projectId} onChange={(e) => setProjectId(e.target.value)}>
                   <option value="" disabled>
-                    Selecione…
+                    {t("k8s.common.select")}
                   </option>
                   {projects.data?.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -259,7 +267,7 @@ export function K8sCreateForm({ mode }: { mode: K8sMode }) {
                   ))}
                 </Select>
               </Field>
-              <Field label="Zona">
+              <Field label={t("k8s.create.zone")}>
                 <Select
                   className="w-full"
                   required
@@ -272,7 +280,7 @@ export function K8sCreateForm({ mode }: { mode: K8sMode }) {
                   }}
                 >
                   <option value="" disabled>
-                    Selecione…
+                    {t("k8s.common.select")}
                   </option>
                   {zones.map((z) => (
                     <option key={z.id} value={z.id}>
@@ -281,10 +289,10 @@ export function K8sCreateForm({ mode }: { mode: K8sMode }) {
                   ))}
                 </Select>
               </Field>
-              <Field label="Versão do Kubernetes" hint="Cada imagem traz uma versão fixa.">
+              <Field label={t("k8s.create.version")} hint={t("k8s.create.versionHint")}>
                 <Select className="w-full" required disabled={!zoneId} value={imageId} onChange={(e) => setImageId(e.target.value)}>
                   <option value="" disabled>
-                    {!zoneId ? "Escolha a zona primeiro" : zoneImages.length ? "Selecione…" : "Nenhuma imagem Kubernetes nesta zona"}
+                    {t(!zoneId ? "k8s.create.pickZoneFirst" : zoneImages.length ? "k8s.common.select" : "k8s.create.noImages")}
                   </option>
                   {zoneImages.map((i) => (
                     <option key={i.id} value={i.id}>
@@ -296,15 +304,15 @@ export function K8sCreateForm({ mode }: { mode: K8sMode }) {
             </div>
           </Card>
 
-          <Card title="2. Control plane" description="Um nó (alta disponibilidade com 3 nós chega numa próxima fase).">
+          <Card title={t("k8s.create.controlPlane")} description={t("k8s.create.controlPlaneDescription")}>
             <div className="grid gap-4 sm:grid-cols-3">
               <SizeFields value={cp} onChange={setCp} minDisk={minDisk} minVcpus={2} />
             </div>
           </Card>
 
           <Card
-            title="3. Pools de workers"
-            description="Grupos de nós iguais; cada pool pode ter um tamanho diferente."
+            title={t("k8s.create.workerPools")}
+            description={t("k8s.create.workerPoolsDescription")}
             actions={
               pools.length < 5 && (
                 <Button
@@ -312,7 +320,7 @@ export function K8sCreateForm({ mode }: { mode: K8sMode }) {
                   variant="secondary"
                   onClick={() => setPools((cur) => [...cur, { name: `pool${cur.length + 1}`, count: 1, vcpus: 2, memoryGb: 4, disk: 40 }])}
                 >
-                  <Icon name="plus" /> Adicionar pool
+                  <Icon name="plus" /> {t("k8s.create.addPool")}
                 </Button>
               )
             }
@@ -320,29 +328,29 @@ export function K8sCreateForm({ mode }: { mode: K8sMode }) {
             <div className="space-y-4">
               {pools.map((p, i) => (
                 <div key={i} className="grid gap-4 rounded-md border border-slate-200 p-3 sm:grid-cols-5 dark:border-slate-800">
-                  <Field label="Nome do pool">
+                  <Field label={t("k8s.create.poolName")}>
                     <Input value={p.name} onChange={(e) => setPool(i, { ...p, name: e.target.value.toLowerCase() })} required />
                   </Field>
-                  <Field label="Nós">
+                  <Field label={t("k8s.common.nodes")}>
                     <Input type="number" min={1} max={20} value={p.count} onChange={(e) => setPool(i, { ...p, count: Number(e.target.value) })} />
                   </Field>
                   <SizeFields value={p} onChange={(v) => setPool(i, v)} minDisk={minDisk} />
                   {pools.length > 1 && (
                     <div className="sm:col-span-5">
                       <Button type="button" variant="secondary" onClick={() => setPools((cur) => cur.filter((_, j) => j !== i))}>
-                        Remover pool
+                        {t("k8s.create.removePool")}
                       </Button>
                     </div>
                   )}
                 </div>
               ))}
-              {!poolsValid && <Alert variant="warning">Nomes de pool: minúsculas/números/hífen, únicos e diferentes de “cp”.</Alert>}
+              {!poolsValid && <Alert variant="warning">{t("k8s.create.poolNamesInvalid")}</Alert>}
             </div>
           </Card>
 
-          <Card title="4. Rede" description="Todos os nós e o IP do load balancer ficam na mesma rede: o MetalLB anuncia o IP a partir dos nós.">
+          <Card title={t("k8s.create.network")} description={t("k8s.create.networkDescription")}>
             {!zoneId ? (
-              <p className="text-sm text-slate-500">Escolha a zona primeiro.</p>
+              <p className="text-sm text-slate-500">{t("k8s.create.pickZoneFirstSentence")}</p>
             ) : (
               <div className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -356,7 +364,7 @@ export function K8sCreateForm({ mode }: { mode: K8sMode }) {
                           onChange={(e) => setNodeAddr((cur) => Object.assign([...cur], { [i]: e.target.value }))}
                         >
                           <option value="" disabled>
-                            Selecione…
+                            {t("k8s.common.select")}
                           </option>
                           {addressOptions(nodeAddr[i] ?? "").map((a) => (
                             <option key={a.id} value={a.id}>
@@ -376,11 +384,11 @@ export function K8sCreateForm({ mode }: { mode: K8sMode }) {
                   ))}
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <Field label="IP do load balancer" hint="IP público do Gateway compartilhado (HTTPRoute).">
+                  <Field label={t("k8s.create.lbIp")} hint={t("k8s.create.lbIpHint")}>
                     {fromIpam ? (
                       <Select className="w-full" required value={lbAddr} onChange={(e) => setLbAddr(e.target.value)}>
                         <option value="" disabled>
-                          Selecione…
+                          {t("k8s.common.select")}
                         </option>
                         {addressOptions(lbAddr).map((a) => (
                           <option key={a.id} value={a.id}>
@@ -397,35 +405,32 @@ export function K8sCreateForm({ mode }: { mode: K8sMode }) {
                       <Input required placeholder="203.0.113.14" value={gateway} onChange={(e) => setGateway(e.target.value)} />
                     </Field>
                   )}
-                  <Field label="DNS (opcional)" hint="Padrão: 8.8.8.8 1.1.1.1">
+                  <Field label={t("k8s.create.dns")} hint={t("k8s.create.defaultHint", { value: "8.8.8.8 1.1.1.1" })}>
                     <Input placeholder="8.8.8.8 1.1.1.1" value={dns} onChange={(e) => setDns(e.target.value)} />
                   </Field>
                   {admin && !fromIpam && (
                     <>
-                      <Field label="Bridge (opcional)" hint="Padrão: a do template.">
+                      <Field label={t("k8s.create.bridge")} hint={t("k8s.create.bridgeHint")}>
                         <Input placeholder="vmbr0" value={bridge} onChange={(e) => setBridge(e.target.value)} />
                       </Field>
-                      <Field label="VLAN (opcional)">
+                      <Field label={t("k8s.create.vlan")}>
                         <Input type="number" min={1} max={4094} value={vlan} onChange={(e) => setVlan(e.target.value)} />
                       </Field>
                     </>
                   )}
                 </div>
                 {fromIpam ? (
-                  <p className="text-xs text-slate-500">IPs livres no cadastro de IPs desta zona; ficam reservados enquanto o cluster existir.</p>
+                  <p className="text-xs text-slate-500">{t("k8s.create.ipamNote")}</p>
                 ) : (
-                  <p className="text-xs text-slate-500">
-                    Esta zona não tem IPs no cadastro: digite IP/prefixo de cada nó. A plataforma impede IPs repetidos entre as VMs dela, mas
-                    não detecta IPs usados fora dela.
-                  </p>
+                  <p className="text-xs text-slate-500">{t("k8s.create.staticNote")}</p>
                 )}
               </div>
             )}
           </Card>
 
-          <Card title="5. Chaves SSH (opcional)" description="Para acessar os nós por SSH, se precisar diagnosticar.">
+          <Card title={t("k8s.create.sshKeys")} description={t("k8s.create.sshKeysDescription")}>
             {keys.data?.length === 0 ? (
-              <p className="text-sm text-slate-500">Você não tem chaves SSH cadastradas.</p>
+              <p className="text-sm text-slate-500">{t("k8s.create.noSshKeys")}</p>
             ) : (
               <ul className="space-y-2">
                 {keys.data?.map((k) => (
@@ -449,13 +454,16 @@ export function K8sCreateForm({ mode }: { mode: K8sMode }) {
         </div>
 
         <aside className="space-y-4 lg:sticky lg:top-20">
-          <Card title="Resumo">
+          <Card title={t("k8s.create.summary")}>
             <dl className="space-y-2 text-sm">
               {[
                 ["Kubernetes", image?.kubernetes_version ?? "—"],
-                ["Nós", `${totals.nodes} (1 control plane + ${totals.nodes - 1} workers)`],
-                ["Total", `${totals.vcpus} vCPU · ${totals.memoryGb} GiB · ${totals.disk} GiB disco`],
-                ["Componentes", "Cilium · Gateway API · MetalLB · cert-manager · local-path"],
+                [t("k8s.common.nodes"), t("k8s.create.summaryNodes", { total: totals.nodes, workers: totals.nodes - 1 })],
+                [
+                  t("k8s.create.total"),
+                  t("k8s.create.summaryTotal", { vcpus: totals.vcpus, memory: totals.memoryGb, disk: totals.disk }),
+                ],
+                [t("k8s.create.components"), "Cilium · Gateway API · MetalLB · cert-manager · local-path"],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between gap-3">
                   <dt className="text-slate-500">{label}</dt>
@@ -464,17 +472,17 @@ export function K8sCreateForm({ mode }: { mode: K8sMode }) {
               ))}
             </dl>
             <p className="mt-3 text-xs text-slate-500">
-              A criação leva alguns minutos. As VMs contam na quota e nos custos do cliente como qualquer VM.
+              {t("k8s.create.summaryNote")}
             </p>
             <div className="mt-4 space-y-3">
               <ErrorBox message={create.isError ? errorMessage(create.error) : null} />
               <div className="flex gap-2">
                 <Button type="submit" className="flex-1" disabled={!ready || create.isPending}>
-                  Criar cluster
+                  {t("k8s.common.createCluster")}
                 </Button>
                 <Link href={base}>
                   <Button type="button" variant="secondary">
-                    Cancelar
+                    {t("k8s.common.cancel")}
                   </Button>
                 </Link>
               </div>

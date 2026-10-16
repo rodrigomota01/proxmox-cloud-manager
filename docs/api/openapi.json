@@ -6358,6 +6358,14 @@
             "title": "Id",
             "type": "string"
           },
+          "locale": {
+            "enum": [
+              "pt-BR",
+              "en"
+            ],
+            "title": "Locale",
+            "type": "string"
+          },
           "platform_roles": {
             "items": {
               "type": "string"
@@ -6377,6 +6385,7 @@
           "id",
           "email",
           "display_name",
+          "locale",
           "tenants",
           "platform_roles"
         ],
@@ -7568,19 +7577,61 @@
         "title": "PricesOut",
         "type": "object"
       },
-      "ProfileUpdate": {
-        "additionalProperties": false,
+      "ProfileOut": {
         "properties": {
           "display_name": {
-            "maxLength": 100,
-            "minLength": 1,
             "title": "Display Name",
+            "type": "string"
+          },
+          "locale": {
+            "enum": [
+              "pt-BR",
+              "en"
+            ],
+            "title": "Locale",
             "type": "string"
           }
         },
         "required": [
-          "display_name"
+          "display_name",
+          "locale"
         ],
+        "title": "ProfileOut",
+        "type": "object"
+      },
+      "ProfileUpdate": {
+        "additionalProperties": false,
+        "description": "Absent field: unchanged.",
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pt-BR",
+                  "en"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
+          }
+        },
         "title": "ProfileUpdate",
         "type": "object"
       },
@@ -14302,11 +14353,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "title": "Response Update Profile Api V1 Me Patch",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProfileOut"
                 }
               }
             },

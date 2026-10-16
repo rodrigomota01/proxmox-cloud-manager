@@ -4,6 +4,7 @@ import { StatTile } from "@/components/page";
 import { Card, Empty, formatBytes } from "@/components/ui";
 import { Meter, mib, pct, rate } from "@/components/viz";
 import type { Schemas } from "@/lib/api/client";
+import { useT, type MessageKey } from "@/lib/i18n";
 
 type Usage = Schemas["UsageOut"] | Schemas["AdminUsageOut"];
 type Entry = Schemas["TopInstanceOut"] & Partial<Pick<Schemas["AdminTopInstanceOut"], "tenant_name" | "node_id" | "managed">>;
@@ -13,21 +14,29 @@ export function Stat({ label, value, hint }: { label: string; value: React.React
   return <StatTile label={label} value={value} hint={hint} />;
 }
 
-const RANKINGS = [
-  { key: "cpu", title: "Mais CPU", empty: "Nenhuma VM ligada." },
-  { key: "memory", title: "Mais memória", empty: "Nenhuma VM ligada." },
-  { key: "disk", title: "Disco mais cheio", empty: "Sem dados de disco: as VMs precisam do qemu-guest-agent." },
-  { key: "network", title: "Mais tráfego de rede", empty: "Sem tráfego medido ainda." },
-] as const;
+const RANKINGS: readonly { key: "cpu" | "memory" | "disk" | "network"; title: MessageKey; empty: MessageKey }[] = [
+  { key: "cpu", title: "compute.usage.topCpu", empty: "compute.usage.noneRunning" },
+  { key: "memory", title: "compute.usage.topMemory", empty: "compute.usage.noneRunning" },
+  { key: "disk", title: "compute.usage.topDisk", empty: "compute.usage.noDiskData" },
+  { key: "network", title: "compute.usage.topNetwork", empty: "compute.usage.noTraffic" },
+];
 
-function detail(key: (typeof RANKINGS)[number]["key"], e: Entry) {
+function detail(key: (typeof RANKINGS)[number]["key"], e: Entry, t: ReturnType<typeof useT>) {
   switch (key) {
     case "cpu":
-      return <Meter value={e.value} label={`${pct(e.value)} de ${e.vcpus} vCPU`} title="CPU em uso" />;
+      return (
+        <Meter
+          value={e.value}
+          label={t("compute.usage.cpuOfVcpus", { pct: pct(e.value), vcpus: e.vcpus })}
+          title={t("compute.usage.cpuInUse")}
+        />
+      );
     case "memory":
-      return <Meter value={e.value} label={`${mib(e.memory_used_mb)} / ${mib(e.memory_mb)}`} title="Memória em uso" />;
+      return (
+        <Meter value={e.value} label={`${mib(e.memory_used_mb)} / ${mib(e.memory_mb)}`} title={t("compute.usage.memoryInUse")} />
+      );
     case "disk":
-      return <Meter value={e.value} title="Sistema de arquivos mais cheio" />;
+      return <Meter value={e.value} title={t("compute.usage.fullestFs")} />;
     case "network":
       return (
         <span className="text-xs tabular-nums text-slate-700 dark:text-slate-300">
@@ -39,32 +48,38 @@ function detail(key: (typeof RANKINGS)[number]["key"], e: Entry) {
 
 /** Live usage of the running guests in view: totals, then the top consumers. */
 export function UsagePanel({ usage, href }: { usage: Usage; href: (e: Entry) => string | null }) {
+  const t = useT();
   const u = usage;
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <Stat label="Ligadas" value={u.instances_running} />
+        <Stat label={t("compute.usage.running")} value={u.instances_running} />
         <Stat
-          label="CPU em uso"
+          label={t("compute.usage.cpuInUse")}
           value={u.vcpus ? pct(u.cpu_used_vcpus / u.vcpus) : "—"}
-          hint={`${u.cpu_used_vcpus.toFixed(1)} de ${u.vcpus} vCPUs ocupadas`}
+          hint={t("compute.usage.vcpusBusy", { used: u.cpu_used_vcpus.toFixed(1), total: u.vcpus })}
         />
         <Stat
-          label="Memória em uso"
+          label={t("compute.usage.memoryInUse")}
           value={u.memory_mb ? pct(u.memory_used_mb / u.memory_mb) : "—"}
-          hint={`${mib(u.memory_used_mb)} de ${mib(u.memory_mb)}`}
+          hint={t("compute.usage.bytesOf", { used: mib(u.memory_used_mb), total: mib(u.memory_mb) })}
         />
         <Stat
-          label="Disco usado"
+          label={t("compute.usage.diskUsed")}
           value={u.disk_total_bytes ? pct(u.disk_used_bytes / u.disk_total_bytes) : "—"}
           hint={
             u.disk_known
-              ? `${formatBytes(u.disk_used_bytes)} de ${formatBytes(u.disk_total_bytes)} · ${u.disk_known} de ${u.instances_running} com dado`
-              : "requer qemu-guest-agent nas VMs"
+              ? t("compute.usage.diskKnown", {
+                  used: formatBytes(u.disk_used_bytes),
+                  total: formatBytes(u.disk_total_bytes),
+                  known: u.disk_known,
+                  running: u.instances_running,
+                })
+              : t("compute.usage.needsAgent")
           }
         />
         <Stat
-          label="Rede agora"
+          label={t("compute.usage.networkNow")}
           value={<span className="text-lg">↓ {rate(u.net_in_bps)}</span>}
           hint={`↑ ${rate(u.net_out_bps)}`}
         />
@@ -73,9 +88,9 @@ export function UsagePanel({ usage, href }: { usage: Usage; href: (e: Entry) => 
         {RANKINGS.map((r) => {
           const rows = u.top[r.key] as Entry[];
           return (
-            <Card key={r.key} title={r.title}>
+            <Card key={r.key} title={t(r.title)}>
               {rows.length === 0 ? (
-                <Empty icon="dashboard">{r.empty}</Empty>
+                <Empty icon="dashboard">{t(r.empty)}</Empty>
               ) : (
                 <ol className="divide-y divide-slate-100 dark:divide-slate-800">
                   {rows.map((e) => {
@@ -91,10 +106,10 @@ export function UsagePanel({ usage, href }: { usage: Usage; href: (e: Entry) => 
                             <span className="truncate font-medium">{e.name}</span>
                           )}
                           {"tenant_name" in e && (
-                            <div className="truncate text-xs text-slate-500">{e.tenant_name ?? "sem cliente (descoberta)"}</div>
+                            <div className="truncate text-xs text-slate-500">{e.tenant_name ?? t("compute.usage.noTenant")}</div>
                           )}
                         </div>
-                        {detail(r.key, e)}
+                        {detail(r.key, e, t)}
                       </li>
                     );
                   })}

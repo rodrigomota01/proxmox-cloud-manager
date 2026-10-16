@@ -1,14 +1,17 @@
 import { Status, type StatusTone } from "@/components/ui";
+import { type MessageKey, useT } from "@/lib/i18n";
 
-const STATUS: Record<string, [StatusTone, string]> = {
-  online: ["ok", "Online"],
-  offline: ["error", "Offline"],
-  auth_error: ["error", "Erro de autenticação"],
-  error: ["error", "Erro"],
-  unknown: ["unknown", "Não verificado"],
+// "Online" and "Offline" read the same in every language
+const STATUS: Record<string, [StatusTone, MessageKey | { text: string }]> = {
+  online: ["ok", { text: "Online" }],
+  offline: ["error", { text: "Offline" }],
+  auth_error: ["error", "k8s.clusterStatus.authError"],
+  error: ["error", "k8s.clusterStatus.error"],
+  unknown: ["unknown", "k8s.clusterStatus.unknown"],
 };
 
 export function ClusterStatus({ status }: { status: string }) {
-  const [tone, label] = STATUS[status] ?? ["unknown", status];
-  return <Status tone={tone}>{label}</Status>;
+  const t = useT();
+  const [tone, label] = STATUS[status] ?? ["unknown", { text: status }];
+  return <Status tone={tone}>{typeof label === "string" ? t(label) : label.text}</Status>;
 }

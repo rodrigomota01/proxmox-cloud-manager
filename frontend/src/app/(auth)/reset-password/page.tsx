@@ -5,8 +5,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Button, ErrorBox, Field, Input } from "@/components/ui";
+import { useT } from "@/lib/i18n";
 
 export default function ResetPasswordPage() {
+  const t = useT();
   // undefined: not read yet; null: no token in the link
   const [token, setToken] = useState<string | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +28,7 @@ export default function ResetPasswordPage() {
     const form = new FormData(e.currentTarget);
     const password = String(form.get("password"));
     if (password !== String(form.get("confirm"))) {
-      setError("As senhas não conferem.");
+      setError(t("auth.passwordsDiffer"));
       return;
     }
     setBusy(true);
@@ -38,36 +40,36 @@ export default function ResetPasswordPage() {
     });
     setBusy(false);
     if (res.ok) setDone(true);
-    else if (res.status === 422) setError("A senha precisa ter pelo menos 12 caracteres.");
-    else setError("Link inválido ou expirado. Peça um novo.");
+    else if (res.status === 422) setError(t("auth.passwordTooShort"));
+    else setError(t("auth.linkExpired"));
   }
 
   if (done) {
     return (
       <div className="space-y-4 text-sm">
-        <p>Senha definida. Você já pode entrar.</p>
+        <p>{t("auth.passwordSet")}</p>
         <Link href="/login" className="text-brand-600 hover:underline dark:text-brand-400">
-          Ir para o login
+          {t("auth.goToLogin")}
         </Link>
       </div>
     );
   }
   if (token === undefined) return null;
   if (token === null) {
-    return <p className="text-sm text-slate-500">Link inválido: abra o link recebido por e-mail.</p>;
+    return <p className="text-sm text-slate-500">{t("auth.linkMissing")}</p>;
   }
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <Field label="Nova senha" hint="Mínimo de 12 caracteres.">
+      <Field label={t("auth.newPassword")} hint={t("auth.newPasswordHint")}>
         <Input name="password" type="password" autoComplete="new-password" minLength={12} required />
       </Field>
-      <Field label="Repita a senha">
+      <Field label={t("auth.repeatPassword")}>
         <Input name="confirm" type="password" autoComplete="new-password" minLength={12} required />
       </Field>
       <ErrorBox message={error} />
       <Button type="submit" className="w-full" disabled={busy}>
-        Definir senha
+        {t("auth.setPassword")}
       </Button>
     </form>
   );

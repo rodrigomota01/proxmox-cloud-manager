@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { tbl } from "@/components/ui";
+import { getLocale, translate, useT } from "@/lib/i18n";
 
 // --- formatting ------------------------------------------------------------------------
 
@@ -33,7 +34,11 @@ export function uptime(seconds: number): string {
   const d = Math.floor(seconds / 86_400);
   const h = Math.floor((seconds % 86_400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  return d ? `${d}d ${h}h` : h ? `${h}h ${m}min` : `${m}min`;
+  return d
+    ? translate("compute.viz.uptimeDays", { d, h })
+    : h
+      ? translate("compute.viz.uptimeHours", { h, m })
+      : translate("compute.viz.uptimeMinutes", { m });
 }
 
 // --- allocation ------------------------------------------------------------------------
@@ -52,11 +57,12 @@ export function Allocation({
   title?: string;
   warnAbove?: number;
 }) {
+  const t = useT();
   const warn = warnAbove !== undefined && ratio > warnAbove;
   return (
     <span className="whitespace-nowrap text-xs tabular-nums text-slate-700 dark:text-slate-300" title={title}>
       {warn && (
-        <span aria-label="sobrecomprometida" className="mr-0.5" style={{ color: "var(--viz-serious)" }}>
+        <span aria-label={t("compute.viz.overcommitted")} className="mr-0.5" style={{ color: "var(--viz-serious)" }}>
           ⚠
         </span>
       )}
@@ -66,7 +72,7 @@ export function Allocation({
   );
 }
 
-export const ratioLabel = (r: number) => `${r.toLocaleString("pt-BR", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}×`;
+export const ratioLabel = (r: number) => `${r.toLocaleString(getLocale(), { maximumFractionDigits: 1, minimumFractionDigits: 1 })}×`;
 
 // --- meter -----------------------------------------------------------------------------
 
@@ -87,6 +93,7 @@ export function Meter({
   /** Label above a full-width bar, for narrow table columns with long labels. */
   stacked?: boolean;
 }) {
+  const t = useT();
   const clamped = Math.max(0, Math.min(value, 1));
   const level = value >= CRITICAL ? "critical" : value >= SERIOUS ? "serious" : null;
   const fill = level === "critical" ? "var(--viz-critical)" : level === "serious" ? "var(--viz-serious)" : "var(--viz-series-1)";
@@ -110,7 +117,7 @@ export function Meter({
         className={`${stacked ? "" : "min-w-[3.5rem] shrink-0 text-right"} whitespace-nowrap text-xs tabular-nums text-slate-700 dark:text-slate-300`}
       >
         {level && (
-          <span aria-label={level === "critical" ? "crítico" : "alto"} className="mr-0.5">
+          <span aria-label={level === "critical" ? t("compute.viz.critical") : t("compute.viz.high")} className="mr-0.5">
             ⚠
           </span>
         )}
@@ -130,8 +137,9 @@ const RANGES: { value: Range; label: string }[] = [
 ];
 
 export function RangePicker({ value, onChange }: { value: Range; onChange: (r: Range) => void }) {
+  const t = useT();
   return (
-    <div role="radiogroup" aria-label="Período" className="inline-flex rounded-md border border-slate-300 p-0.5 dark:border-slate-700">
+    <div role="radiogroup" aria-label={t("compute.viz.period")} className="inline-flex rounded-md border border-slate-300 p-0.5 dark:border-slate-700">
       {RANGES.map((r) => (
         <button
           key={r.value}
@@ -172,8 +180,8 @@ function niceMax(max: number): number {
 function timeLabel(t: number, range: Range): string {
   const d = new Date(t * 1000);
   return range === "week"
-    ? d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-    : d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    ? d.toLocaleDateString(getLocale(), { day: "2-digit", month: "2-digit" })
+    : d.toLocaleTimeString(getLocale(), { hour: "2-digit", minute: "2-digit" });
 }
 
 export function TimeSeriesChart({
@@ -191,6 +199,7 @@ export function TimeSeriesChart({
   yMax?: number; // fixed top (e.g. 1 for percentages); otherwise from the data
   range: Range;
 }) {
+  const t = useT();
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(600);
   const [hover, setHover] = useState<number | null>(null);
@@ -245,7 +254,7 @@ export function TimeSeriesChart({
       <div ref={wrap} className="relative">
         {n === 0 ? (
           <div className="flex items-center justify-center text-xs text-slate-500" style={{ height: HEIGHT }}>
-            Sem dados no período (a VM estava desligada?)
+            {t("compute.viz.noData")}
           </div>
         ) : (
           <svg width={width} height={HEIGHT} role="img" aria-label={title} className="block">
@@ -291,7 +300,7 @@ export function TimeSeriesChart({
             style={x(hover) > width / 2 ? { right: width - x(hover) + 12 } : { left: x(hover) + 12 }}
           >
             <div className="mb-1 text-slate-500">
-              {new Date(times[hover] * 1000).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+              {new Date(times[hover] * 1000).toLocaleString(getLocale(), { dateStyle: "short", timeStyle: "short" })}
             </div>
             {series.map((s) => (
               <div key={s.name} className="flex items-center gap-2">

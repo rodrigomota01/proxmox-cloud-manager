@@ -10,11 +10,13 @@ import { ClusterStatus } from "@/components/cluster-status";
 import { PageHeader } from "@/components/page";
 import { ErrorBox } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 
 /** A connection is shown on its own page only while it has no node yet (never synced,
  * bad token) or when it is a real multi-node cluster. A single-server connection lives
  * in that server's page, under "Configuração". */
 export default function ConnectionPage() {
+  const t = useT();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const cluster = useQuery({
@@ -45,14 +47,14 @@ export default function ConnectionPage() {
         title={c.name}
         kind="cluster"
         status={<ClusterStatus status={c.status} />}
-        breadcrumbs={[{ label: "Infraestrutura" }, { label: "Hypervisors", href: "/admin/nodes" }, { label: c.name }]}
+        breadcrumbs={[{ label: t("nav.infrastructure") }, { label: t("nav.hypervisors"), href: "/admin/nodes" }, { label: c.name }]}
       >
         <p className="text-sm text-slate-600 dark:text-slate-400">
           {mine.length === 0 ? (
-            "Nenhum servidor sincronizado ainda. Confira o token e clique em Sincronizar."
+            t("infra.cluster.noServer")
           ) : (
             <>
-              Cluster com {mine.length} servidores:{" "}
+              {t("infra.cluster.servers", { count: mine.length })}{" "}
               {mine.map((n, i) => (
                 <span key={n.id}>
                   {i > 0 && ", "}

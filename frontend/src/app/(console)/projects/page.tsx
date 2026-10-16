@@ -7,6 +7,7 @@ import { NoTenant } from "@/components/no-tenant";
 import { Menu, PageHeader, ResourceIcon, SearchInput, Toolbar } from "@/components/page";
 import { Button, Card, Dialog, Empty, ErrorBox, Field, Input, formatDate, tbl } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 import { useProjects } from "@/lib/queries";
 import { usePermissions, useSession } from "@/lib/session";
 
@@ -22,6 +23,7 @@ function useInvalidate() {
 
 function NewProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const invalidate = useInvalidate();
+  const t = useT();
   const create = useMutation({
     mutationFn: async (body: Schemas["ProjectCreate"]) => unwrap(await api.POST("/api/v1/projects", { body })),
     onSuccess: () => {
@@ -30,7 +32,7 @@ function NewProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
     },
   });
   return (
-    <Dialog open={open} onClose={onClose} title="Novo projeto">
+    <Dialog open={open} onClose={onClose} title={t("access.projects.newProject")}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -43,22 +45,22 @@ function NewProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
         }}
         className="space-y-3"
       >
-        <Field label="Nome">
-          <Input name="name" required maxLength={100} placeholder="Produção" />
+        <Field label={t("access.common.name")}>
+          <Input name="name" required maxLength={100} placeholder={t("access.projects.namePlaceholder")} />
         </Field>
-        <Field label="Identificador" hint="Minúsculas, números e hífen. Não muda depois.">
-          <Input name="slug" required pattern="[a-z0-9]([a-z0-9\-]{0,30}[a-z0-9])?" placeholder="producao" />
+        <Field label={t("access.common.identifier")} hint={t("access.projects.slugHint")}>
+          <Input name="slug" required pattern="[a-z0-9]([a-z0-9\-]{0,30}[a-z0-9])?" placeholder={t("access.projects.slugPlaceholder")} />
         </Field>
-        <Field label="Descrição (opcional)">
+        <Field label={t("access.projects.descriptionOptional")}>
           <Input name="description" maxLength={1000} />
         </Field>
         <ErrorBox message={create.isError ? errorMessage(create.error) : null} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
+            {t("access.common.cancel")}
           </Button>
           <Button type="submit" disabled={create.isPending}>
-            Criar projeto
+            {t("access.projects.create")}
           </Button>
         </div>
       </form>
@@ -68,6 +70,7 @@ function NewProjectDialog({ open, onClose }: { open: boolean; onClose: () => voi
 
 function EditProjectDialog({ project, onClose }: { project: Project | null; onClose: () => void }) {
   const invalidate = useInvalidate();
+  const t = useT();
   const [confirm, setConfirm] = useState("");
   const update = useMutation({
     mutationFn: async (body: Schemas["ProjectUpdate"]) =>
@@ -91,7 +94,7 @@ function EditProjectDialog({ project, onClose }: { project: Project | null; onCl
     },
   });
   return (
-    <Dialog open={project !== null} onClose={onClose} title={`Projeto ${project?.name ?? ""}`}>
+    <Dialog open={project !== null} onClose={onClose} title={t("access.projects.projectTitle", { name: project?.name ?? "" })}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -100,28 +103,28 @@ function EditProjectDialog({ project, onClose }: { project: Project | null; onCl
         }}
         className="space-y-3"
       >
-        <Field label="Nome">
+        <Field label={t("access.common.name")}>
           <Input name="name" required maxLength={100} defaultValue={project?.name} />
         </Field>
-        <Field label="Descrição">
+        <Field label={t("access.common.description")}>
           <Input name="description" maxLength={1000} defaultValue={project?.description} />
         </Field>
         <ErrorBox message={update.isError ? errorMessage(update.error) : null} />
         <div className="flex justify-end">
           <Button type="submit" disabled={update.isPending}>
-            Salvar
+            {t("access.common.save")}
           </Button>
         </div>
       </form>
       <div className="mt-6 space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
-        <p className="text-sm font-medium text-rose-700 dark:text-rose-300">Excluir projeto</p>
+        <p className="text-sm font-medium text-rose-700 dark:text-rose-300">{t("access.projects.deleteTitle")}</p>
         <p className="text-xs text-slate-600 dark:text-slate-400">
-          Os acessos dados a este projeto são removidos. Digite <strong>{project?.slug}</strong> para confirmar.
+          {t("access.projects.deleteBefore")} <strong>{project?.slug}</strong> {t("access.projects.deleteAfter")}
         </p>
         <div className="flex gap-2">
           <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" />
           <Button variant="danger" disabled={confirm !== project?.slug || remove.isPending} onClick={() => remove.mutate()}>
-            Excluir
+            {t("access.common.delete")}
           </Button>
         </div>
         <ErrorBox message={remove.isError ? errorMessage(remove.error) : null} />
@@ -132,6 +135,7 @@ function EditProjectDialog({ project, onClose }: { project: Project | null; onCl
 
 export default function ProjectsPage() {
   const { tenantId, tenant } = useSession();
+  const t = useT();
   const projects = useProjects();
   const perms = usePermissions(tenantId ? `tenant:${tenantId}` : null);
   const [creating, setCreating] = useState(false);
@@ -148,37 +152,37 @@ export default function ProjectsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Projetos"
-        description={`Projetos organizam as VMs de ${tenant?.name ?? "cliente"}. Membros com acesso a um projeto só veem as VMs dele.`}
-        actions={canManage && <Button onClick={() => setCreating(true)}>Novo projeto</Button>}
+        title={t("access.projects.title")}
+        description={t("access.projects.description", { tenant: tenant?.name ?? t("access.projects.tenantFallback") })}
+        actions={canManage && <Button onClick={() => setCreating(true)}>{t("access.projects.newProject")}</Button>}
       />
       <ErrorBox message={projects.isError ? errorMessage(projects.error) : null} />
       <Card flush>
-        <Toolbar count={projects.data ? `${visible.length} de ${projects.data.length} projetos` : undefined}>
+        <Toolbar count={projects.data ? t("access.projects.count", { visible: visible.length, total: projects.data.length }) : undefined}>
           <SearchInput value={search} onChange={setSearch} />
         </Toolbar>
         {projects.data?.length === 0 ? (
           <Empty
-            title="Nenhum projeto"
+            title={t("access.projects.emptyTitle")}
             icon="folder"
-            action={canManage && <Button onClick={() => setCreating(true)}>Novo projeto</Button>}
+            action={canManage && <Button onClick={() => setCreating(true)}>{t("access.projects.newProject")}</Button>}
           >
-            Crie um projeto para agrupar as VMs.
+            {t("access.projects.empty")}
           </Empty>
         ) : projects.data && visible.length === 0 ? (
-          <Empty title="Nenhum resultado">Nenhum projeto corresponde ao filtro.</Empty>
+          <Empty title={t("access.common.noResults")}>{t("access.projects.noMatch")}</Empty>
         ) : (
           <div className={tbl.wrap}>
             <table className={tbl.table}>
               <thead className={tbl.thead}>
                 <tr>
-                  <th className={tbl.th}>Nome</th>
-                  <th className={tbl.th}>Identificador</th>
-                  <th className={tbl.th}>Descrição</th>
-                  <th className={tbl.th}>Criado em</th>
+                  <th className={tbl.th}>{t("access.common.name")}</th>
+                  <th className={tbl.th}>{t("access.common.identifier")}</th>
+                  <th className={tbl.th}>{t("access.common.description")}</th>
+                  <th className={tbl.th}>{t("access.common.createdAt")}</th>
                   {canManage && (
                     <th className={tbl.th}>
-                      <span className="sr-only">Ações</span>
+                      <span className="sr-only">{t("common.actions")}</span>
                     </th>
                   )}
                 </tr>
@@ -200,8 +204,8 @@ export default function ProjectsPage() {
                     {canManage && (
                       <td className={`${tbl.td} text-right`}>
                         <Menu
-                          ariaLabel={`Ações de ${p.name}`}
-                          items={[{ label: "Editar ou excluir", onClick: () => setEditing(p) }]}
+                          ariaLabel={t("access.common.actionsFor", { name: p.name })}
+                          items={[{ label: t("access.projects.editOrDelete"), onClick: () => setEditing(p) }]}
                         />
                       </td>
                     )}

@@ -6,11 +6,13 @@ import { useEffect, useState } from "react";
 
 import { Button, Dialog, ErrorBox, Field, Input, Spinner } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 import { useJob } from "@/lib/jobs";
 import { usePermissions } from "@/lib/session";
 
 /** Typing the name is the UI side of the `confirm` the API requires. */
 export function DeleteInstance({ instance }: { instance: Schemas["InstanceOut"] }) {
+  const t = useT();
   const router = useRouter();
   const perms = usePermissions(`project:${instance.project_id}`);
   const [open, setOpen] = useState(false);
@@ -46,10 +48,10 @@ export function DeleteInstance({ instance }: { instance: Schemas["InstanceOut"] 
   return (
     <>
       <Button variant="danger" onClick={() => setOpen(true)}>
-        Excluir
+        {t("compute.delete.delete")}
       </Button>
-      {job?.status === "failed" && <ErrorBox message={`Exclusão falhou: ${job.error_message}`} />}
-      <Dialog open={open} onClose={() => setOpen(false)} title="Excluir instância">
+      {job?.status === "failed" && <ErrorBox message={t("compute.delete.failed", { error: job.error_message ?? "" })} />}
+      <Dialog open={open} onClose={() => setOpen(false)} title={t("compute.delete.title")}>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -58,19 +60,18 @@ export function DeleteInstance({ instance }: { instance: Schemas["InstanceOut"] 
           className="space-y-4"
         >
           <p className="text-sm">
-            A VM <strong>{instance.name}</strong> e os discos dela serão apagados. Isso não pode ser
-            desfeito.
+            {t("compute.delete.bodyBefore")} <strong>{instance.name}</strong> {t("compute.delete.bodyAfter")}
           </p>
-          <Field label={`Digite "${instance.name}" para confirmar`}>
+          <Field label={t("compute.delete.typeToConfirm", { name: instance.name })}>
             <Input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
           </Field>
           <ErrorBox message={remove.isError ? errorMessage(remove.error) : null} />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
-              Cancelar
+              {t("compute.delete.cancel")}
             </Button>
             <Button type="submit" variant="danger" disabled={typed !== instance.name || remove.isPending}>
-              Excluir definitivamente
+              {t("compute.delete.confirm")}
             </Button>
           </div>
         </form>

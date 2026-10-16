@@ -1,14 +1,15 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Icon, type IconName } from "@/components/icons";
 import { LogoMark } from "@/components/logo";
-import { api, unwrap } from "@/lib/api/client";
+import { api, unwrap, type Schemas } from "@/lib/api/client";
 import { logout } from "@/lib/auth/session";
+import { LOCALES, useLocale, useT, type Locale } from "@/lib/i18n";
 import { useCostVisibility } from "@/lib/queries";
 import { SessionProvider, usePermissions, useSession } from "@/lib/session";
 
@@ -17,6 +18,7 @@ type NavGroup = { key: string; label: string; icon: IconName; items: NavItem[] }
 
 /** Navigation as the console groups it: one section per area, each item gated by role. */
 function useNav(): { top: NavItem & { icon: IconName }; groups: NavGroup[] } {
+  const t = useT();
   const { tenantId, isPlatformAdmin } = useSession();
   const perms = usePermissions(tenantId ? `tenant:${tenantId}` : null);
   const admin = isPlatformAdmin;
@@ -33,73 +35,73 @@ function useNav(): { top: NavItem & { icon: IconName }; groups: NavGroup[] } {
   const groups: NavGroup[] = [
     {
       key: "compute",
-      label: "Computação",
+      label: t("nav.compute"),
       icon: "monitor",
       items: [
-        { href: "/instances", label: "Máquinas virtuais" },
-        { href: "/ssh-keys", label: "Chaves SSH" },
-        ...(admin ? [{ href: "/admin/images", label: "Imagens" }] : []),
+        { href: "/instances", label: t("nav.vms") },
+        { href: "/ssh-keys", label: t("nav.sshKeys") },
+        ...(admin ? [{ href: "/admin/images", label: t("nav.images") }] : []),
       ],
     },
     {
       key: "k8s",
-      label: "Kubernetes",
+      label: t("nav.kubernetes"),
       icon: "kubernetes",
       items: [
-        ...(tenantId && (k8sLinked || admin) ? [{ href: "/kubernetes", label: admin ? "Clusters do cliente" : "Clusters" }] : []),
-        ...(admin ? [{ href: "/admin/kubernetes", label: "Todos os clusters" }] : []),
+        ...(tenantId && (k8sLinked || admin) ? [{ href: "/kubernetes", label: admin ? t("nav.tenantClusters") : t("nav.clusters") }] : []),
+        ...(admin ? [{ href: "/admin/kubernetes", label: t("nav.allClusters") }] : []),
       ],
     },
     {
       key: "observe",
-      label: "Observabilidade",
+      label: t("nav.observability"),
       icon: "bell",
       items: [
-        { href: "/alerts", label: "Alertas" },
-        { href: "/history", label: "Histórico" },
-        ...(admin ? [{ href: "/admin/alerts", label: "Regras de alerta" }] : []),
+        { href: "/alerts", label: t("nav.alerts") },
+        { href: "/history", label: t("nav.history") },
+        ...(admin ? [{ href: "/admin/alerts", label: t("nav.alertRules") }] : []),
       ],
     },
     {
       key: "billing",
-      label: admin || costs !== "usage" ? "Custos" : "Consumo",
+      label: admin || costs !== "usage" ? t("nav.costs") : t("nav.consumption"),
       icon: "coins",
       items: [
         // every tenant role sees the costs of its own projects (the page scopes them),
         // unless the client's costs are limited to usage or hidden
         ...(tenantId && costs && costs !== "none"
-          ? [{ href: "/costs", label: costs === "usage" ? "Uso de recursos" : "Custos e uso" }]
+          ? [{ href: "/costs", label: costs === "usage" ? t("nav.resourceUsage") : t("nav.costsAndUsage") }]
           : []),
-        ...(admin ? [{ href: "/admin/pricing", label: "Tabelas de preço" }] : []),
+        ...(admin ? [{ href: "/admin/pricing", label: t("nav.pricing") }] : []),
       ],
     },
     {
       key: "access",
-      label: admin ? "Clientes e acesso" : "Organização",
+      label: admin ? t("nav.clientsAndAccess") : t("nav.organization"),
       icon: "users",
       items: [
-        ...(admin ? [{ href: "/admin/tenants", label: "Clientes e quotas" }] : []),
-        ...(admin ? [{ href: "/admin/users", label: "Usuários" }] : []),
-        ...(tenantId ? [{ href: "/projects", label: "Projetos" }] : []),
-        ...(tenantId && perms.has("member:manage") ? [{ href: "/members", label: "Membros" }] : []),
+        ...(admin ? [{ href: "/admin/tenants", label: t("nav.clientsAndQuotas") }] : []),
+        ...(admin ? [{ href: "/admin/users", label: t("nav.users") }] : []),
+        ...(tenantId ? [{ href: "/projects", label: t("nav.projects") }] : []),
+        ...(tenantId && perms.has("member:manage") ? [{ href: "/members", label: t("nav.members") }] : []),
       ],
     },
     ...(admin
       ? [
           {
             key: "infra",
-            label: "Infraestrutura",
+            label: t("nav.infrastructure"),
             icon: "server" as const,
             items: [
-              { href: "/admin/nodes", label: "Hypervisors", also: ["/admin/clusters"] },
-              { href: "/admin/regions", label: "Regiões e zonas" },
+              { href: "/admin/nodes", label: t("nav.hypervisors"), also: ["/admin/clusters"] },
+              { href: "/admin/regions", label: t("nav.regionsAndZones") },
             ],
           },
         ]
       : []),
   ];
   return {
-    top: { href: "/dashboard", label: "Visão geral", icon: "dashboard" },
+    top: { href: "/dashboard", label: t("nav.overview"), icon: "dashboard" },
     groups: groups.filter((g) => g.items.length > 0),
   };
 }
@@ -123,14 +125,20 @@ function useAlertSummary() {
 }
 
 function AlertBell() {
+  const t = useT();
   const s = useAlertSummary();
   const firing = s?.firing ?? 0;
   return (
     <Link
       href="/alerts"
       className="relative rounded-md p-2 text-slate-300 hover:bg-white/10 hover:text-white"
-      aria-label={firing ? `${firing} alertas ativos${s?.critical ? `, ${s.critical} críticos` : ""}` : "Alertas"}
-      title="Alertas"
+      aria-label={
+        firing
+          ? t("header.activeAlerts", { count: firing }) +
+            (s?.critical ? t("header.criticalAlerts", { count: s.critical }) : "")
+          : t("header.alerts")
+      }
+      title={t("header.alerts")}
     >
       <Icon name="bell" className="h-5 w-5" />
       {firing > 0 && (
@@ -147,24 +155,25 @@ function AlertBell() {
 }
 
 function TenantSwitcher() {
+  const t = useT();
   const { tenants, tenantId, selectTenant } = useSession();
-  if (tenants.length === 0) return <span className="text-sm text-slate-400">Nenhum cliente</span>;
+  if (tenants.length === 0) return <span className="text-sm text-slate-400">{t("header.noClient")}</span>;
   return (
     <label className="flex min-w-0 items-center gap-2 text-sm">
-      <span className="hidden text-slate-400 sm:inline">Cliente</span>
+      <span className="hidden text-slate-400 sm:inline">{t("header.client")}</span>
       {tenants.length === 1 ? (
         <span className="truncate font-medium text-white">{tenants[0].name}</span>
       ) : (
         <span className="relative">
           <select
-            aria-label="Cliente ativo"
+            aria-label={t("header.activeClient")}
             value={tenantId ?? ""}
             onChange={(e) => selectTenant(e.target.value)}
             className="max-w-[14rem] appearance-none truncate rounded-md border border-white/15 bg-white/5 py-1.5 pr-8 pl-3 text-sm font-medium text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand-400 [&>option]:text-slate-900"
           >
-            {tenants.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
+            {tenants.map((tenant) => (
+              <option key={tenant.id} value={tenant.id}>
+                {tenant.name}
               </option>
             ))}
           </select>
@@ -177,7 +186,48 @@ function TenantSwitcher() {
   );
 }
 
+/** Saved on the account (PATCH /me), so it follows the user to other devices and e-mails. */
+function LanguageSwitch() {
+  const t = useT();
+  const { locale, setLocale } = useLocale();
+  const queryClient = useQueryClient();
+  const save = useMutation({
+    mutationFn: async (next: Locale) => unwrap(await api.PATCH("/api/v1/me", { body: { locale: next } })),
+    onSuccess: (_, next) => {
+      queryClient.setQueryData(["me"], (me: Schemas["MeResponse"] | undefined) => (me ? { ...me, locale: next } : me));
+      setLocale(next);
+    },
+  });
+  return (
+    <div className="flex items-center justify-between gap-2 px-4 py-2 text-sm" onClick={(e) => e.stopPropagation()}>
+      <span className="flex items-center gap-2">
+        <Icon name="globe" /> {t("common.language")}
+      </span>
+      <span className="flex overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+        {LOCALES.map((l) => (
+          <button
+            key={l.value}
+            type="button"
+            disabled={save.isPending}
+            aria-pressed={locale === l.value}
+            onClick={() => locale !== l.value && save.mutate(l.value)}
+            className={`px-2 py-0.5 text-xs ${
+              locale === l.value
+                ? "bg-brand-600 text-white"
+                : "hover:bg-slate-100 dark:hover:bg-slate-800"
+            }`}
+            title={l.label}
+          >
+            {l.value === "pt-BR" ? "PT" : "EN"}
+          </button>
+        ))}
+      </span>
+    </div>
+  );
+}
+
 function UserMenu() {
+  const t = useT();
   const router = useRouter();
   const { me, isPlatformAdmin } = useSession();
   const [open, setOpen] = useState(false);
@@ -222,18 +272,19 @@ function UserMenu() {
           <div className="border-b border-slate-100 px-4 py-2 dark:border-slate-800">
             <div className="truncate text-sm font-medium">{me.display_name}</div>
             <div className="truncate text-xs text-slate-500">{me.email}</div>
-            {isPlatformAdmin && <div className="mt-1 text-xs text-brand-600 dark:text-brand-400">Administrador da plataforma</div>}
+            {isPlatformAdmin && <div className="mt-1 text-xs text-brand-600 dark:text-brand-400">{t("header.platformAdmin")}</div>}
           </div>
           <Link role="menuitem" href="/perfil" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
-            <Icon name="user" /> Meu perfil
+            <Icon name="user" /> {t("header.myProfile")}
           </Link>
+          <LanguageSwitch />
           <button
             role="menuitem"
             type="button"
             onClick={signOut}
             className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
           >
-            <Icon name="logout" /> Sair
+            <Icon name="logout" /> {t("header.signOut")}
           </button>
         </div>
       )}
@@ -252,6 +303,7 @@ function readClosed(): string[] {
 }
 
 function Sidebar({ onNavigate }: { onNavigate: () => void }) {
+  const t = useT();
   const pathname = usePathname();
   const { top, groups } = useNav();
   const [closed, setClosed] = useState<string[]>([]);
@@ -274,7 +326,7 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
   const topActive = isActive(pathname, top);
 
   return (
-    <nav className="flex flex-col gap-1 py-3" aria-label="Navegação principal">
+    <nav className="flex flex-col gap-1 py-3" aria-label={t("nav.main")}>
       <Link href={top.href} onClick={onNavigate} className={`${linkCls(topActive)} pl-4`} aria-current={topActive ? "page" : undefined}>
         <Icon name={top.icon} className="h-[18px] w-[18px]" />
         {top.label}
@@ -324,6 +376,7 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const pathname = usePathname();
   // desktop: sidebar shown unless collapsed; mobile: hidden unless opened
   const [collapsed, setCollapsed] = useState(false);
@@ -339,7 +392,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             if (window.matchMedia("(min-width: 1024px)").matches) setCollapsed((c) => !c);
             else setMobileOpen((o) => !o);
           }}
-          aria-label="Mostrar ou ocultar navegação"
+          aria-label={t("nav.toggle")}
           className="rounded-md p-2 text-slate-300 hover:bg-white/10 hover:text-white"
         >
           <Icon name="menu" className="h-5 w-5" />
@@ -348,7 +401,7 @@ function Shell({ children }: { children: React.ReactNode }) {
           <LogoMark className="h-6 w-auto" />
           <span className="hidden leading-none sm:flex sm:flex-col">
             <span className="text-sm font-semibold uppercase tracking-wide">Cloud Manager</span>
-            <span className="mt-0.5 text-[0.55rem] font-medium uppercase tracking-[0.35em] text-sky-400">System</span>
+            <span className="mt-0.5 text-[0.55rem] font-medium uppercase tracking-[0.35em] text-accent-400">System</span>
           </span>
         </Link>
         <span className="hidden h-6 w-px bg-white/15 sm:block" />
@@ -363,7 +416,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         {mobileOpen && (
           <button
             type="button"
-            aria-label="Fechar navegação"
+            aria-label={t("nav.close")}
             onClick={() => setMobileOpen(false)}
             className="fixed inset-0 top-14 z-20 bg-slate-950/50 lg:hidden"
           />

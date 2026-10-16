@@ -16,25 +16,26 @@ import { Meter, mib, rate, uptime } from "@/components/viz";
 import { ActivityRow } from "@/components/activity";
 import { Badge, Card, Empty, ErrorBox, PowerBadge, StateBadge, formatDate } from "@/components/ui";
 import { api, errorMessage, unwrap } from "@/lib/api/client";
+import { useT, type MessageKey } from "@/lib/i18n";
 import { useProjectNames } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 
 const BUSY = ["provisioning", "deleting"];
 
-const TABS = [
-  { key: "overview", label: "Visão geral" },
-  { key: "metrics", label: "Métricas" },
-  { key: "history", label: "Histórico" },
-] as const;
+const TABS: readonly { key: "overview" | "metrics" | "history"; label: MessageKey }[] = [
+  { key: "overview", label: "compute.detail.tabOverview" },
+  { key: "metrics", label: "compute.detail.tabMetrics" },
+  { key: "history", label: "compute.detail.tabHistory" },
+];
 type Tab = (typeof TABS)[number]["key"];
 
-const CRUMBS = { label: "Máquinas virtuais", href: "/instances" };
-
 export default function InstanceDetailPage() {
+  const t = useT();
+  const crumbs = { label: t("nav.vms"), href: "/instances" };
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const params = useSearchParams();
-  const tab: Tab = TABS.some((t) => t.key === params.get("tab")) ? (params.get("tab") as Tab) : "overview";
+  const tab: Tab = TABS.some((x) => x.key === params.get("tab")) ? (params.get("tab") as Tab) : "overview";
   const { tenantId } = useSession();
   const projectNames = useProjectNames();
 
@@ -58,7 +59,7 @@ export default function InstanceDetailPage() {
   if (instance.isError) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Instância" breadcrumbs={[CRUMBS]} />
+        <PageHeader title={t("compute.detail.instance")} breadcrumbs={[crumbs]} />
         <ErrorBox message={errorMessage(instance.error)} />
       </div>
     );
@@ -72,7 +73,7 @@ export default function InstanceDetailPage() {
       <PageHeader
         title={i.name}
         kind={i.kind === "vm" ? "vm" : "container"}
-        breadcrumbs={[CRUMBS, { label: i.name }]}
+        breadcrumbs={[crumbs, { label: i.name }]}
         status={i.state === "active" ? <PowerBadge state={i.power_state} /> : <StateBadge state={i.state} />}
         actions={
           <>
@@ -80,84 +81,88 @@ export default function InstanceDetailPage() {
             <DeleteInstance instance={i} />
           </>
         }
-        tabs={TABS.map((t) => (t.key === "history" && jobs.data ? { ...t, count: jobs.data.length } : t))}
+        tabs={TABS.map((x) => ({
+          key: x.key,
+          label: t(x.label),
+          ...(x.key === "history" && jobs.data ? { count: jobs.data.length } : {}),
+        }))}
         activeTab={tab}
-        onTab={(t) => router.replace(t === "overview" ? `/instances/${id}` : `/instances/${id}?tab=${t}`)}
+        onTab={(k) => router.replace(k === "overview" ? `/instances/${id}` : `/instances/${id}?tab=${k}`)}
       />
 
       {tab === "overview" && (
         <div className="grid gap-4 lg:grid-cols-3">
-          <Card title="Detalhes" className="lg:col-span-2">
+          <Card title={t("compute.detail.details")} className="lg:col-span-2">
             <DescriptionList
               items={[
-                ["Nome", i.name],
-                ["Tipo", i.kind === "vm" ? "Máquina virtual" : "Container"],
-                ["Projeto", projectNames.get(i.project_id) ?? "—"],
-                ["Região / zona", i.region_name ? `${i.region_name} · ${i.zone_name}` : "—"],
-                ["vCPUs", i.vcpus],
-                ["Memória", `${(i.memory_mb / 1024).toFixed(1)} GiB`],
-                ["Discos", <VolumeList key="v" volumes={i.volumes} rootDiskGb={i.root_disk_gb} />],
+                [t("compute.detail.name"), i.name],
+                [t("compute.detail.kind"), i.kind === "vm" ? t("compute.detail.kindVm") : t("compute.detail.kindContainer")],
+                [t("compute.detail.project"), projectNames.get(i.project_id) ?? "—"],
+                [t("compute.detail.regionZone"), i.region_name ? `${i.region_name} · ${i.zone_name}` : "—"],
+                [t("compute.detail.vcpus"), i.vcpus],
+                [t("compute.detail.memory"), `${(i.memory_mb / 1024).toFixed(1)} GiB`],
+                [t("compute.detail.disks"), <VolumeList key="v" volumes={i.volumes} rootDiskGb={i.root_disk_gb} />],
                 [
-                  "IP",
+                  t("compute.detail.ip"),
                   <IpAddress key="ip" ip={i.ipv4} source={i.ipv4_source} gateway={i.gateway} detailed />,
                 ],
                 [
-                  "Tags",
+                  t("compute.detail.tags"),
                   i.tags.length ? (
                     <span className="flex flex-wrap gap-1">
-                      {i.tags.map((t) => (
-                        <Badge key={t}>{t}</Badge>
+                      {i.tags.map((tag) => (
+                        <Badge key={tag}>{tag}</Badge>
                       ))}
                     </span>
                   ) : (
                     "—"
                   ),
                 ],
-                ["Visto pela última vez", formatDate(i.last_seen_at)],
+                [t("compute.detail.lastSeen"), formatDate(i.last_seen_at)],
               ]}
             />
           </Card>
 
-          <Card title="Utilização" description={running ? "Agora" : undefined}>
+          <Card title={t("compute.detail.usage")} description={running ? t("compute.detail.now") : undefined}>
             {running ? (
               <DescriptionList
                 columns={1}
                 items={[
-                  ["CPU", <Meter key="c" value={i.cpu_usage} title="CPU" />],
+                  [t("compute.detail.cpu"), <Meter key="c" value={i.cpu_usage} title={t("compute.detail.cpu")} />],
                   [
-                    "Memória",
+                    t("compute.detail.memory"),
                     <Meter
                       key="m"
                       value={i.memory_mb ? i.memory_used_mb / i.memory_mb : 0}
                       label={`${mib(i.memory_used_mb)} / ${mib(i.memory_mb)}`}
-                      title="Memória"
+                      title={t("compute.detail.memory")}
                     />,
                   ],
-                  ["Disco usado", <DiskUsage key="d" disk={i.disk} detailed />],
+                  [t("compute.detail.diskUsed"), <DiskUsage key="d" disk={i.disk} detailed />],
                   [
-                    "Rede",
+                    t("compute.detail.network"),
                     <span key="n" className="tabular-nums">
                       ↓ {rate(i.net_in_bps)} · ↑ {rate(i.net_out_bps)}
                     </span>,
                   ],
-                  ["Ligada há", uptime(i.uptime_seconds)],
+                  [t("compute.detail.uptime"), uptime(i.uptime_seconds)],
                 ]}
               />
             ) : (
-              <Empty icon="power">Sem consumo: a instância não está ligada.</Empty>
+              <Empty icon="power">{t("compute.detail.notRunning")}</Empty>
             )}
           </Card>
 
           <Card
-            title="Operações recentes"
+            title={t("compute.detail.recentOps")}
             className="lg:col-span-3"
             actions={
               <Link href={`/instances/${id}?tab=history`} replace className="text-sm text-brand-600 hover:underline dark:text-brand-400">
-                Ver todas
+                {t("compute.detail.viewAll")}
               </Link>
             }
           >
-            {jobs.data?.length === 0 && <Empty icon="history">Nenhuma operação nesta instância.</Empty>}
+            {jobs.data?.length === 0 && <Empty icon="history">{t("compute.detail.noOps")}</Empty>}
             <ul className="divide-y divide-slate-100 dark:divide-slate-800">
               {jobs.data?.slice(0, 5).map((job) => (
                 <ActivityRow key={job.id} job={job} showResource={false} />
@@ -172,20 +177,20 @@ export default function InstanceDetailPage() {
           <InstanceMetrics instanceId={i.id} tenantId={tenantId} />
         ) : (
           <Card>
-            <Empty icon="dashboard">Métricas aparecem quando a instância estiver ativa.</Empty>
+            <Empty icon="dashboard">{t("compute.detail.metricsInactive")}</Empty>
           </Card>
         ))}
 
       {tab === "history" && (
         <Card
-          title="Histórico"
+          title={t("compute.detail.history")}
           actions={
             <Link href="/history" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
-              Histórico do cliente
+              {t("compute.detail.tenantHistory")}
             </Link>
           }
         >
-          {jobs.data?.length === 0 && <Empty icon="history">Nenhuma operação nesta instância.</Empty>}
+          {jobs.data?.length === 0 && <Empty icon="history">{t("compute.detail.noOps")}</Empty>}
           <ul className="divide-y divide-slate-100 dark:divide-slate-800">
             {jobs.data?.map((job) => (
               <ActivityRow key={job.id} job={job} showResource={false} />

@@ -8,6 +8,7 @@ import { Icon } from "@/components/icons";
 import { PageHeader } from "@/components/page";
 import { Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Input, Status, tbl } from "@/components/ui";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 
 type Region = Schemas["AdminRegionOut"];
 
@@ -22,6 +23,7 @@ function useInvalidate() {
 }
 
 function NewRegionDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const t = useT();
   const invalidate = useInvalidate();
   const create = useMutation({
     mutationFn: async (body: Schemas["RegionCreate"]) =>
@@ -32,7 +34,7 @@ function NewRegionDialog({ open, onClose }: { open: boolean; onClose: () => void
     },
   });
   return (
-    <Dialog open={open} onClose={onClose} title="Nova região">
+    <Dialog open={open} onClose={onClose} title={t("infra.regions.newRegion")}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -46,25 +48,25 @@ function NewRegionDialog({ open, onClose }: { open: boolean; onClose: () => void
         }}
         className="space-y-3"
       >
-        <Field label="Identificador" hint="Curto e estável, aparece na API. Ex.: br-sp, us-east, ca-central.">
+        <Field label={t("infra.regions.slug")} hint={t("infra.regions.slugHint")}>
           <Input name="slug" required pattern="[a-z0-9]([a-z0-9\-]{0,30}[a-z0-9])?" placeholder="br-sp" />
         </Field>
-        <Field label="Nome">
-          <Input name="name" required maxLength={100} placeholder="Brasil - São Paulo" />
+        <Field label={t("infra.common.name")}>
+          <Input name="name" required maxLength={100} placeholder={t("infra.regions.namePlaceholder")} />
         </Field>
-        <Field label="País (código ISO)" hint="BR, US, CA…">
+        <Field label={t("infra.regions.country")} hint="BR, US, CA…">
           <Input name="country_code" required maxLength={2} placeholder="BR" />
         </Field>
-        <Field label="Descrição (opcional)">
+        <Field label={t("infra.common.descriptionOptional")}>
           <Input name="description" maxLength={500} />
         </Field>
         <ErrorBox message={create.isError ? errorMessage(create.error) : null} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
+            {t("infra.common.cancel")}
           </Button>
           <Button type="submit" disabled={create.isPending}>
-            Criar região
+            {t("infra.regions.createRegion")}
           </Button>
         </div>
       </form>
@@ -73,6 +75,7 @@ function NewRegionDialog({ open, onClose }: { open: boolean; onClose: () => void
 }
 
 function NewZoneForm({ region }: { region: Region }) {
+  const t = useT();
   const invalidate = useInvalidate();
   const [open, setOpen] = useState(false);
   const create = useMutation({
@@ -91,7 +94,7 @@ function NewZoneForm({ region }: { region: Region }) {
   if (!open) {
     return (
       <Button variant="secondary" onClick={() => setOpen(true)}>
-        <Icon name="plus" /> Nova zona
+        <Icon name="plus" /> {t("infra.regions.newZone")}
       </Button>
     );
   }
@@ -104,17 +107,17 @@ function NewZoneForm({ region }: { region: Region }) {
       }}
       className="flex flex-wrap items-end gap-2"
     >
-      <Field label="Identificador">
+      <Field label={t("infra.regions.slug")}>
         <Input name="slug" required pattern="[a-z0-9]([a-z0-9\-]{0,30}[a-z0-9])?" placeholder="sp02-hv08" className="w-40" />
       </Field>
-      <Field label="Nome">
+      <Field label={t("infra.common.name")}>
         <Input name="name" required maxLength={100} placeholder="SP02 HV08" className="w-48" />
       </Field>
       <Button type="submit" disabled={create.isPending}>
-        Criar
+        {t("infra.common.create")}
       </Button>
       <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-        Cancelar
+        {t("infra.common.cancel")}
       </Button>
       {create.isError && <ErrorBox message={errorMessage(create.error)} />}
     </form>
@@ -123,6 +126,7 @@ function NewZoneForm({ region }: { region: Region }) {
 
 /** Name, country and description; the slug is fixed (servers and instances refer to it). */
 function EditRegionDialog({ region, onClose }: { region: Region | null; onClose: () => void }) {
+  const t = useT();
   const invalidate = useInvalidate();
   const save = useMutation({
     mutationFn: async (body: Schemas["RegionUpdate"]) =>
@@ -142,7 +146,7 @@ function EditRegionDialog({ region, onClose }: { region: Region | null; onClose:
     onClose();
   };
   return (
-    <Dialog open={region !== null} onClose={close} title="Editar região">
+    <Dialog open={region !== null} onClose={close} title={t("infra.regions.editRegion")}>
       {region && (
         <form
           key={region.id}
@@ -157,25 +161,25 @@ function EditRegionDialog({ region, onClose }: { region: Region | null; onClose:
           }}
           className="space-y-3"
         >
-          <Field label="Identificador" hint="Não muda: servidores e instâncias se referem a ele.">
+          <Field label={t("infra.regions.slug")} hint={t("infra.regions.slugFixed")}>
             <Input value={region.slug} disabled readOnly />
           </Field>
-          <Field label="Nome">
+          <Field label={t("infra.common.name")}>
             <Input name="name" required maxLength={100} defaultValue={region.name} autoFocus />
           </Field>
-          <Field label="País (código ISO)" hint="BR, US, CA…">
+          <Field label={t("infra.regions.country")} hint="BR, US, CA…">
             <Input name="country_code" required maxLength={2} defaultValue={region.country_code} />
           </Field>
-          <Field label="Descrição (opcional)">
+          <Field label={t("infra.common.descriptionOptional")}>
             <Input name="description" maxLength={500} defaultValue={region.description} />
           </Field>
           <ErrorBox message={save.isError ? errorMessage(save.error) : null} />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={close}>
-              Cancelar
+              {t("infra.common.cancel")}
             </Button>
             <Button type="submit" disabled={save.isPending}>
-              Salvar
+              {t("infra.common.save")}
             </Button>
           </div>
         </form>
@@ -186,6 +190,7 @@ function EditRegionDialog({ region, onClose }: { region: Region | null; onClose:
 
 /** Name and description; the slug is fixed (servers and instances refer to it). */
 function EditZoneDialog({ zone, onClose }: { zone: Schemas["AdminZoneOut"] | null; onClose: () => void }) {
+  const t = useT();
   const invalidate = useInvalidate();
   const save = useMutation({
     mutationFn: async (body: Schemas["ZoneUpdate"]) =>
@@ -205,7 +210,7 @@ function EditZoneDialog({ zone, onClose }: { zone: Schemas["AdminZoneOut"] | nul
     onClose();
   };
   return (
-    <Dialog open={zone !== null} onClose={close} title="Editar zona">
+    <Dialog open={zone !== null} onClose={close} title={t("infra.regions.editZone")}>
       {zone && (
         <form
           key={zone.id}
@@ -216,22 +221,22 @@ function EditZoneDialog({ zone, onClose }: { zone: Schemas["AdminZoneOut"] | nul
           }}
           className="space-y-3"
         >
-          <Field label="Identificador" hint="Não muda: servidores e instâncias se referem a ele.">
+          <Field label={t("infra.regions.slug")} hint={t("infra.regions.slugFixed")}>
             <Input value={zone.slug} disabled readOnly />
           </Field>
-          <Field label="Nome">
+          <Field label={t("infra.common.name")}>
             <Input name="name" required maxLength={100} defaultValue={zone.name} autoFocus />
           </Field>
-          <Field label="Descrição (opcional)">
+          <Field label={t("infra.common.descriptionOptional")}>
             <Input name="description" maxLength={500} defaultValue={zone.description} />
           </Field>
           <ErrorBox message={save.isError ? errorMessage(save.error) : null} />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={close}>
-              Cancelar
+              {t("infra.common.cancel")}
             </Button>
             <Button type="submit" disabled={save.isPending}>
-              Salvar
+              {t("infra.common.save")}
             </Button>
           </div>
         </form>
@@ -241,6 +246,7 @@ function EditZoneDialog({ zone, onClose }: { zone: Schemas["AdminZoneOut"] | nul
 }
 
 function ZoneToggle({ zone }: { zone: Schemas["AdminZoneOut"] }) {
+  const t = useT();
   const invalidate = useInvalidate();
   const toggle = useMutation({
     mutationFn: async () =>
@@ -254,12 +260,13 @@ function ZoneToggle({ zone }: { zone: Schemas["AdminZoneOut"] }) {
   });
   return (
     <Button variant="ghost" disabled={toggle.isPending} onClick={() => toggle.mutate()}>
-      {zone.active ? "Desativar" : "Ativar"}
+      {zone.active ? t("infra.regions.deactivate") : t("infra.regions.activate")}
     </Button>
   );
 }
 
 export default function RegionsPage() {
+  const t = useT();
   const [creating, setCreating] = useState(false);
   const [editingRegion, setEditingRegion] = useState<Region | null>(null);
   const [editingZone, setEditingZone] = useState<Schemas["AdminZoneOut"] | null>(null);
@@ -271,21 +278,20 @@ export default function RegionsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Regiões e zonas"
-        breadcrumbs={[{ label: "Infraestrutura" }, { label: "Regiões e zonas" }]}
+        title={t("nav.regionsAndZones")}
+        breadcrumbs={[{ label: t("nav.infrastructure") }, { label: t("nav.regionsAndZones") }]}
         description={
           <>
-            Os usuários escolhem região e zona ao criar instâncias; a plataforma escolhe o servidor dentro da
-            zona. Vincule servidores às zonas em{" "}
+            {t("infra.regions.descriptionBefore")}
             <Link href="/admin/nodes" className="text-brand-600 hover:underline dark:text-brand-400">
-              Hypervisors
-            </Link>{" "}
-            (aba Configuração de cada servidor).
+              {t("nav.hypervisors")}
+            </Link>
+            {t("infra.regions.descriptionAfter")}
           </>
         }
         actions={
           <Button onClick={() => setCreating(true)}>
-            <Icon name="plus" /> Nova região
+            <Icon name="plus" /> {t("infra.regions.newRegion")}
           </Button>
         }
       />
@@ -294,14 +300,14 @@ export default function RegionsPage() {
         <Card>
           <Empty
             icon="globe"
-            title="Nenhuma região"
+            title={t("infra.regions.emptyTitle")}
             action={
               <Button onClick={() => setCreating(true)}>
-                <Icon name="plus" /> Nova região
+                <Icon name="plus" /> {t("infra.regions.newRegion")}
               </Button>
             }
           >
-            Crie a primeira, por exemplo “br-sp”.
+            {t("infra.regions.emptyBody")}
           </Empty>
         </Card>
       )}
@@ -313,14 +319,14 @@ export default function RegionsPage() {
               <span aria-hidden>{FLAG[r.country_code] ?? "🌐"}</span>
               {r.name}
               <span className="font-mono text-xs font-normal text-slate-500">{r.slug}</span>
-              {!r.active && <Badge tone="red">inativa</Badge>}
+              {!r.active && <Badge tone="red">{t("infra.regions.inactiveBadge")}</Badge>}
             </span>
           }
-          description={`${r.zones.length} zona(s)`}
+          description={t(r.zones.length === 1 ? "infra.regions.zoneOne" : "infra.regions.zoneOther", { count: r.zones.length })}
           actions={
             <div className="flex flex-wrap items-end gap-2">
               <Button variant="ghost" onClick={() => setEditingRegion(r)}>
-                Editar região
+                {t("infra.regions.editRegion")}
               </Button>
               <NewZoneForm region={r} />
             </div>
@@ -328,15 +334,15 @@ export default function RegionsPage() {
           flush
         >
           {r.zones.length === 0 ? (
-            <Empty icon="globe">Nenhuma zona nesta região.</Empty>
+            <Empty icon="globe">{t("infra.regions.noZones")}</Empty>
           ) : (
             <div className={tbl.wrap}>
               <table className={tbl.table}>
                 <thead className={tbl.thead}>
                   <tr>
-                    <th className={tbl.th}>Zona</th>
-                    <th className={tbl.th}>Servidores</th>
-                    <th className={tbl.th}>Situação</th>
+                    <th className={tbl.th}>{t("infra.common.zone")}</th>
+                    <th className={tbl.th}>{t("infra.regions.servers")}</th>
+                    <th className={tbl.th}>{t("infra.common.situation")}</th>
                     <th className={tbl.th} />
                   </tr>
                 </thead>
@@ -350,16 +356,16 @@ export default function RegionsPage() {
                       <td className={tbl.td}>{z.clusters.length ? z.clusters.join(", ") : "—"}</td>
                       <td className={tbl.td}>
                         {!z.active ? (
-                          <Status tone="off">Inativa</Status>
+                          <Status tone="off">{t("infra.regions.inactive")}</Status>
                         ) : z.usable ? (
-                          <Status tone="ok">Recebe instâncias</Status>
+                          <Status tone="ok">{t("infra.regions.receivesInstances")}</Status>
                         ) : (
-                          <Status tone="warn">Sem servidor pronto</Status>
+                          <Status tone="warn">{t("infra.regions.noServerReady")}</Status>
                         )}
                       </td>
                       <td className={`${tbl.td} whitespace-nowrap text-right`}>
                         <Button variant="ghost" onClick={() => setEditingZone(z)}>
-                          Editar
+                          {t("infra.common.edit")}
                         </Button>
                         <ZoneToggle zone={z} />
                       </td>

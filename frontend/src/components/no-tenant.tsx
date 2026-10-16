@@ -3,26 +3,28 @@
 import Link from "next/link";
 
 import { Card } from "@/components/ui";
+import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 
 /** Users without memberships (e.g. a fresh platform admin) have no tenant to show. */
 export function NoTenant() {
+  const t = useT();
   const { isPlatformAdmin } = useSession();
   return (
-    <Card title="Nenhum tenant">
+    <Card title={t("compute.noTenant.title")}>
       <p className="text-sm text-slate-600 dark:text-slate-400">
-        Você ainda não é membro de nenhum tenant.
+        {t("compute.noTenant.body")}
         {isPlatformAdmin ? (
           <>
             {" "}
-            Como administrador da plataforma, comece pelos{" "}
+            {t("compute.noTenant.adminBefore")}{" "}
             <Link href="/admin/nodes" className="text-brand-600 hover:underline dark:text-brand-400">
-              hypervisors
+              {t("compute.noTenant.adminLink")}
             </Link>
             .
           </>
         ) : (
-          " Peça acesso a um administrador."
+          ` ${t("compute.noTenant.askAdmin")}`
         )}
       </p>
     </Card>

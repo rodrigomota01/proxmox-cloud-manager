@@ -13,6 +13,7 @@ import { PowerActions } from "@/components/power-actions";
 import { Badge, Button, Card, Empty, ErrorBox, PowerBadge, Select, StateBadge, tbl } from "@/components/ui";
 import { Meter, SortHeader, mib, uptime, useSorted } from "@/components/viz";
 import { api, errorMessage, unwrap, type Schemas } from "@/lib/api/client";
+import { useT } from "@/lib/i18n";
 import { useProjectNames, useProjects } from "@/lib/queries";
 import { useSession } from "@/lib/session";
 
@@ -24,6 +25,7 @@ type SortKey = "name" | "cpu" | "memory" | "uptime";
 const memRatio = (i: Instance) => (i.memory_mb ? i.memory_used_mb / i.memory_mb : 0);
 
 export default function InstancesPage() {
+  const t = useT();
   const { tenantId } = useSession();
   const projects = useProjects();
   const projectNames = useProjectNames();
@@ -76,7 +78,7 @@ export default function InstancesPage() {
   const create = (
     <Link href="/instances/new">
       <Button>
-        <Icon name="plus" /> Criar instância
+        <Icon name="plus" /> {t("compute.instances.create")}
       </Button>
     </Link>
   );
@@ -84,42 +86,42 @@ export default function InstancesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Máquinas virtuais"
-        description="VMs e containers do cliente, com estado, consumo atual e ações de energia."
+        title={t("compute.instances.title")}
+        description={t("compute.instances.description")}
         actions={create}
       />
 
       <ErrorBox message={list.isError ? errorMessage(list.error) : null} />
       <Card flush>
-        <Toolbar count={list.isSuccess ? `${items.length} ${items.length === 1 ? "item" : "itens"}` : undefined}>
-          <SearchInput value={search} onChange={setSearch} placeholder="Filtrar por nome ou IP…" />
-          <Select aria-label="Projeto" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-            <option value="">Todos os projetos</option>
+        <Toolbar count={list.isSuccess ? t(items.length === 1 ? "compute.instances.itemOne" : "compute.instances.itemOther", { count: items.length }) : undefined}>
+          <SearchInput value={search} onChange={setSearch} placeholder={t("compute.instances.searchPlaceholder")} />
+          <Select aria-label={t("compute.instances.project")} value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+            <option value="">{t("compute.instances.allProjects")}</option>
             {projects.data?.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
           </Select>
-          <Select aria-label="Tipo" value={kind} onChange={(e) => setKind(e.target.value as Kind | "")}>
-            <option value="">VMs e containers</option>
-            <option value="vm">VMs</option>
-            <option value="container">Containers</option>
+          <Select aria-label={t("compute.instances.kind")} value={kind} onChange={(e) => setKind(e.target.value as Kind | "")}>
+            <option value="">{t("compute.instances.allKinds")}</option>
+            <option value="vm">{t("compute.instances.vms")}</option>
+            <option value="container">{t("compute.instances.containers")}</option>
           </Select>
-          <Select aria-label="Estado" value={power} onChange={(e) => setPower(e.target.value as Power | "")}>
-            <option value="">Qualquer estado</option>
-            <option value="running">Ligadas</option>
-            <option value="stopped">Desligadas</option>
-            <option value="paused">Pausadas</option>
-            <option value="unknown">Desconhecido</option>
+          <Select aria-label={t("compute.instances.state")} value={power} onChange={(e) => setPower(e.target.value as Power | "")}>
+            <option value="">{t("compute.instances.anyState")}</option>
+            <option value="running">{t("compute.instances.running")}</option>
+            <option value="stopped">{t("compute.instances.stopped")}</option>
+            <option value="paused">{t("compute.instances.paused")}</option>
+            <option value="unknown">{t("compute.instances.unknown")}</option>
           </Select>
         </Toolbar>
         {list.isSuccess && items.length === 0 &&
           (filtered ? (
-            <Empty title="Nenhuma instância encontrada">Nenhuma instância corresponde aos filtros.</Empty>
+            <Empty title={t("compute.instances.noMatchTitle")}>{t("compute.instances.noMatch")}</Empty>
           ) : (
-            <Empty title="Nenhuma instância ainda" icon="monitor" action={create}>
-              Crie a primeira VM do cliente escolhendo região, imagem e tamanho.
+            <Empty title={t("compute.instances.emptyTitle")} icon="monitor" action={create}>
+              {t("compute.instances.empty")}
             </Empty>
           ))}
         {items.length > 0 && (
@@ -127,16 +129,16 @@ export default function InstancesPage() {
             <table className={tbl.table}>
               <thead className={tbl.thead}>
                 <tr>
-                  <SortHeader label="Nome" k="name" sort={sort} toggle={toggle} />
-                  <th className={tbl.th}>Status</th>
-                  <th className={tbl.th}>Zona</th>
-                  <SortHeader label="CPU" k="cpu" sort={sort} toggle={toggle} />
-                  <SortHeader label="Memória" k="memory" sort={sort} toggle={toggle} />
-                  <th className={`${tbl.th} text-right`}>Disco</th>
-                  <th className={tbl.th}>IP</th>
-                  <SortHeader label="Ligada há" k="uptime" sort={sort} toggle={toggle} align="right" />
+                  <SortHeader label={t("compute.instances.colName")} k="name" sort={sort} toggle={toggle} />
+                  <th className={tbl.th}>{t("compute.instances.colStatus")}</th>
+                  <th className={tbl.th}>{t("compute.instances.colZone")}</th>
+                  <SortHeader label={t("compute.instances.colCpu")} k="cpu" sort={sort} toggle={toggle} />
+                  <SortHeader label={t("compute.instances.colMemory")} k="memory" sort={sort} toggle={toggle} />
+                  <th className={`${tbl.th} text-right`}>{t("compute.instances.colDisk")}</th>
+                  <th className={tbl.th}>{t("compute.instances.colIp")}</th>
+                  <SortHeader label={t("compute.instances.colUptime")} k="uptime" sort={sort} toggle={toggle} align="right" />
                   <th className={tbl.th}>
-                    <span className="sr-only">Ações</span>
+                    <span className="sr-only">{t("common.actions")}</span>
                   </th>
                 </tr>
               </thead>
@@ -152,8 +154,8 @@ export default function InstancesPage() {
                             {i.name}
                           </Link>
                           {i.k8s_cluster_id && (
-                            <Link href={`/kubernetes/${i.k8s_cluster_id}`} title="Nó de um cluster Kubernetes: operado pelo cluster">
-                              <Badge tone="brand">nó k8s</Badge>
+                            <Link href={`/kubernetes/${i.k8s_cluster_id}`} title={t("compute.instances.k8sNodeHint")}>
+                              <Badge tone="brand">{t("compute.instances.k8sNode")}</Badge>
                             </Link>
                           )}
                         </div>
@@ -170,7 +172,7 @@ export default function InstancesPage() {
                       </td>
                       <td className={tbl.td}>
                         {running ? (
-                          <Meter value={i.cpu_usage} title={`CPU de ${i.name}`} />
+                          <Meter value={i.cpu_usage} title={t("compute.instances.cpuOf", { name: i.name })} />
                         ) : (
                           <span className="text-slate-400">—</span>
                         )}
@@ -180,7 +182,7 @@ export default function InstancesPage() {
                           <Meter
                             value={memRatio(i)}
                             label={`${mib(i.memory_used_mb)} / ${mib(i.memory_mb)}`}
-                            title={`Memória de ${i.name}`}
+                            title={t("compute.instances.memoryOf", { name: i.name })}
                           />
                         ) : (
                           <span className="text-slate-400">{mib(i.memory_mb)}</span>
@@ -206,7 +208,7 @@ export default function InstancesPage() {
         {list.hasNextPage && (
           <div className="border-t border-slate-200 py-3 text-center dark:border-slate-800">
             <Button variant="secondary" onClick={() => list.fetchNextPage()} disabled={list.isFetchingNextPage}>
-              Carregar mais
+              {t("compute.instances.loadMore")}
             </Button>
           </div>
         )}
