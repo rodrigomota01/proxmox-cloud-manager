@@ -10,8 +10,14 @@ entrou por senha ou por OIDC.
 | Token | Formato | TTL | Onde fica no browser | Revogação |
 |---|---|---|---|---|
 | Access | JWT assinado **EdDSA (Ed25519)**, `kid` no header | 10 min | **memória** (variável JS), enviado em `Authorization: Bearer` | Expira rápido; `sid` checado contra lista de sessões revogadas no Redis |
-| Refresh | Opaco, 256 bits, guardado como **hash SHA-256** em `refresh_tokens` | 12 h ociosa / 7 d absoluta | Cookie `cm_rt`: `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` | Rotação a cada uso; reuso → revoga a família inteira |
+| Refresh | Opaco, 256 bits, guardado como **hash SHA-256** em `refresh_tokens` | 2 h ociosa (`CM_REFRESH_IDLE_TTL_SECONDS`) / 7 d absoluta | Cookie `cm_rt`: `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` | Rotação a cada uso; reuso → revoga a família inteira |
 | Ticket de console/SSH | Opaco, uso único | 30 s | query string do WS | Consumido no upgrade (Redis `GETDEL`) |
+
+Inatividade: abas abertas fazem polling e renovam o access token sozinhas, então só o
+refresh nunca ficaria ocioso. O console conta a atividade do usuário (mouse, teclado,
+toque, rolagem; compartilhada entre abas) e encerra a sessão depois de
+`idle_timeout_seconds` (do `/me`, o mesmo `CM_REFRESH_IDLE_TTL_SECONDS`) sem nenhuma,
+voltando ao login com o aviso de sessão expirada.
 
 Claims do access token: `iss`, `aud=cloud-manager-api`, `sub` (user_id), `sid`,
 `iat`, `exp`, `jti`, `amr` (`["pwd"]`, `["pwd","otp"]`, `["oidc"]`). **Roles e tenants

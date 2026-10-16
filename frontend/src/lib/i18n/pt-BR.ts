@@ -60,6 +60,7 @@ export const ptBR = {
     passwordSet: "Senha definida. Você já pode entrar.",
     goToLogin: "Ir para o login",
     linkMissing: "Link inválido: abra o link recebido por e-mail.",
+    sessionExpired: "Sessão encerrada por inatividade. Entre novamente.",
   },
   nav: {
     main: "Navegação principal",

@@ -33,7 +33,10 @@ class Settings(BaseSettings):
     jwt_private_key: SecretStr | None = None  # Ed25519 PEM; `python -m app.cli gen-keys`
     jwt_issuer: str = "cloud-manager"
     access_token_ttl_seconds: int = 600
-    refresh_idle_ttl_seconds: int = 12 * 3600
+    # no user activity for this long ends the session: the console signs out on its own
+    # (open tabs keep polling, so the refresh alone would never go idle) and the refresh
+    # token stops working for a closed browser
+    refresh_idle_ttl_seconds: int = 2 * 3600
     refresh_absolute_ttl_seconds: int = 7 * 24 * 3600
     password_reset_ttl_seconds: int = 30 * 60
     invite_ttl_seconds: int = 72 * 3600

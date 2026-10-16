@@ -10,7 +10,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import { api, setActiveTenant, unwrap, type Schemas } from "@/lib/api/client";
-import { getAccessToken, onAuthChange, refresh } from "@/lib/auth/session";
+import { getAccessToken, logout, onAuthChange, refresh } from "@/lib/auth/session";
 import { isLocale, useLocale } from "@/lib/i18n";
 
 type Me = Schemas["MeResponse"];
@@ -76,6 +76,56 @@ function useAuthenticated(): boolean {
   return ready;
 }
 
+const ACTIVITY_KEY = "cm.lastActivity";
+const ACTIVITY_EVENTS = ["pointerdown", "pointermove", "keydown", "wheel", "scroll", "touchstart"];
+
+function lastActivityElsewhere(): number {
+  try {
+    return Number(window.localStorage.getItem(ACTIVITY_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Signs out after `limitSeconds` without user activity in any tab of this browser. Polling
+ * renews the tokens on its own, so only people count: pointer, keys, wheel, touch. */
+function useIdleSignOut(limitSeconds: number | undefined) {
+  useEffect(() => {
+    if (!limitSeconds) return;
+    const limit = limitSeconds * 1000;
+    let last = 0;
+    const mark = () => {
+      const now = Date.now();
+      if (now - last < 15_000) return; // shared across tabs: write at most every 15 s
+      last = now;
+      try {
+        window.localStorage.setItem(ACTIVITY_KEY, String(now));
+      } catch {
+        /* storage unavailable: this tab still tracks its own activity */
+      }
+    };
+    mark(); // opening the console counts
+    let done = false;
+    const check = async () => {
+      if (done || Date.now() - Math.max(last, lastActivityElsewhere()) < limit) return;
+      done = true;
+      await logout();
+      // a full load: nothing of the session stays in memory, and the regular "signed out"
+      // redirect cannot replace the idle notice
+      window.location.replace("/login?expired=idle");
+    };
+    const timer = window.setInterval(check, 30_000);
+    const onVisible = () => document.visibilityState === "visible" && check();
+    for (const e of ACTIVITY_EVENTS) window.addEventListener(e, mark, { passive: true });
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      for (const e of ACTIVITY_EVENTS) window.removeEventListener(e, mark);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [limitSeconds]);
+}
+
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const authenticated = useAuthenticated();
   const queryClient = useQueryClient();
@@ -98,6 +148,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     enabled: authenticated,
     staleTime: 60_000,
   });
+
+  useIdleSignOut(me.data?.idle_timeout_seconds);
 
   // the language saved on the account wins over this browser's
   const { setLocale } = useLocale();

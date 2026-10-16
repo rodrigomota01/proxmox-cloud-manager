@@ -150,7 +150,7 @@ async def jwks(settings: AppSettings) -> dict[str, list[dict[str, str]]]:
 
 
 @router.get("/me", tags=["me"])
-async def me(principal: CurrentPrincipal, db: DbSession) -> MeResponse:
+async def me(principal: CurrentPrincipal, db: DbSession, settings: AppSettings) -> MeResponse:
     user = await db.get(User, principal.user_id)
     if user is None or not user.is_active:
         raise NotFound()
@@ -173,6 +173,7 @@ async def me(principal: CurrentPrincipal, db: DbSession) -> MeResponse:
     ).scalars().all()
     return MeResponse(
         id=user.id, email=user.email, display_name=user.display_name, locale=user.locale,
+        idle_timeout_seconds=settings.refresh_idle_ttl_seconds,
         tenants=[
             TenantSummary(id=t.id, slug=t.slug, name=t.name, status=t.status) for t in tenants
         ],

@@ -58,5 +58,7 @@ class TenantSummary(BaseModel):
 
 class MeResponse(UserOut):
     locale: Locale
+    # the console signs out after this long without user activity
+    idle_timeout_seconds: int
     tenants: list[TenantSummary]
     platform_roles: list[str]

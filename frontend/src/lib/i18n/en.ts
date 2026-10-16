@@ -59,6 +59,7 @@ export const en: Messages = {
     passwordSet: "Password set. You can sign in now.",
     goToLogin: "Go to sign in",
     linkMissing: "Invalid link: open the link you received by e-mail.",
+    sessionExpired: "Session ended after inactivity. Please sign in again.",
   },
   nav: {
     main: "Main navigation",

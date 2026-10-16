@@ -136,6 +136,11 @@ async def test_locale_is_saved_on_the_user(client, alice):
     assert r.status_code == 422
 
 
+async def test_me_tells_the_console_the_idle_timeout(client, alice):
+    body = (await client.get("/api/v1/me", headers=_bearer(await _login(client)))).json()
+    assert body["idle_timeout_seconds"] == 2 * 3600
+
+
 @pytest.mark.parametrize(
     "header",
     ["", "Bearer", "Bearer not-a-jwt", "Basic Zm9vOmJhcg==",

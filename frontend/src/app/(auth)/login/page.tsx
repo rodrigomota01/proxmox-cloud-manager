@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
-import { Button, ErrorBox, Field, Input } from "@/components/ui";
+import { Alert, Button, ErrorBox, Field, Input } from "@/components/ui";
 import { login } from "@/lib/auth/session";
 import { useT } from "@/lib/i18n";
 
@@ -40,6 +40,7 @@ function LoginForm() {
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {params.get("expired") === "idle" && !error && <Alert variant="info" title={t("auth.sessionExpired")} />}
       <Field label={t("auth.email")}>
         <Input name="email" type="email" autoComplete="username" required autoFocus />
       </Field>

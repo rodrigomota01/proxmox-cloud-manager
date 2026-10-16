@@ -6358,6 +6358,10 @@
             "title": "Id",
             "type": "string"
           },
+          "idle_timeout_seconds": {
+            "title": "Idle Timeout Seconds",
+            "type": "integer"
+          },
           "locale": {
             "enum": [
               "pt-BR",
@@ -6386,6 +6390,7 @@
           "email",
           "display_name",
           "locale",
+          "idle_timeout_seconds",
           "tenants",
           "platform_roles"
         ],

@@ -4095,6 +4095,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /** Idle Timeout Seconds */
+            idle_timeout_seconds: number;
             /**
              * Locale
              * @enum {string}
