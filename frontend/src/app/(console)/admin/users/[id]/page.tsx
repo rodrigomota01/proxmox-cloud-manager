@@ -142,7 +142,7 @@ export default function AdminUserPage() {
         <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
           <span>{u.email}</span>
           {u.platform_roles.map((r) => (
-            <Badge key={r} tone="indigo">
+            <Badge key={r} tone="brand">
               {roleName(r)}
             </Badge>
           ))}

@@ -49,7 +49,7 @@ function LoginForm() {
         {busy ? "Entrando…" : "Entrar"}
       </Button>
       <p className="text-center text-sm">
-        <Link href="/forgot-password" className="text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link href="/forgot-password" className="text-brand-600 hover:underline dark:text-brand-400">
           Esqueci minha senha
         </Link>
       </p>

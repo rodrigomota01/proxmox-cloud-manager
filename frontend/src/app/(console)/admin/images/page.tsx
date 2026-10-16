@@ -234,7 +234,7 @@ export default function AdminImagesPage() {
                         </div>
                         {i.kubernetes_version && (
                           <div className="mt-1">
-                            <Badge tone="indigo">Kubernetes {i.kubernetes_version}</Badge>
+                            <Badge tone="brand">Kubernetes {i.kubernetes_version}</Badge>
                           </div>
                         )}
                       </td>

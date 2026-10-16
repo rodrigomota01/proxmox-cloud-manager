@@ -120,7 +120,7 @@ export function K8sAttentionPreview() {
     <Card
       title="Clusters Kubernetes que pedem atenção"
       actions={
-        <Link href="/admin/kubernetes" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link href="/admin/kubernetes" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
           Ver clusters
         </Link>
       }
@@ -128,7 +128,7 @@ export function K8sAttentionPreview() {
       <ul className="divide-y divide-slate-100 dark:divide-slate-800">
         {due.map((c) => (
           <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-            <Link href={`/admin/kubernetes/${c.id}`} className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+            <Link href={`/admin/kubernetes/${c.id}`} className="font-medium text-brand-600 hover:underline dark:text-brand-400">
               {c.name}
             </Link>
             <span className="flex flex-wrap items-center gap-2 text-slate-600 dark:text-slate-400">

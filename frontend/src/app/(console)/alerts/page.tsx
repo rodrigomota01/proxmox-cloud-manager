@@ -36,7 +36,7 @@ function PlatformAlerts() {
         actions={
           <>
             <ScopeToggle />
-            <Link href="/admin/alerts" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+            <Link href="/admin/alerts" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
               Regras e canais
             </Link>
           </>
@@ -82,7 +82,7 @@ function TenantAlerts({ tenantId }: { tenantId: string }) {
           <>
             <ScopeToggle />
             {perms.has("alert:manage") && (
-              <Link href="/alerts/settings" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+              <Link href="/alerts/settings" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
                 Regras e canais
               </Link>
             )}

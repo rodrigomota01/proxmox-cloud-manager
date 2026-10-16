@@ -194,7 +194,7 @@ export function IpamPanel({ clusterId, onGuest }: { clusterId: string; onGuest?:
                       onClick={() => setFilter(key)}
                       className={`rounded-full border px-2 py-0.5 ${
                         filter === key
-                          ? "border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"
+                          ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300"
                           : "border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                       }`}
                     >
@@ -237,7 +237,7 @@ export function IpamPanel({ clusterId, onGuest }: { clusterId: string; onGuest?:
                           {a.guest ? (
                             <>
                               {onGuest ? (
-                                <a href={onGuest(a.guest.id)} className="text-indigo-600 hover:underline dark:text-indigo-400">
+                                <a href={onGuest(a.guest.id)} className="text-brand-600 hover:underline dark:text-brand-400">
                                   {a.guest.name}
                                 </a>
                               ) : (

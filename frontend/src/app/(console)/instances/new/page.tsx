@@ -322,7 +322,7 @@ export default function NewInstancePage() {
             {keys.data?.length === 0 ? (
               <p className="text-sm">
                 Você ainda não tem chaves.{" "}
-                <Link href="/ssh-keys" className="text-indigo-600 hover:underline dark:text-indigo-400">
+                <Link href="/ssh-keys" className="text-brand-600 hover:underline dark:text-brand-400">
                   Adicione uma chave pública
                 </Link>{" "}
                 para acessar a instância.
@@ -367,7 +367,7 @@ export default function NewInstancePage() {
               ))}
             </dl>
             {estimate && estimate.running > 0 && (
-              <div className="mt-4 rounded-md bg-indigo-50 px-3 py-2 text-sm dark:bg-indigo-950/50">
+              <div className="mt-4 rounded-md bg-brand-50 px-3 py-2 text-sm dark:bg-brand-950/50">
                 <div className="text-xs text-slate-600 dark:text-slate-400">Custo estimado</div>
                 <div className="text-lg font-semibold tabular-nums">
                   {money(estimate.running, prices.data!.currency)}/mês

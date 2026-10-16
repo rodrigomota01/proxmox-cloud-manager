@@ -144,7 +144,7 @@ export function TenantCostPreview({ tenantId }: { tenantId: string }) {
     <Card
       title="Custos"
       actions={
-        <Link href="/costs" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link href="/costs" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
           Ver detalhes
         </Link>
       }
@@ -176,7 +176,7 @@ export function PlatformCostPreview() {
     <Card
       title="Custos de todos os clientes"
       actions={
-        <Link href="/costs" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link href="/costs" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
           Custo por cliente
         </Link>
       }

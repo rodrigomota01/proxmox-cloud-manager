@@ -84,7 +84,7 @@ export function UsagePanel({ usage, href }: { usage: Usage; href: (e: Entry) => 
                       <li key={e.id} className="grid grid-cols-[minmax(0,1fr)_minmax(9rem,14rem)] items-center gap-3 py-2 text-sm">
                         <div className="min-w-0">
                           {link ? (
-                            <Link href={link} className="truncate font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                            <Link href={link} className="truncate font-medium text-brand-600 hover:underline dark:text-brand-400">
                               {e.name}
                             </Link>
                           ) : (

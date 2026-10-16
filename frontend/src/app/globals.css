@@ -1,5 +1,35 @@
 @import "tailwindcss";
 
+/* Atena brand (https://atena.io): blue #0067CF / #39A1FC as the primary scale, amber
+   #FCB239 as the accent; Inter for text and headings, JetBrains Mono for technical data
+   (IPs, ids, sizes), both self-hosted by next/font. */
+@theme {
+  --color-brand-50: #eaf4ff;
+  --color-brand-100: #d3e8ff;
+  --color-brand-200: #a9d2ff;
+  --color-brand-300: #74b6fd;
+  --color-brand-400: #39a1fc;
+  --color-brand-500: #1683ea;
+  --color-brand-600: #0067cf;
+  --color-brand-700: #0053a8;
+  --color-brand-800: #064687;
+  --color-brand-900: #0b3b6f;
+  --color-brand-950: #08254a;
+
+  --color-accent-50: #fff8eb;
+  --color-accent-100: #feecc7;
+  --color-accent-200: #fdd88a;
+  --color-accent-300: #fdc55c;
+  --color-accent-400: #fcb239;
+  --color-accent-500: #f5981a;
+  --color-accent-600: #d97b0b;
+  --color-accent-700: #b45d0b;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 /* Data-viz tokens (validated: scripts/validate_palette.js against the card surfaces,
    white in light mode and slate-900 in dark mode). Text never takes series colors. */
 :root {

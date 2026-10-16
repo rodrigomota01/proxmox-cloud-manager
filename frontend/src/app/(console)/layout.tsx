@@ -160,7 +160,7 @@ function TenantSwitcher() {
             aria-label="Cliente ativo"
             value={tenantId ?? ""}
             onChange={(e) => selectTenant(e.target.value)}
-            className="max-w-[14rem] appearance-none truncate rounded-md border border-white/15 bg-white/5 py-1.5 pr-8 pl-3 text-sm font-medium text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-400 [&>option]:text-slate-900"
+            className="max-w-[14rem] appearance-none truncate rounded-md border border-white/15 bg-white/5 py-1.5 pr-8 pl-3 text-sm font-medium text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand-400 [&>option]:text-slate-900"
           >
             {tenants.map((t) => (
               <option key={t.id} value={t.id}>
@@ -208,7 +208,7 @@ function UserMenu() {
         aria-expanded={open}
         className="flex items-center gap-2 rounded-md py-1 pr-2 pl-1 text-sm text-slate-200 hover:bg-white/10"
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-xs font-semibold text-white">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-xs font-semibold text-white">
           {initials}
         </span>
         <span className="hidden max-w-[10rem] truncate md:inline">{me.display_name}</span>
@@ -222,7 +222,7 @@ function UserMenu() {
           <div className="border-b border-slate-100 px-4 py-2 dark:border-slate-800">
             <div className="truncate text-sm font-medium">{me.display_name}</div>
             <div className="truncate text-xs text-slate-500">{me.email}</div>
-            {isPlatformAdmin && <div className="mt-1 text-xs text-indigo-600 dark:text-indigo-400">Administrador da plataforma</div>}
+            {isPlatformAdmin && <div className="mt-1 text-xs text-brand-600 dark:text-brand-400">Administrador da plataforma</div>}
           </div>
           <Link role="menuitem" href="/perfil" className="flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
             <Icon name="user" /> Meu perfil
@@ -268,7 +268,7 @@ function Sidebar({ onNavigate }: { onNavigate: () => void }) {
   const linkCls = (active: boolean) =>
     `flex items-center gap-2 border-l-[3px] py-2 pr-3 text-sm transition-colors ${
       active
-        ? "border-indigo-400 bg-white/10 font-medium text-white"
+        ? "border-accent-400 bg-white/10 font-medium text-white"
         : "border-transparent text-slate-300 hover:bg-white/5 hover:text-white"
     }`;
   const topActive = isActive(pathname, top);

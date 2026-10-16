@@ -152,7 +152,7 @@ export default function InstanceDetailPage() {
             title="Operações recentes"
             className="lg:col-span-3"
             actions={
-              <Link href={`/instances/${id}?tab=history`} replace className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+              <Link href={`/instances/${id}?tab=history`} replace className="text-sm text-brand-600 hover:underline dark:text-brand-400">
                 Ver todas
               </Link>
             }
@@ -180,7 +180,7 @@ export default function InstanceDetailPage() {
         <Card
           title="Histórico"
           actions={
-            <Link href="/history" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+            <Link href="/history" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
               Histórico do cliente
             </Link>
           }

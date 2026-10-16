@@ -153,7 +153,7 @@ export default function InstancesPage() {
                           </Link>
                           {i.k8s_cluster_id && (
                             <Link href={`/kubernetes/${i.k8s_cluster_id}`} title="Nó de um cluster Kubernetes: operado pelo cluster">
-                              <Badge tone="indigo">nó k8s</Badge>
+                              <Badge tone="brand">nó k8s</Badge>
                             </Link>
                           )}
                         </div>

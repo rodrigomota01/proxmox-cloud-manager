@@ -27,7 +27,7 @@ export default function ForgotPasswordPage() {
     return (
       <div className="space-y-4 text-sm">
         <p>Se o e-mail estiver cadastrado, você receberá um link para redefinir a senha.</p>
-        <Link href="/login" className="text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link href="/login" className="text-brand-600 hover:underline dark:text-brand-400">
           Voltar ao login
         </Link>
       </div>
@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
         Enviar link
       </Button>
       <p className="text-center text-sm">
-        <Link href="/login" className="text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link href="/login" className="text-brand-600 hover:underline dark:text-brand-400">
           Voltar ao login
         </Link>
       </p>

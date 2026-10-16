@@ -262,7 +262,7 @@ export default function MembersPage() {
                       <td className={tbl.td}>
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium">{m.display_name}</span>
-                          {self && <Badge tone="indigo">você</Badge>}
+                          {self && <Badge tone="brand">você</Badge>}
                           {m.invited && <Badge tone="amber">convite pendente</Badge>}
                         </div>
                         <div className="text-xs text-slate-500">{m.email}</div>

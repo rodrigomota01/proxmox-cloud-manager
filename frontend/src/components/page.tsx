@@ -9,24 +9,29 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { Icon, type IconName } from "@/components/icons";
+import { ProxmoxMark } from "@/components/proxmox";
 
 // --- resource icon ---------------------------------------------------------------------
 
 const KINDS = {
-  vm: { label: "VM", className: "bg-indigo-600" },
+  vm: { label: "VM", className: "bg-brand-600" },
   container: { label: "CT", className: "bg-sky-600" },
   hypervisor: { label: "HV", className: "bg-slate-700 dark:bg-slate-600" },
   cluster: { label: "C", className: "bg-sky-700" },
   k8s: { label: "K8s", className: "bg-sky-600" },
   ns: { label: "NS", className: "bg-emerald-700" },
-  tenant: { label: "CLI", className: "bg-indigo-800" },
+  tenant: { label: "CLI", className: "bg-brand-800" },
   user: { label: "U", className: "bg-slate-600" },
-  project: { label: "PR", className: "bg-indigo-500" },
+  project: { label: "PR", className: "bg-brand-500" },
 } as const;
 export type ResourceKind = keyof typeof KINDS;
 
-/** Small colored tag naming the kind of resource, next to its name (like "VM", "NS"). */
+/** Small colored tag naming the kind of resource, next to its name (like "VM", "NS").
+ * Hypervisors and the connections to them show the Proxmox mark instead. */
 export function ResourceIcon({ kind, className = "" }: { kind: ResourceKind; className?: string }) {
+  if (kind === "hypervisor" || kind === "cluster") {
+    return <ProxmoxMark className={`h-5 w-5 ${className}`} />;
+  }
   const k = KINDS[kind];
   return (
     <span
@@ -44,7 +49,7 @@ export type Crumb = { label: string; href?: string };
 
 export type TabItem<K extends string = string> = { key: K; label: string; count?: number };
 
-/** Horizontal tabs with an indigo underline; the parent owns routing (usually ?tab=). */
+/** Horizontal tabs with a brand-colored underline; the parent owns routing (usually ?tab=). */
 export function Tabs<K extends string>({
   tabs,
   active,
@@ -66,7 +71,7 @@ export function Tabs<K extends string>({
           aria-current={active === t.key ? "page" : undefined}
           className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-[3px] px-3 pt-2 pb-2.5 text-sm transition-colors ${
             active === t.key
-              ? "border-indigo-600 font-semibold text-slate-900 dark:border-indigo-400 dark:text-white"
+              ? "border-brand-600 font-semibold text-slate-900 dark:border-brand-400 dark:text-white"
               : "border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-100"
           }`}
         >
@@ -122,7 +127,7 @@ export function PageHeader<K extends string>({
             <span key={`${c.label}-${i}`} className="flex items-center gap-1">
               {i > 0 && <Icon name="chevronRight" className="h-3.5 w-3.5 text-slate-400" />}
               {c.href ? (
-                <Link href={c.href} className="text-indigo-600 hover:underline dark:text-indigo-400">
+                <Link href={c.href} className="text-brand-600 hover:underline dark:text-brand-400">
                   {c.label}
                 </Link>
               ) : (
@@ -134,7 +139,7 @@ export function PageHeader<K extends string>({
       )}
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 space-y-1">
-          <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xl font-semibold tracking-tight">
+          <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 font-display text-2xl font-semibold tracking-tight">
             {kind && <ResourceIcon kind={kind} className="h-6 min-w-6 text-[11px]" />}
             <span className="min-w-0 break-words">{title}</span>
             {status && <span className="text-base font-normal">{status}</span>}
@@ -183,7 +188,7 @@ export function SearchInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-md border border-slate-300 bg-white py-1.5 pr-3 pl-8 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900"
+        className="w-full rounded-md border border-slate-300 bg-white py-1.5 pr-3 pl-8 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-900"
       />
     </label>
   );
@@ -240,7 +245,7 @@ export function StatTile({
         ? "text-amber-500 dark:text-amber-400"
         : tone === "ok"
           ? "text-emerald-600 dark:text-emerald-400"
-          : "text-indigo-600 dark:text-indigo-400";
+          : "text-brand-600 dark:text-brand-400";
   const body = (
     <div className="flex items-start gap-3">
       {icon && (
@@ -258,7 +263,7 @@ export function StatTile({
   const cls =
     "block rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900";
   return href ? (
-    <Link href={href} className={`${cls} transition-colors hover:border-indigo-300 dark:hover:border-indigo-700`}>
+    <Link href={href} className={`${cls} transition-colors hover:border-brand-300 dark:hover:border-brand-700`}>
       {body}
     </Link>
   ) : (

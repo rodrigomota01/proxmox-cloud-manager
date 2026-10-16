@@ -56,7 +56,7 @@ export default function ConnectionPage() {
               {mine.map((n, i) => (
                 <span key={n.id}>
                   {i > 0 && ", "}
-                  <Link href={`/admin/nodes/${n.id}`} className="text-indigo-600 hover:underline dark:text-indigo-400">
+                  <Link href={`/admin/nodes/${n.id}`} className="text-brand-600 hover:underline dark:text-brand-400">
                     {n.name}
                   </Link>
                 </span>

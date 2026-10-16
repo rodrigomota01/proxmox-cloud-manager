@@ -82,7 +82,7 @@ function PendingConnections({ nodes }: { nodes: Node[] }) {
       <ul className="mt-1 space-y-1.5">
         {pending.map((c) => (
           <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Link href={`/admin/clusters/${c.id}`} className="font-medium text-indigo-700 hover:underline dark:text-indigo-300">
+            <Link href={`/admin/clusters/${c.id}`} className="font-medium text-brand-700 hover:underline dark:text-brand-300">
               {c.name}
             </Link>
             <span className="font-mono text-xs opacity-75">{c.api_url}</span>
@@ -219,7 +219,8 @@ export default function NodesPage() {
                       const multi = (nodes.data ?? []).filter((x) => x.cluster_id === n.cluster_id).length > 1;
                       return (
                         <tr key={n.id} className={tbl.tr}>
-                          <td className={tbl.td}>
+                          {/* only where it is: Proxmox name, cluster, cores and memory are on its page */}
+                          <td className={`${tbl.td} whitespace-nowrap`}>
                             <div className="flex items-center gap-2">
                               <ResourceIcon kind="hypervisor" />
                               <Link href={`/admin/nodes/${n.id}`} className={tbl.link}>
@@ -227,8 +228,7 @@ export default function NodesPage() {
                               </Link>
                             </div>
                             <div className="mt-0.5 pl-7 text-xs text-slate-500">
-                              {n.region_name ? `${n.region_name} · ${n.zone_name}` : "sem zona"} ·{" "}
-                              {multi ? `cluster ${n.cluster_name}` : n.name} · {n.cpu_count} núcleos · {formatBytes(n.memory_bytes)}
+                              {n.region_name ? `${n.region_name} · ${n.zone_name}` : "sem zona"}
                             </div>
                           </td>
                           <td className={tbl.td}>

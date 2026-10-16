@@ -74,9 +74,9 @@ function TableEditor({ table }: { table: Schemas["PriceTableOut"] }) {
     <Card
       title={
         <span className="flex items-center gap-2">
-          <Icon name="tag" className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+          <Icon name="tag" className="h-4 w-4 text-brand-600 dark:text-brand-400" />
           {table.name}
-          {table.is_default && <Badge tone="indigo">padrão</Badge>}
+          {table.is_default && <Badge tone="brand">padrão</Badge>}
         </span>
       }
       description={

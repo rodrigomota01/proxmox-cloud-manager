@@ -69,7 +69,7 @@ export function AlertList({
       {alerts.map((a) => {
         const link = href(a);
         const name = link ? (
-          <Link href={link} className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+          <Link href={link} className="font-medium text-brand-600 hover:underline dark:text-brand-400">
             {a.resource_name}
           </Link>
         ) : (

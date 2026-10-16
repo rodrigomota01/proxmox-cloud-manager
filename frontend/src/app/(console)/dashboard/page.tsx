@@ -95,7 +95,7 @@ function ActiveAlerts({ scope }: { scope: { admin: boolean; tenantId: string } }
     <Card
       title="Alertas ativos"
       actions={
-        <Link href="/alerts" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link href="/alerts" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
           Ver todos
         </Link>
       }
@@ -182,7 +182,7 @@ function TenantDashboard({ tenantId }: { tenantId: string }) {
       <Card
         title="Operações recentes"
         actions={
-          <Link href="/history" className="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
+          <Link href="/history" className="text-sm text-brand-600 hover:underline dark:text-brand-400">
             Ver histórico completo
           </Link>
         }

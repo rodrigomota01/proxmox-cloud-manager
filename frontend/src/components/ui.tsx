@@ -8,12 +8,12 @@ import { Icon, type IconName } from "@/components/icons";
 type Variant = "primary" | "secondary" | "danger" | "ghost" | "link";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 disabled:bg-indigo-400",
+  primary: "bg-brand-600 text-white shadow-sm hover:bg-brand-500 disabled:bg-brand-400",
   secondary:
     "border border-slate-300 bg-white text-slate-800 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800",
   danger: "bg-rose-600 text-white hover:bg-rose-500 disabled:bg-rose-400",
   ghost: "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
-  link: "!px-0 text-indigo-600 hover:underline dark:text-indigo-400",
+  link: "!px-0 text-brand-600 hover:underline dark:text-brand-400",
 };
 
 export function Button({
@@ -23,7 +23,7 @@ export function Button({
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
       {...props}
     />
   );
@@ -32,7 +32,7 @@ export function Button({
 export function Input({ className = "", ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 ${className}`}
+      className={`w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 ${className}`}
       {...props}
     />
   );
@@ -44,7 +44,7 @@ export function Textarea({
 }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
-      className={`w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 ${className}`}
+      className={`w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 ${className}`}
       {...props}
     />
   );
@@ -53,7 +53,7 @@ export function Textarea({
 export function Select({ className = "", ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 ${className}`}
+      className={`rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-900 ${className}`}
       {...props}
     />
   );
@@ -117,7 +117,7 @@ const tones = {
   amber: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
   red: "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
   blue: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
-  indigo: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
+  brand: "bg-brand-100 text-brand-800 dark:bg-brand-900/40 dark:text-brand-300",
 };
 
 export function Badge({ tone = "gray", children }: { tone?: keyof typeof tones; children: React.ReactNode }) {
@@ -283,7 +283,7 @@ export const tbl = {
   tbody: "divide-y divide-slate-100 dark:divide-slate-800",
   tr: "align-middle hover:bg-slate-50 dark:hover:bg-slate-800/40",
   td: "px-4 py-3 first:pl-5 last:pr-5",
-  link: "font-medium text-indigo-600 hover:underline dark:text-indigo-400",
+  link: "font-medium text-brand-600 hover:underline dark:text-brand-400",
 };
 
 export function Spinner() {

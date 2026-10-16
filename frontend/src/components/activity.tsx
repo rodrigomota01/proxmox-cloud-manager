@@ -68,7 +68,7 @@ export function ActivityRow({ job, showResource = true }: { job: Job; showResour
               {isInstance && !gone ? (
                 <Link
                   href={`/instances/${job.resource_id}`}
-                  className="font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                  className="font-medium text-brand-600 hover:underline dark:text-brand-400"
                 >
                   {job.resource_name}
                 </Link>

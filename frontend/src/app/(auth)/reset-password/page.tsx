@@ -46,7 +46,7 @@ export default function ResetPasswordPage() {
     return (
       <div className="space-y-4 text-sm">
         <p>Senha definida. Você já pode entrar.</p>
-        <Link href="/login" className="text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link href="/login" className="text-brand-600 hover:underline dark:text-brand-400">
           Ir para o login
         </Link>
       </div>

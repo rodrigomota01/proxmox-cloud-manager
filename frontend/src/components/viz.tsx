@@ -140,7 +140,7 @@ export function RangePicker({ value, onChange }: { value: Range; onChange: (r: R
           onClick={() => onChange(r.value)}
           className={`rounded px-3 py-1 text-xs font-medium ${
             value === r.value
-              ? "bg-indigo-600 text-white"
+              ? "bg-brand-600 text-white"
               : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
           }`}
         >

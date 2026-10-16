@@ -759,7 +759,7 @@ export function K8sClusterDetail({ mode }: { mode: K8sMode }) {
           <span className="flex items-center gap-2">
             {d.managed && d.managed.state !== "active" ? <ManagedState c={d} /> : <HealthBadge s={s} />}
             {admin && d.source === "manual" && <Badge>manual</Badge>}
-            {d.source === "managed" && <Badge tone="indigo">criado pela plataforma</Badge>}
+            {d.source === "managed" && <Badge tone="brand">criado pela plataforma</Badge>}
           </span>
         }
         actions={
