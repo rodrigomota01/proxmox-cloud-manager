@@ -35,6 +35,7 @@ from app.inventory.guest_disk import poll_guest_disks
 from app.inventory.models import ProviderCluster, ProviderCredential
 from app.inventory.node_disks import poll_node_disks
 from app.inventory.reconciler import reconcile
+from app.inventory.versions import poll_versions
 from app.ipam.service import source_for
 from app.ipam.sync import poll_guest_config, sync_ipam
 from app.jobs import handlers  # noqa: F401 - registers job handlers
@@ -263,6 +264,7 @@ async def housekeeping_loop(
                 next_disk_poll = loop.time() + settings.guest_disk_interval_seconds
                 await poll_guest_disks(sessionmaker, registry, **fanout)
                 await poll_node_disks(sessionmaker, registry, **fanout)
+                await poll_versions(sessionmaker, registry, **fanout)
             if loop.time() >= next_ipam:
                 next_ipam = loop.time() + settings.ipam_sync_interval_seconds
                 await refresh_ipam(settings, sessionmaker, registry)

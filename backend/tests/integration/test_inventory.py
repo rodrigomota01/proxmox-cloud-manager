@@ -470,6 +470,22 @@ async def test_guest_polls_survive_a_sync_that_runs_meanwhile(
     assert [d["volume"] for d in vm.disks] == ["v0"]
 
 
+async def test_version_is_kept_current_without_a_connection_test(
+    client, ctx, app, registry, owner_db
+):
+    """Servers added without "Test connection" showed no version; an upgrade must show too."""
+    from app.inventory.versions import poll_versions
+
+    cid = await _cluster_with_creds(client, ctx["root"])
+    await reconcile_all(app.state.sessionmaker, registry)
+    await poll_versions(app.state.sessionmaker, registry)
+    cluster = (await owner_db.execute(select(ProviderCluster))).scalar_one()
+    assert cluster.version == "fake-1.0"
+    assert (await client.get(f"/api/v1/admin/clusters/{cid}", headers=ctx["root"])).json()[
+        "version"
+    ] == "fake-1.0"
+
+
 async def test_every_virtual_disk_and_physical_disks(client, ctx, app, registry, fake, owner_db):
     root = ctx["root"]
     await _cluster_with_creds(client, root)
