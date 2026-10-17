@@ -23,3 +23,4 @@ mudança de decisão gera um novo ADR que marca o anterior como *Substituído*.
 | [0016](0016-clusters-kubernetes.md) | Clusters Kubernetes: cópia da tabela legada, vencimento pelo certificado, kubeconfig selado e auditado | Aceito |
 | [0017](0017-kubernetes-observabilidade.md) | Kubernetes: saúde, carga, namespaces e workloads pela API de cada cluster, só leitura garantida no código | Aceito |
 | [0018](0018-criacao-de-clusters-kubernetes.md) | Criação de clusters Kubernetes: kubeadm em VMs da plataforma, instalação pelo guest agent, Cilium/MetalLB/cert-manager/local-path | Aceito |
+| [0019](0019-logs-de-pods.md) | Logs de pods: um pod ou o workload inteiro intercalado, lidos na hora do cluster, auditados, só admin da plataforma | Aceito |

@@ -599,6 +599,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/kubernetes/clusters/{cluster_id}/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pod Logs
+         * @description Logs of one or more pods, or of every pod of a workload, merged in time order.
+         *     Read from the cluster at each call and never stored; each read is audited (logs may
+         *     carry credentials).
+         */
+        get: operations["pod_logs_api_v1_admin_kubernetes_clusters__cluster_id__logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/kubernetes/clusters/{cluster_id}/tenant": {
         parameters: {
             query?: never;
@@ -3704,6 +3726,52 @@ export interface components {
             /** Kubeconfig */
             kubeconfig: string;
         };
+        /** K8sLogLineOut */
+        K8sLogLineOut: {
+            /** Pod */
+            pod: string;
+            /** Text */
+            text: string;
+            /** Ts */
+            ts: string | null;
+        };
+        /** K8sLogPodOut */
+        K8sLogPodOut: {
+            /** Container */
+            container: string | null;
+            /** Containers */
+            containers: string[];
+            /** Error */
+            error: string | null;
+            /** Lines */
+            lines: number;
+            /** Name */
+            name: string;
+            /** Partial */
+            partial: boolean;
+            /** Restarts */
+            restarts: number;
+            /** Status */
+            status: string | null;
+        };
+        /** K8sLogsOut */
+        K8sLogsOut: {
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
+            /** Lines */
+            lines: components["schemas"]["K8sLogLineOut"][];
+            /** Namespace */
+            namespace: string;
+            /** Pods */
+            pods: components["schemas"]["K8sLogPodOut"][];
+            /** Pods Truncated */
+            pods_truncated: boolean;
+            /** Workload */
+            workload: string | null;
+        };
         /** K8sManagedOut */
         K8sManagedOut: {
             /** Api Endpoint */
@@ -3819,6 +3887,11 @@ export interface components {
         };
         /** K8sPodOut */
         K8sPodOut: {
+            /**
+             * Containers
+             * @default []
+             */
+            containers?: string[];
             /** Cpu Usage */
             cpu_usage: number | null;
             /** Ip */
@@ -3843,6 +3916,8 @@ export interface components {
             started_at: string | null;
             /** Status */
             status: string;
+            /** Workload */
+            workload?: string | null;
         };
         /** K8sPoolOut */
         K8sPoolOut: {
@@ -6378,6 +6453,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["K8sClusterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pod_logs_api_v1_admin_kubernetes_clusters__cluster_id__logs_get: {
+        parameters: {
+            query: {
+                namespace: string;
+                /** @description Kind/name, e.g. Deployment/web */
+                workload?: string | null;
+                pod?: string[] | null;
+                container?: string | null;
+                tail_lines?: number;
+                since_seconds?: number | null;
+                previous?: boolean;
+            };
+            header?: never;
+            path: {
+                cluster_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["K8sLogsOut"];
                 };
             };
             /** @description Validation Error */

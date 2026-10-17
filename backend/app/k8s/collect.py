@@ -72,6 +72,20 @@ def _items(doc: dict[str, Any] | None) -> list[dict[str, Any]]:
     return (doc or {}).get("items") or []
 
 
+def pod_workload(meta: dict[str, Any]) -> str | None:
+    """"Kind/name" of what runs the pod. A Deployment's pods belong to a ReplicaSet named
+    `<deployment>-<pod-template-hash>`: the hash label gives the Deployment back."""
+    refs = meta.get("ownerReferences") or []
+    owner = next((r for r in refs if r.get("controller")), None) or next(iter(refs), None)
+    if not owner:
+        return None
+    kind, name = owner.get("kind"), owner.get("name") or ""
+    tpl_hash = (meta.get("labels") or {}).get("pod-template-hash")
+    if kind == "ReplicaSet" and tpl_hash and name.endswith(f"-{tpl_hash}"):
+        return f"Deployment/{name[: -len(tpl_hash) - 1]}"
+    return f"{kind}/{name}"
+
+
 def _requests(spec: dict[str, Any]) -> tuple[float, float]:
     cpu = mem = 0.0
     for c in spec.get("containers") or []:
@@ -278,6 +292,8 @@ async def collect(reader: K8sReader, now: datetime | None = None) -> Snapshot:
             "restarts": restarts, "owner": f"{owner.get('kind')}/{owner.get('name')}"
             if owner else None, "ip": status.get("podIP"),
             "started_at": status.get("startTime"), "cpu_usage": cpu_u, "mem_usage": mem_u,
+            "workload": pod_workload(meta),
+            "containers": [c.get("name") for c in spec.get("containers") or []],
         })
     if problems:
         reasons.append(f"{problems} pod(s) com problema")

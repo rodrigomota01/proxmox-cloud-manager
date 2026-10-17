@@ -356,3 +356,46 @@ async def test_cluster_linked_to_a_tenant_without_its_kubeconfig(client, app, en
     actions = (await owner_db.execute(
         select(AuditLog.action).where(AuditLog.action == "K8S_CLUSTER_TENANT"))).scalars().all()
     assert len(actions) == 2
+
+
+async def test_pod_logs_are_platform_only_and_audited(client, app, env, owner_db):
+    from tests.k8s_api import healthy_cluster, pod
+
+    await _sync(app, env)
+    api = healthy_cluster()
+    api["/api/v1/pods"]["items"] += [pod("shop", "api-7d9f-a", "n1", deployment="api"),
+                                     pod("shop", "api-7d9f-b", "n2", deployment="api")]
+    api["logs"] = {
+        ("shop", "api-7d9f-a", "app"): "2026-10-16T10:00:01Z GET /health 200\n",
+        ("shop", "api-7d9f-b", "app"): "2026-10-16T10:00:00Z started\n",
+    }
+    app.state.k8s_reader = _reader_factory({"prod.k8s.example": api})
+    prod = await owner_db.scalar(select(K8sCluster.id).where(K8sCluster.name == "prod"))
+    url = f"/api/v1/admin/kubernetes/clusters/{prod}/logs"
+
+    r = await client.get(url, params={"namespace": "shop", "workload": "Deployment/api"},
+                         headers=env["root"])
+    assert r.status_code == 200, r.text
+    assert [(x["pod"], x["text"]) for x in r.json()["lines"]] == [
+        ("api-7d9f-b", "started"), ("api-7d9f-a", "GET /health 200")]
+    r = await client.get(url, params={"namespace": "shop", "pod": ["api-7d9f-a"],
+                                      "tail_lines": 10}, headers=env["root"])
+    assert [p["name"] for p in r.json()["pods"]] == ["api-7d9f-a"]
+    details = (await owner_db.execute(
+        select(AuditLog.details).where(AuditLog.action == "K8S_POD_LOGS")
+        .order_by(AuditLog.id)
+    )).scalars().all()
+    assert [d["pods"] for d in details] == [["api-7d9f-a", "api-7d9f-b"], ["api-7d9f-a"]]
+    assert details[0]["workload"] == "Deployment/api" and details[0]["namespace"] == "shop"
+
+    assert (await client.get(url, params={"namespace": "shop", "pod": ["x"]},
+                             headers=env["alice"])).status_code == 403
+    for params in ({"namespace": "shop"},  # neither workload nor pod
+                   {"namespace": "shop", "workload": "web"},
+                   {"namespace": "../secrets", "pod": ["x"]},
+                   {"namespace": "shop", "pod": ["x"], "tail_lines": 99999}):
+        assert (await client.get(url, params=params, headers=env["root"])).status_code == 422
+    drift = await owner_db.scalar(select(K8sCluster.id).where(K8sCluster.name == "drift"))
+    r = await client.get(f"/api/v1/admin/kubernetes/clusters/{drift}/logs",
+                         params={"namespace": "shop", "pod": ["x"]}, headers=env["root"])
+    assert r.status_code == 503 and "connection refused" in r.json()["detail"]

@@ -8,6 +8,7 @@ k8s:delete / k8s:admin also create and delete clusters on the platform's VMs and
 download the kubeconfig of those (audited); never of a legacy or manual cluster.
 """
 
+import asyncio
 import base64
 import binascii
 import re
@@ -16,7 +17,7 @@ from datetime import UTC, date, datetime
 from typing import Annotated
 
 import yaml
-from fastapi import APIRouter, Header, Request, Response, status
+from fastapi import APIRouter, Header, Query, Request, Response, status
 from sqlalchemy import column, select, table
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,13 +32,15 @@ from app.api.deps import (
 )
 from app.audit import service as audit
 from app.compute.schemas import Accepted
-from app.core.errors import Conflict, NotFound, ValidationError
+from app.core.errors import Conflict, NotFound, ProviderUnavailableError, ValidationError
 from app.core.ids import uuid7
 from app.iam.authz import Scope, authorize, effective_permissions, projects_with_permission
 from app.images.models import Image
 from app.images.router import zones_by_image
 from app.infra.secrets import Sealed, SecretsBackend, SecretsError, unseal
 from app.jobs.presenter import job_out
+from app.k8s import logs
+from app.k8s.client import ForbiddenPath, K8sApiError
 from app.k8s.models import K8sCluster, K8sNodePool, K8sSnapshot
 from app.k8s.provision import K8sProvisioner
 from app.k8s.schemas import (
@@ -49,6 +52,7 @@ from app.k8s.schemas import (
     K8sClusterTenantPut,
     K8sImageOut,
     K8sKubeconfigPut,
+    K8sLogsOut,
     K8sManagedOut,
     K8sPoolOut,
     K8sProvision,
@@ -298,6 +302,16 @@ async def delete_cluster(cluster_id: uuid.UUID, principal: K8sAdmin, db: DbSessi
     await db.delete(cluster)
 
 
+def _kubeconfig(cluster: K8sCluster, request: Request) -> str:
+    if cluster.kubeconfig_ciphertext is None or cluster.dek_wrapped is None:
+        raise Conflict(cluster.kubeconfig_error or "This cluster has no kubeconfig")
+    return unseal(
+        _secrets(request),
+        Sealed(cluster.kubeconfig_ciphertext, cluster.dek_wrapped, cluster.kek_ref or ""),
+        aad=cluster.id.bytes,
+    )
+
+
 @router.get(
     "/clusters/{cluster_id}/kubeconfig",
     response_class=Response,
@@ -308,18 +322,63 @@ async def download_kubeconfig(
 ) -> Response:
     """The kubeconfig grants access to the cluster: every download is audited."""
     cluster = await _load(db, cluster_id)
-    if cluster.kubeconfig_ciphertext is None or cluster.dek_wrapped is None:
-        raise Conflict(cluster.kubeconfig_error or "This cluster has no kubeconfig")
-    text = unseal(
-        _secrets(request),
-        Sealed(cluster.kubeconfig_ciphertext, cluster.dek_wrapped, cluster.kek_ref or ""),
-        aad=cluster.id.bytes,
-    )
+    text = _kubeconfig(cluster, request)
     await audit.record(
         db, "K8S_KUBECONFIG_DOWNLOAD", actor_user_id=principal.user_id,
         resource_type="k8s_cluster", resource_id=cluster.id, details={"name": cluster.name},
     )
     return _kubeconfig_response(cluster.name, text)
+
+
+@router.get("/clusters/{cluster_id}/logs")
+async def pod_logs(
+    cluster_id: uuid.UUID,
+    request: Request,
+    principal: K8sAdmin,
+    db: DbSession,
+    namespace: str,
+    workload: Annotated[str | None, Query(description="Kind/name, e.g. Deployment/web")] = None,
+    pod: Annotated[list[str] | None, Query(max_length=logs.MAX_PODS)] = None,
+    container: str | None = None,
+    tail_lines: Annotated[int, Query(ge=1, le=logs.MAX_TAIL)] = logs.DEFAULT_TAIL,
+    since_seconds: Annotated[int | None, Query(ge=1, le=logs.MAX_SINCE)] = None,
+    previous: bool = False,
+) -> K8sLogsOut:
+    """Logs of one or more pods, or of every pod of a workload, merged in time order.
+    Read from the cluster at each call and never stored; each read is audited (logs may
+    carry credentials)."""
+    if bool(workload) == bool(pod):
+        raise ValidationError(errors=[{"field": "workload", "message": "workload or pod"}])
+    if workload and not re.fullmatch(r"[A-Za-z]+/[a-z0-9][-a-z0-9.]*", workload):
+        raise ValidationError(errors=[{"field": "workload", "message": "Kind/name"}])
+    cluster = await _load(db, cluster_id)
+    text = _kubeconfig(cluster, request)
+    query = logs.LogQuery(
+        namespace=namespace, workload=workload, pods=tuple(pod or ()), container=container,
+        tail_lines=tail_lines, since_seconds=since_seconds, previous=previous,
+    )
+    settings = request.app.state.settings
+    try:
+        async with asyncio.timeout(settings.k8s_poll_timeout_seconds):
+            async with request.app.state.k8s_reader(text) as reader:
+                out = await logs.read_logs(reader, query)
+    except ForbiddenPath as exc:
+        raise ValidationError(str(exc)) from None
+    except TimeoutError:
+        raise ProviderUnavailableError(
+            f"the cluster did not answer in {settings.k8s_poll_timeout_seconds:.0f}s"
+        ) from None
+    except K8sApiError as exc:
+        raise ProviderUnavailableError(str(exc)) from None
+    await audit.record(
+        db, "K8S_POD_LOGS", actor_user_id=principal.user_id, resource_type="k8s_cluster",
+        resource_id=cluster.id, details={
+            "name": cluster.name, "namespace": namespace, "workload": workload,
+            "pods": [p["name"] for p in out["pods"]], "container": container,
+            "previous": previous,
+        },
+    )
+    return K8sLogsOut(**out)
 
 
 # --- tenant ------------------------------------------------------------------------------

@@ -28,6 +28,7 @@ from app.infra.mailer import build_mailer
 from app.infra.secrets import SecretsError, build_secrets_backend
 from app.ipam import router as ipam
 from app.k8s import router as k8s
+from app.k8s.client import K8sReader
 from app.providers.registry import ProviderRegistry
 from app.regions import router as regions
 from app.sshkeys import router as sshkeys
@@ -74,6 +75,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
+    app.state.k8s_reader = K8sReader  # replaced by a fake API in tests
     app.add_middleware(RequestIdMiddleware)
     install_error_handlers(app)
 

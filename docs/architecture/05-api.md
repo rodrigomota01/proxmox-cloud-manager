@@ -204,6 +204,7 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | GET/DELETE | `/admin/kubernetes/clusters/{id}` | `cluster:manage` — detalhe (nós, namespaces, workloads, pods, services, ingresses); DELETE só de manuais ✅ |
 | PUT | `/admin/kubernetes/clusters/{id}/kubeconfig` | `cluster:manage` — troca o kubeconfig de um manual ✅ |
 | GET | `/admin/kubernetes/clusters/{id}/kubeconfig` | `cluster:manage` — download auditado, `no-store` ✅ |
+| GET | `/admin/kubernetes/clusters/{id}/logs` | `cluster:manage` — logs de um ou mais pods (`pod=`) ou de todos os pods de um workload (`workload=Kind/nome`), intercalados pelo horário; lidos na hora, nunca guardados, auditados (ADR-0019) ✅ |
 | PUT | `/admin/kubernetes/clusters/{id}/tenant` | `cluster:manage` — vincula o cluster a um tenant (`null` desvincula), auditado ✅ |
 | POST | `/admin/kubernetes/clusters/provision` | `cluster:manage` — cria um cluster nas VMs da plataforma para um cliente (`tenant_id`); bridge/VLAN só aqui (ADR-0018) ✅ |
 | POST | `/admin/kubernetes/clusters/{id}/destroy` | `cluster:manage` — `{confirm: nome}`; destrói um cluster criado pela plataforma com as VMs ✅ |

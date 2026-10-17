@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
-from app.k8s.client import ALLOWED_PATHS, ForbiddenPath
+from app.k8s.client import ALLOWED_PATHS, LOG_PARAMS, NAME, ForbiddenPath, K8sApiError
 
 NOW = datetime.now(UTC).replace(microsecond=0)  # the worker collects with the real clock
 
@@ -29,19 +29,29 @@ def node(name, *, ready=True, role="worker", memory_pressure=False):
 
 
 def pod(ns, name, node_name, *, phase="Running", waiting=None, created=NOW, restarts=0,
-        cpu="250m", memory="256Mi", env_secret=False):
-    container = {"name": "app", "image": "nginx:1.27",
-                 "resources": {"requests": {"cpu": cpu, "memory": memory}}}
+        cpu="250m", memory="256Mi", env_secret=False, deployment=None, containers=("app",),
+        annotations=None):
+    """`deployment`: owned like a Deployment's pod (ReplicaSet `<deployment>-7d9f` with the
+    matching pod-template-hash); otherwise by a ReplicaSet `<name>-rs`."""
+    specs = [{"name": c, "image": "nginx:1.27",
+              "resources": {"requests": {"cpu": cpu, "memory": memory}}} for c in containers]
     if env_secret:
-        container["env"] = [{"name": "DB_PASSWORD", "value": "hunter2"}]
+        specs[0]["env"] = [{"name": "DB_PASSWORD", "value": "hunter2"}]
     status = {"phase": phase, "podIP": "10.244.0.5", "startTime": _iso(created),
               "containerStatuses": [{"ready": phase == "Running" and not waiting,
                                      "restartCount": restarts,
                                      "state": {"waiting": {"reason": waiting}} if waiting
                                      else {"running": {}}}]}
-    return {"metadata": {"namespace": ns, "name": name, "creationTimestamp": _iso(created),
-                         "ownerReferences": [{"kind": "ReplicaSet", "name": f"{name}-rs"}]},
-            "spec": {"nodeName": node_name, "containers": [container]}, "status": status}
+    meta = {"namespace": ns, "name": name, "creationTimestamp": _iso(created),
+            "ownerReferences": [{"kind": "ReplicaSet", "name": f"{name}-rs"}]}
+    if deployment:
+        meta["labels"] = {"pod-template-hash": "7d9f"}
+        meta["ownerReferences"] = [{"kind": "ReplicaSet", "name": f"{deployment}-7d9f",
+                                    "controller": True}]
+    if annotations:
+        meta["annotations"] = annotations
+    return {"metadata": meta, "spec": {"nodeName": node_name, "containers": specs},
+            "status": status}
 
 
 def gateway(ns, name, *, address="198.51.100.9"):
@@ -157,6 +167,26 @@ class FakeReader:
         if path not in self.api:
             if optional:
                 return None
-            from app.k8s.client import K8sApiError
             raise K8sApiError(f"GET {path}: HTTP 404")
         return self.api[path]
+
+    async def namespace_pods(self, namespace: str):
+        if not NAME.fullmatch(namespace):
+            raise ForbiddenPath(namespace)
+        self.calls.append(f"pods:{namespace}")
+        items = (self.api.get("/api/v1/pods") or {}).get("items") or []
+        return {"items": [p for p in items if p["metadata"]["namespace"] == namespace]}
+
+    async def pod_log(self, namespace: str, pod: str, params: dict[str, str], *, max_bytes: int):
+        """api["logs"][(namespace, pod, container)]: the full log (timestamped lines), or
+        an exception to raise; the tail is applied here like the kubelet does."""
+        assert params.keys() <= LOG_PARAMS and params.get("timestamps") == "true"
+        self.calls.append(("log", namespace, pod, dict(params)))
+        log = (self.api.get("logs") or {}).get((namespace, pod, params.get("container")))
+        if isinstance(log, Exception):
+            raise log
+        if log is None:
+            raise K8sApiError(f'container "{params.get("container")}" in pod "{pod}" '
+                              "is waiting to start: ContainerCreating")
+        lines = log.splitlines()[-int(params["tailLines"]):]
+        return "".join(f"{line}\n" for line in lines), False

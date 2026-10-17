@@ -21,6 +21,8 @@ import {
   rich,
   UsageMeter,
 } from "@/components/k8s";
+import { Icon } from "@/components/icons";
+import { type LogTarget, PodLogs } from "@/components/k8s-logs";
 import { Menu, PageHeader, ResourceIcon, SearchInput, StatTile, Toolbar } from "@/components/page";
 import { Alert, Badge, Button, Card, Dialog, Empty, ErrorBox, Field, Select, Status, Textarea, tbl } from "@/components/ui";
 import { SortHeader, useSorted } from "@/components/viz";
@@ -346,7 +348,19 @@ function Namespaces({ d, pick }: { d: Detail; pick: (ns: string) => void }) {
   );
 }
 
-function Workloads({ d, ns, nsSelect }: { d: Detail; ns: string; nsSelect: React.ReactNode }) {
+type OnLogs = ((target: LogTarget) => void) | undefined;
+
+function LogsButton({ onClick }: { onClick: () => void }) {
+  const t = useT();
+  return (
+    <Button variant="secondary" className="!px-2 !py-1 text-xs whitespace-nowrap" onClick={onClick}>
+      <Icon name="logs" className="h-3.5 w-3.5" />
+      {t("k8s.logs.button")}
+    </Button>
+  );
+}
+
+function Workloads({ d, ns, nsSelect, onLogs }: { d: Detail; ns: string; nsSelect: React.ReactNode; onLogs: OnLogs }) {
   const t = useT();
   const [q, setQ] = useState("");
   const inNs = d.workloads.filter((w) => !ns || w.namespace === ns);
@@ -369,6 +383,7 @@ function Workloads({ d, ns, nsSelect }: { d: Detail; ns: string; nsSelect: React
                 <th className={`${th} text-right`}>{t("k8s.detail.readyReplicas")}</th>
                 <th className={th}>{t("k8s.detail.images")}</th>
                 <th className={th}>{t("k8s.common.age")}</th>
+                {onLogs && <th className={th} />}
               </tr>
             </thead>
             <tbody className={tbody}>
@@ -391,6 +406,11 @@ function Workloads({ d, ns, nsSelect }: { d: Detail; ns: string; nsSelect: React
                   </td>
                   <td className={`${td} max-w-[24rem] font-mono text-xs text-slate-600 dark:text-slate-400`}>{w.images.join(", ")}</td>
                   <td className={`${td} text-xs text-slate-500`}>{age(w.created_at)}</td>
+                  {onLogs && (
+                    <td className={`${td} text-right`}>
+                      <LogsButton onClick={() => onLogs({ namespace: w.namespace, workload: `${w.kind}/${w.name}`, pod: null })} />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -401,7 +421,7 @@ function Workloads({ d, ns, nsSelect }: { d: Detail; ns: string; nsSelect: React
   );
 }
 
-function Pods({ d, ns, nsSelect }: { d: Detail; ns: string; nsSelect: React.ReactNode }) {
+function Pods({ d, ns, nsSelect, onLogs }: { d: Detail; ns: string; nsSelect: React.ReactNode; onLogs: OnLogs }) {
   const t = useT();
   const [onlyProblems, setOnlyProblems] = useState(false);
   const [q, setQ] = useState("");
@@ -438,6 +458,7 @@ function Pods({ d, ns, nsSelect }: { d: Detail; ns: string; nsSelect: React.Reac
                 <th className={`${th} text-right`}>{t("k8s.common.memory")}</th>
                 <th className={th}>{t("k8s.detail.node")}</th>
                 <th className={th}>{t("k8s.common.age")}</th>
+                {onLogs && <th className={th} />}
               </tr>
             </thead>
             <tbody className={tbody}>
@@ -475,6 +496,11 @@ function Pods({ d, ns, nsSelect }: { d: Detail; ns: string; nsSelect: React.Reac
                   <td className={`${td} text-right tabular-nums`}>{bytes(p.mem_usage)}</td>
                   <td className={`${td} text-xs text-slate-600 dark:text-slate-400`}>{p.node ?? "—"}</td>
                   <td className={`${td} text-xs text-slate-500`}>{age(p.started_at)}</td>
+                  {onLogs && (
+                    <td className={`${td} text-right`}>
+                      <LogsButton onClick={() => onLogs({ namespace: p.namespace, workload: p.workload ?? null, pod: p.name })} />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -737,6 +763,8 @@ export function K8sClusterDetail({ mode }: { mode: K8sMode }) {
     refetchInterval: 30_000,
   });
   const d = cluster.data;
+  const [logs, setLogs] = useState<LogTarget | null>(null);
+  const onLogs: OnLogs = admin ? setLogs : undefined;
   const namespaces = useMemo(() => (d?.namespaces ?? []).map((n) => n.name).sort(), [d]);
 
   const crumbs = [
@@ -826,10 +854,21 @@ export function K8sClusterDetail({ mode }: { mode: K8sMode }) {
 
       {tab === "overview" && <Overview d={d} />}
       {tab === "namespaces" && <Namespaces d={d} pick={(n) => go({ tab: "pods", ns: n })} />}
-      {tab === "workloads" && <Workloads d={d} ns={ns} nsSelect={nsSelect} />}
-      {tab === "pods" && <Pods d={d} ns={ns} nsSelect={nsSelect} />}
+      {tab === "workloads" && <Workloads d={d} ns={ns} nsSelect={nsSelect} onLogs={onLogs} />}
+      {tab === "pods" && <Pods d={d} ns={ns} nsSelect={nsSelect} onLogs={onLogs} />}
       {tab === "services" && <Services d={d} ns={ns} nsSelect={nsSelect} />}
       {tab === "routes" && <Routes d={d} ns={ns} nsSelect={nsSelect} />}
+      {logs && (
+        <PodLogs
+          key={`${logs.namespace}/${logs.workload}/${logs.pod}`}
+          clusterId={d.id}
+          target={logs}
+          workloadPods={
+            logs.workload ? d.pods.filter((p) => p.namespace === logs.namespace && p.workload === logs.workload).map((p) => p.name) : []
+          }
+          onClose={() => setLogs(null)}
+        />
+      )}
     </div>
   );
 }

@@ -156,6 +156,9 @@ class K8sPodOut(BaseModel):
     started_at: str | None
     cpu_usage: float | None
     mem_usage: float | None
+    # absent from snapshots taken before the logs screen
+    workload: str | None = None
+    containers: list[str] = []
 
 
 class K8sServiceOut(BaseModel):
@@ -307,6 +310,32 @@ class K8sImageOut(BaseModel):
     kubernetes_version: str
     min_disk_gb: int
     zone_ids: list[uuid.UUID]
+
+
+class K8sLogPodOut(BaseModel):
+    name: str
+    status: str | None  # phase
+    restarts: int
+    containers: list[str]
+    container: str | None  # the one read; None when the request named one it lacks
+    lines: int
+    partial: bool  # stopped at the size limit: the oldest lines of the tail are missing
+    error: str | None  # the cluster's refusal, e.g. "container ... is waiting to start"
+
+
+class K8sLogLineOut(BaseModel):
+    ts: str | None
+    pod: str
+    text: str
+
+
+class K8sLogsOut(BaseModel):
+    namespace: str
+    workload: str | None
+    pods: list[K8sLogPodOut]
+    pods_truncated: bool  # the workload has more pods than are read at once
+    lines: list[K8sLogLineOut]  # every pod, in time order, the latest `tail_lines`
+    fetched_at: datetime
 
 
 K8sClusterOut.model_rebuild()

@@ -304,11 +304,13 @@ export function Dialog({
   open,
   onClose,
   title,
+  wide = false,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -322,7 +324,7 @@ export function Dialog({
     <dialog
       ref={ref}
       onClose={onClose}
-      className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+      className={`m-auto w-full ${wide ? "max-w-6xl" : "max-w-lg"} rounded-lg border border-slate-200 bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-900/40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100`}
     >
       <div className="flex items-center justify-between gap-3 px-5 pt-5 pb-2">
         <h2 className="text-lg font-semibold">{title}</h2>

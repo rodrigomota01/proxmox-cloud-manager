@@ -5165,6 +5165,160 @@
         "title": "K8sKubeconfigPut",
         "type": "object"
       },
+      "K8sLogLineOut": {
+        "properties": {
+          "pod": {
+            "title": "Pod",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "ts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ts"
+          }
+        },
+        "required": [
+          "ts",
+          "pod",
+          "text"
+        ],
+        "title": "K8sLogLineOut",
+        "type": "object"
+      },
+      "K8sLogPodOut": {
+        "properties": {
+          "container": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Container"
+          },
+          "containers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Containers",
+            "type": "array"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "lines": {
+            "title": "Lines",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "partial": {
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "restarts": {
+            "title": "Restarts",
+            "type": "integer"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "restarts",
+          "containers",
+          "container",
+          "lines",
+          "partial",
+          "error"
+        ],
+        "title": "K8sLogPodOut",
+        "type": "object"
+      },
+      "K8sLogsOut": {
+        "properties": {
+          "fetched_at": {
+            "format": "date-time",
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/K8sLogLineOut"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "namespace": {
+            "title": "Namespace",
+            "type": "string"
+          },
+          "pods": {
+            "items": {
+              "$ref": "#/components/schemas/K8sLogPodOut"
+            },
+            "title": "Pods",
+            "type": "array"
+          },
+          "pods_truncated": {
+            "title": "Pods Truncated",
+            "type": "boolean"
+          },
+          "workload": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workload"
+          }
+        },
+        "required": [
+          "namespace",
+          "workload",
+          "pods",
+          "pods_truncated",
+          "lines",
+          "fetched_at"
+        ],
+        "title": "K8sLogsOut",
+        "type": "object"
+      },
       "K8sManagedOut": {
         "properties": {
           "api_endpoint": {
@@ -5544,6 +5698,14 @@
       },
       "K8sPodOut": {
         "properties": {
+          "containers": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Containers",
+            "type": "array"
+          },
           "cpu_usage": {
             "anyOf": [
               {
@@ -5633,6 +5795,17 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "workload": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workload"
           }
         },
         "required": [
@@ -11188,6 +11361,153 @@
           }
         },
         "summary": "Replace Kubeconfig",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/kubernetes/clusters/{cluster_id}/logs": {
+      "get": {
+        "description": "Logs of one or more pods, or of every pod of a workload, merged in time order.\nRead from the cluster at each call and never stored; each read is audited (logs may\ncarry credentials).",
+        "operationId": "pod_logs_api_v1_admin_kubernetes_clusters__cluster_id__logs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cluster_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cluster Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "namespace",
+            "required": true,
+            "schema": {
+              "title": "Namespace",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Kind/name, e.g. Deployment/web",
+            "in": "query",
+            "name": "workload",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Kind/name, e.g. Deployment/web",
+              "title": "Workload"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pod",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 20,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pod"
+            }
+          },
+          {
+            "in": "query",
+            "name": "container",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Container"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tail_lines",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 5000,
+              "minimum": 1,
+              "title": "Tail Lines",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since_seconds",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 604800,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since Seconds"
+            }
+          },
+          {
+            "in": "query",
+            "name": "previous",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Previous",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/K8sLogsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pod Logs",
         "tags": [
           "admin"
         ]
