@@ -5,7 +5,8 @@
 - instances.nics comes from each guest's provider config (MAC, bridge, VLAN, cloud-init
   IP): that is what tells "marked in use" from "really in use". The same read gives
   instances.disks (every virtual disk), completed with the space each image takes in
-  its storage where the token may list it (the managed pool).
+  its storage where the token may list it (the managed pool), and the guest's notes
+  (instances.description).
 """
 
 import asyncio
@@ -174,6 +175,8 @@ async def _poll_cluster(
             disks = [{**asdict(d), "used_bytes": used.get(d.volume)} for d in config.disks]
             if disks != instance.disks:
                 instance.disks = disks
+            if config.description != instance.description:
+                instance.description = config.description
 
 
 async def _volume_usage(provider: CloudProvider, pools: Sequence[StoragePool]) -> dict[str, int]:

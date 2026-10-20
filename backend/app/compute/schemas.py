@@ -121,6 +121,7 @@ class InstanceOut(BaseModel):
     memory_mb: int
     root_disk_gb: int
     tags: list[str]
+    description: str | None  # the guest's notes in the provider (read-only here)
     image_id: uuid.UUID | None
     read_only: bool  # outside the managed pool: visible, not operable
     k8s_cluster_id: uuid.UUID | None  # a node of this Kubernetes cluster (ADR-0018)

@@ -88,7 +88,10 @@ class ProxmoxProvider:
     async def guest_config(self, ref: ProviderRef) -> GuestConfig:
         config = await self.client.get(f"{self._path(ref)}/config") or {}
         pve_type = ref.data["type"]
-        return GuestConfig(mapper.nics(config, pve_type), mapper.vm_disks(config, pve_type))
+        return GuestConfig(
+            mapper.nics(config, pve_type), mapper.vm_disks(config, pve_type),
+            mapper.description(config),
+        )
 
     async def storage_volumes(self, node: str, storage: str) -> list[VolumeUsage]:
         path = f"/nodes/{quote(node, safe='')}/storage/{quote(storage, safe='')}/content"

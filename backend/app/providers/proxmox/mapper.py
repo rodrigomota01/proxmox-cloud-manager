@@ -370,6 +370,16 @@ def nics(config: dict[str, Any], pve_type: str) -> list[GuestNic]:
     return out
 
 
+DESCRIPTION_MAX = 8192  # what PVE itself accepts
+
+
+def description(config: dict[str, Any]) -> str | None:
+    """The guest's notes from GET .../config (the API returns them decoded). Blank
+    means none; surrounding whitespace is noise."""
+    text = str(config.get("description") or "").strip()
+    return text[:DESCRIPTION_MAX] or None
+
+
 def net_with(current: str, nic: NicSpec) -> str:
     """Rewrite a VM netN spec ('virtio=MAC,bridge=vmbr0,firewall=1') with the given MAC,
     bridge and VLAN, keeping the model and every other option."""

@@ -91,6 +91,7 @@ export const en: Messages = {
     members: "Members",
     infrastructure: "Infrastructure",
     hypervisors: "Hypervisors",
+    ipRegistry: "IP registry",
     regionsAndZones: "Regions and zones",
   },
   header: {

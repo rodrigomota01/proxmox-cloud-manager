@@ -192,6 +192,9 @@ class GuestConfig:
 
     nics: list[GuestNic]
     disks: list[VirtualDisk]
+    # the free-text notes of the guest: on servers too old for tags, it is how people
+    # tell what a VM is for
+    description: str | None = None
 
 
 @dataclass(frozen=True)

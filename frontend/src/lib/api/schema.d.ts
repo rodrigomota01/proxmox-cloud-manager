@@ -425,6 +425,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/ipam/addresses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Registry
+         * @description Every row of the registry (the screen groups them by hypervisor).
+         */
+        get: operations["list_registry_api_v1_admin_ipam_addresses_get"];
+        put?: never;
+        /** Create Registry Address */
+        post: operations["create_registry_address_api_v1_admin_ipam_addresses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ipam/addresses/{address_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Registry Address */
+        delete: operations["delete_registry_address_api_v1_admin_ipam_addresses__address_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Registry Address */
+        patch: operations["update_registry_address_api_v1_admin_ipam_addresses__address_id__patch"];
+        trace?: never;
+    };
     "/api/v1/admin/ipam/networks/{network_id}": {
         parameters: {
             query?: never;
@@ -1980,6 +2019,31 @@ export interface components {
         Accepted: {
             job: components["schemas"]["JobOut"];
         };
+        /**
+         * AddressIn
+         * @description One row as the admin fills it. Blank optional fields are stored as NULL.
+         */
+        AddressIn: {
+            /** Address */
+            address: string;
+            /**
+             * Assigned
+             * @default false
+             */
+            assigned?: boolean;
+            /** Host Owner */
+            host_owner?: string | null;
+            /** Hostname */
+            hostname?: string | null;
+            /** Hypervisor */
+            hypervisor?: string | null;
+            /** Ip Block */
+            ip_block?: string | null;
+            /** Mac */
+            mac?: string | null;
+            /** Node Name */
+            node_name?: string | null;
+        };
         /** AddressOut */
         AddressOut: {
             /** Address */
@@ -2094,6 +2158,8 @@ export interface components {
              * Format: uuid
              */
             cluster_id: string;
+            /** Description */
+            description: string | null;
             /**
              * Id
              * Format: uuid
@@ -3230,6 +3296,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Description */
+            description: string | null;
             disk: components["schemas"]["DiskUsageOut"];
             /** Gateway */
             gateway: string | null;
@@ -4716,6 +4784,45 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /**
+         * RegistryAddressOut
+         * @description A row of the registry as last copied, plus the instance of ours created with it.
+         */
+        RegistryAddressOut: {
+            /** Address */
+            address: string;
+            /** Assigned */
+            assigned: boolean;
+            /** Cluster Id */
+            cluster_id: string | null;
+            /** External Id */
+            external_id: number;
+            held_by: components["schemas"]["GuestRef"] | null;
+            /** Host Owner */
+            host_owner: string | null;
+            /** Hostname */
+            hostname: string | null;
+            /** Hypervisor */
+            hypervisor: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Ip Block */
+            ip_block: string | null;
+            /** Mac */
+            mac: string | null;
+            /** Node Name */
+            node_name: string | null;
+            /** Prefix */
+            prefix: number | null;
+            /**
+             * Synced At
+             * Format: date-time
+             */
+            synced_at: string;
+        };
         /** ResetPasswordRequest */
         ResetPasswordRequest: {
             /** New Password */
@@ -6099,6 +6206,125 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IpamStatusOut"];
+                };
+            };
+        };
+    };
+    list_registry_api_v1_admin_ipam_addresses_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryAddressOut"][];
+                };
+            };
+        };
+    };
+    create_registry_address_api_v1_admin_ipam_addresses_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddressIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Accepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_registry_address_api_v1_admin_ipam_addresses__address_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                address_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Accepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_registry_address_api_v1_admin_ipam_addresses__address_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                address_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddressIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Accepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

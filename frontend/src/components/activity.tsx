@@ -22,6 +22,10 @@ const TYPE: Record<string, MessageKey> = {
   "instance.delete": "alerts.activity.delete",
   "cluster.sync": "alerts.activity.clusterSync",
   "alert.notify": "alerts.activity.alertNotify",
+  "ipam.sync": "alerts.activity.ipamSync",
+  "ipam.address.create": "alerts.activity.ipamCreate",
+  "ipam.address.update": "alerts.activity.ipamUpdate",
+  "ipam.address.delete": "alerts.activity.ipamDelete",
 };
 
 /** Call while rendering: the text follows the current language. */

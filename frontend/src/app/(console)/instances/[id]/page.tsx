@@ -11,6 +11,7 @@ import { DeleteInstance } from "@/components/delete-instance";
 import { InstanceMetrics } from "@/components/metrics-panel";
 import { DiskUsage } from "@/components/disk-usage";
 import { VolumeList } from "@/components/disks";
+import { GuestDescription } from "@/components/guest-description";
 import { IpAddress } from "@/components/ip-address";
 import { Meter, mib, rate, uptime } from "@/components/viz";
 import { ActivityRow } from "@/components/activity";
@@ -117,6 +118,10 @@ export default function InstanceDetailPage() {
                   ) : (
                     "—"
                   ),
+                ],
+                [
+                  t("compute.detail.description"),
+                  <GuestDescription key="d" text={i.description} full title={t("compute.detail.descriptionHint")} />,
                 ],
                 [t("compute.detail.lastSeen"), formatDate(i.last_seen_at)],
               ]}

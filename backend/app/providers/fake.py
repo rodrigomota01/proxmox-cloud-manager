@@ -69,6 +69,7 @@ class FakeProvider:
     nics: dict[str, list[GuestNic]] = field(default_factory=dict)  # vmid -> NICs
     addresses: dict[str, list[GuestAddress]] = field(default_factory=dict)  # agent, by vmid
     disks: dict[str, list[VirtualDisk]] = field(default_factory=dict)  # config, by vmid
+    descriptions: dict[str, str] = field(default_factory=dict)  # guest notes, by vmid
     volumes: dict[tuple[str, str], list[VolumeUsage]] = field(default_factory=dict)  # node, st
     node_disk_list: dict[str, list[PhysicalDisk]] = field(default_factory=dict)  # by node
     # guest agent exec (ADR-0018): exec_handler(vmid, command, stdin) -> (code, out, err);
@@ -229,7 +230,10 @@ class FakeProvider:
 
     async def guest_config(self, ref: ProviderRef) -> GuestConfig:
         self._check()
-        return GuestConfig(self.nics.get(ref.key, []), self.disks.get(ref.key, []))
+        return GuestConfig(
+            self.nics.get(ref.key, []), self.disks.get(ref.key, []),
+            self.descriptions.get(ref.key),
+        )
 
     async def storage_volumes(self, node: str, storage: str) -> list[VolumeUsage]:
         self._check()

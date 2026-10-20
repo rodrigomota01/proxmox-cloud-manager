@@ -14,7 +14,7 @@
 | ProviderCluster | `provider_clusters` | Um cluster Proxmox (ou futuro VMware/OpenStack). |
 | ProviderCredential | `provider_credentials` | Token do PVE cifrado (envelope encryption). Nunca sai do backend. |
 | Node | `nodes` | Node do cluster (inventário). Só visível para admins de plataforma. |
-| Instance | `instances` | VM **ou** container (`kind = vm | container`). |
+| Instance | `instances` | VM **ou** container (`kind = vm | container`). `description` = anotações da VM no Proxmox, lidas com a config (servidores sem tags identificam VMs por aí). |
 | Volume | `volumes` | Disco de uma instância (ou solto, no futuro). |
 | Snapshot | `snapshots` | Snapshot de instância. |
 | Image | `images` | Template/catálogo. Visibilidade `public | tenant | private`. |

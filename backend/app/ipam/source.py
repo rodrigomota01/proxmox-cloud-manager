@@ -1,8 +1,9 @@
 """The legacy IPAM table (MySQL/MariaDB `awf_ip_pool`), the source of truth for IPs.
 
-Only the worker talks to it. Writes are conditional single-row UPDATEs, so two systems
-reserving the same address cannot both win: `reserve` only succeeds on a free row.
-The database user needs SELECT and UPDATE on that table and nothing else.
+Only the worker talks to it. Reservations are conditional single-row UPDATEs, so two
+systems reserving the same address cannot both win: `reserve` only succeeds on a free
+row. Admins also edit the registry from here (insert/update/delete, ADR-0014), so the
+database user needs SELECT, INSERT, UPDATE and DELETE on that table and nothing else.
 """
 
 from dataclasses import dataclass
@@ -29,11 +30,42 @@ class PoolRow:
     ip_block: str | None
 
 
+@dataclass(frozen=True)
+class PoolFields:
+    """Everything an admin sets on a row (all but the id). Same meaning as PoolRow."""
+
+    ip_addr: str
+    assigned: bool = False
+    mac: str | None = None
+    host_owner: str | None = None
+    hostname: str | None = None
+    hypervisor: str | None = None
+    node: str | None = None
+    ip_block: str | None = None
+
+    def values(self) -> tuple[object, ...]:
+        """In the column order of _FIELD_COLUMNS."""
+        return (
+            self.ip_addr, int(self.assigned), self.mac, self.host_owner, self.hostname,
+            self.hypervisor, self.node, self.ip_block,
+        )
+
+
+_FIELD_COLUMNS = (
+    "ip_addr", "assigned", "assigned_to_macaddr", "host_owner", "hostname_lease",
+    "hypervisor", "pve_node_owner", "ipBlock",
+)
+
+
 class IpamSource(Protocol):
     async def fetch(self) -> list[PoolRow]: ...
     async def reserve(self, row_id: int, *, hostname: str, mac: str | None) -> bool: ...
     async def set_mac(self, row_id: int, *, hostname: str, mac: str) -> bool: ...
     async def release(self, row_id: int, *, hostname: str, clear_mac: bool) -> bool: ...
+    # registry edits by admins
+    async def insert(self, fields: PoolFields) -> int: ...
+    async def update(self, row_id: int, fields: PoolFields) -> bool: ...
+    async def delete(self, row_id: int) -> bool: ...
 
 
 def _bit(value: object) -> bool:
@@ -87,4 +119,29 @@ class MysqlIpamSource(MysqlDb):
             "WHERE id = %s AND hostname_lease = %s",
             (row_id, hostname),
         )
+        return count == 1
+
+    async def insert(self, fields: PoolFields) -> int:
+        columns = ", ".join(_FIELD_COLUMNS)
+        marks = ", ".join("%s" for _ in _FIELD_COLUMNS)
+        return await self._insert(
+            f"INSERT INTO awf_ip_pool ({columns}) VALUES ({marks})",  # noqa: S608
+            fields.values(),
+        )
+
+    async def update(self, row_id: int, fields: PoolFields) -> bool:
+        """Rewrites every editable column. False when the row is gone. (An UPDATE that
+        changes nothing reports 0 rows, so existence is checked apart.)"""
+        assignments = ", ".join(f"{c} = %s" for c in _FIELD_COLUMNS)
+        _, count = await self._execute(
+            f"UPDATE awf_ip_pool SET {assignments} WHERE id = %s",  # noqa: S608
+            (*fields.values(), row_id),
+        )
+        if count == 1:
+            return True
+        rows, _ = await self._execute("SELECT id FROM awf_ip_pool WHERE id = %s", (row_id,))
+        return bool(rows)
+
+    async def delete(self, row_id: int) -> bool:
+        _, count = await self._execute("DELETE FROM awf_ip_pool WHERE id = %s", (row_id,))
         return count == 1

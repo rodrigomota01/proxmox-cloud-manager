@@ -94,6 +94,7 @@ function useNav(): { top: NavItem & { icon: IconName }; groups: NavGroup[] } {
             icon: "server" as const,
             items: [
               { href: "/admin/nodes", label: t("nav.hypervisors"), also: ["/admin/clusters"] },
+              { href: "/admin/ipam", label: t("nav.ipRegistry") },
               { href: "/admin/regions", label: t("nav.regionsAndZones") },
             ],
           },

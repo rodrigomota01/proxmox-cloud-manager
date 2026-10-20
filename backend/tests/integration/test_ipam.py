@@ -138,3 +138,133 @@ async def test_ipam_is_admin_only(client, env):
     h = {"Authorization": f"Bearer {r.json()['access_token']}"}
     for path in ("/api/v1/admin/ipam", f"/api/v1/admin/clusters/{env['cid']}/ipam"):
         assert (await client.get(path, headers=h)).status_code == 403
+
+
+# --- the registry editor -----------------------------------------------------------------
+
+
+async def _job(client, h, r):
+    assert r.status_code == 202, r.text
+    return r.json()["job"]["id"]
+
+
+async def _status(client, h, job_id):
+    return (await client.get(f"/api/v1/admin/jobs/{job_id}", headers=h)).json()
+
+
+async def test_registry_create_update_delete(client, env):
+    h, source, drain = env["h"], env["source"], env["drain"]
+    source.rows = [row(1, "177.54.151.10", host="x")]
+    await client.post("/api/v1/admin/ipam/sync", headers=h)
+    await drain()
+
+    bad = await client.post("/api/v1/admin/ipam/addresses", headers=h,
+                            json={"address": "not-an-ip"})
+    assert bad.status_code == 422
+    dup = await client.post("/api/v1/admin/ipam/addresses", headers=h,
+                            json={"address": "177.54.151.10"})
+    assert dup.status_code == 409
+
+    job = await _job(client, h, await client.post("/api/v1/admin/ipam/addresses", headers=h, json={
+        "address": "177.54.151.42", "hypervisor": "hv08.sp02.atena.io", "node_name": "tagima",
+        "mac": "BC-24-11-00-00-01", "ip_block": "177.54.151.0/24", "hostname": "",
+    }))
+    await drain()
+    done = await _status(client, h, job)
+    assert done["status"] == "succeeded", done
+    assert done["resource_name"] == "177.54.151.42"
+    assert source.calls[-1] == ("insert", "177.54.151.42")
+    rows = (await client.get("/api/v1/admin/ipam/addresses", headers=h)).json()
+    new = next(a for a in rows if a["address"] == "177.54.151.42")
+    assert new["external_id"] == 1001 and new["mac"] == "bc:24:11:00:00:01"
+    assert new["hostname"] is None and new["cluster_id"] is not None  # tagima is ours
+    assert new["assigned"] is False and new["held_by"] is None
+
+    # update: mark it in use for a host, with a prefix
+    job = await _job(client, h, await client.patch(
+        f"/api/v1/admin/ipam/addresses/{new['id']}", headers=h,
+        json={"address": "177.54.151.42/24", "hypervisor": "hv08.sp02.atena.io",
+              "node_name": "tagima", "assigned": True, "hostname": "web-1"},
+    ))
+    await drain()
+    assert (await _status(client, h, job))["status"] == "succeeded"
+    rows = (await client.get("/api/v1/admin/ipam/addresses", headers=h)).json()
+    edited = next(a for a in rows if a["external_id"] == 1001)
+    assert edited["assigned"] and edited["hostname"] == "web-1" and edited["prefix"] == 24
+    assert edited["mac"] is None  # the form sends the whole row: a blank MAC clears it
+
+    # moving it onto another row's address is refused
+    clash = await client.patch(f"/api/v1/admin/ipam/addresses/{new['id']}", headers=h,
+                               json={"address": "177.54.151.10"})
+    assert clash.status_code == 409
+
+    job = await _job(client, h, await client.delete(
+        f"/api/v1/admin/ipam/addresses/{new['id']}", headers=h))
+    await drain()
+    assert (await _status(client, h, job))["status"] == "succeeded"
+    rows = (await client.get("/api/v1/admin/ipam/addresses", headers=h)).json()
+    assert [a["external_id"] for a in rows] == [1]
+    assert (await client.delete(f"/api/v1/admin/ipam/addresses/{new['id']}",
+                                headers=h)).status_code == 404
+
+
+async def test_registry_update_of_a_vanished_row_fails(client, env):
+    h, source, drain = env["h"], env["source"], env["drain"]
+    source.rows = [row(1, "177.54.151.10")]
+    await client.post("/api/v1/admin/ipam/sync", headers=h)
+    await drain()
+    [a] = (await client.get("/api/v1/admin/ipam/addresses", headers=h)).json()
+    source.rows = []  # someone removed it in MySQL meanwhile
+    job = await _job(client, h, await client.patch(
+        f"/api/v1/admin/ipam/addresses/{a['id']}", headers=h, json={"address": "177.54.151.10"}))
+    await drain()
+    assert (await _status(client, h, job))["error_code"] == "IP_NOT_FOUND"
+    assert (await client.get("/api/v1/admin/ipam/addresses", headers=h)).json() == []
+
+
+async def test_registry_protects_addresses_of_our_instances(client, env, owner_db):
+    from sqlalchemy import select, update
+
+    from app.compute.models import Instance
+
+    h, source, drain = env["h"], env["source"], env["drain"]
+    source.rows = [row(1, "177.54.151.10", assigned=True, host="cm-test-1")]
+    await client.post("/api/v1/admin/ipam/sync", headers=h)
+    await drain()
+    # pretend cm-test-1 (a discovered guest of the server) was created with row 1
+    vm = await owner_db.scalar(select(Instance).where(Instance.name == "cm-test-1"))
+    await owner_db.execute(update(Instance).where(Instance.id == vm.id).values(
+        network={"address": "177.54.151.10/24", "ipam": {"external_id": 1}}))
+    await owner_db.commit()
+
+    [a] = (await client.get("/api/v1/admin/ipam/addresses", headers=h)).json()
+    assert a["held_by"]["name"] == "cm-test-1"
+    path = f"/api/v1/admin/ipam/addresses/{a['id']}"
+    assert (await client.delete(path, headers=h)).status_code == 409
+    freeing = await client.patch(path, headers=h, json={"address": "177.54.151.10",
+                                                        "assigned": False})
+    assert freeing.status_code == 409
+    renaming = await client.patch(path, headers=h, json={"address": "177.54.151.10",
+                                                         "assigned": True, "hostname": "other"})
+    assert renaming.status_code == 409
+    # the rest of the row (hypervisor, block, owner) may still be fixed
+    ok = await client.patch(path, headers=h, json={
+        "address": "177.54.151.10", "assigned": True, "hostname": "cm-test-1",
+        "hypervisor": "hv09", "node_name": "tagima", "host_owner": "acme"})
+    assert ok.status_code == 202
+
+
+async def test_registry_edits_need_the_source(client, env):
+    ipam_service.configure(None)
+    r = await client.post("/api/v1/admin/ipam/addresses", headers=env["h"],
+                          json={"address": "177.54.151.42"})
+    assert r.status_code == 409
+
+
+async def test_registry_is_admin_only(client, env):
+    r = await client.post("/api/v1/auth/login",
+                          json={"email": "nobody@example.com", "password": PASSWORD})
+    h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert (await client.get("/api/v1/admin/ipam/addresses", headers=h)).status_code == 403
+    assert (await client.post("/api/v1/admin/ipam/addresses", headers=h,
+                              json={"address": "1.1.1.1"})).status_code == 403

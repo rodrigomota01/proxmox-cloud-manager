@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useState } from "react";
 
 import { relativeTime } from "@/components/activity";
@@ -23,7 +24,7 @@ const STATUS: Record<string, { label: MessageKey; tone: StatusTone; hint: Messag
 const ORDER = ["conflict", "stale", "detached", "free", "in_use", "unverified"];
 
 /** Sync state of the legacy IPAM (MySQL awf_ip_pool) and a manual refresh. */
-function IpamSync() {
+export function IpamSync({ invalidate = [] as readonly (readonly unknown[])[] }: { invalidate?: readonly (readonly unknown[])[] }) {
   const t = useT();
   const [jobId, setJobId] = useState<string | null>(null);
   const status = useQuery({
@@ -31,7 +32,10 @@ function IpamSync() {
     queryFn: async () => unwrap(await api.GET("/api/v1/admin/ipam")),
     refetchInterval: 60_000,
   });
-  const { job, done } = useJob(jobId, { admin: true, invalidate: [["admin", "ipam"], ["admin", "ipam-report"]] });
+  const { job, done } = useJob(jobId, {
+    admin: true,
+    invalidate: [["admin", "ipam"], ["admin", "ipam-report"], ["admin", "ipam-registry"], ...invalidate],
+  });
   const sync = useMutation({
     mutationFn: async () => unwrap(await api.POST("/api/v1/admin/ipam/sync")).job,
     onSuccess: (j) => setJobId(j.id),
@@ -178,7 +182,15 @@ export function IpamPanel({ clusterId, onGuest }: { clusterId: string; onGuest?:
       <ErrorBox message={report.isError ? errorMessage(report.error) : null} />
       {r && (
         <>
-          <Card title={t("infra.ipam.addressesTitle")} flush>
+          <Card
+            title={t("infra.ipam.addressesTitle")}
+            flush
+            actions={
+              <Link href={`/admin/ipam?cluster=${clusterId}`} className="text-sm text-brand-600 hover:underline dark:text-brand-400">
+                {t("infra.registry.editRegistry")}
+              </Link>
+            }
+          >
             <Toolbar count={t("infra.ipam.ipCount", { count: shown.length })}>
               <div className="flex flex-wrap gap-2 text-xs">
                 {[

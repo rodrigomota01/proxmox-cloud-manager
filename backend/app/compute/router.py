@@ -80,8 +80,8 @@ def instance_out(i: Instance, where: Places, ipam: dict[str, str] | None = None)
     return InstanceOut(
         id=i.id, project_id=i.project_id, kind=i.kind, name=i.name, state=i.state,
         power_state=i.power_state, vcpus=i.vcpus, memory_mb=i.memory_mb,
-        root_disk_gb=i.root_disk_gb, tags=i.tags, image_id=i.image_id,
-        zone_id=zone_id, zone_name=zone_name, region_name=region_name,
+        root_disk_gb=i.root_disk_gb, tags=i.tags, description=i.description,
+        image_id=i.image_id, zone_id=zone_id, zone_name=zone_name, region_name=region_name,
         read_only=not operable(i, settings) or i.k8s_cluster_id is not None,
         k8s_cluster_id=i.k8s_cluster_id,
         cpu_usage=i.cpu_usage, memory_used_mb=i.memory_used_mb,

@@ -9,8 +9,9 @@ import { useState } from "react";
 
 import { ClusterStatus } from "@/components/cluster-status";
 import { volumesSummary } from "@/components/disks";
+import { GuestDescription } from "@/components/guest-description";
 import { IpAddress } from "@/components/ip-address";
-import { DescriptionList, ResourceIcon, Toolbar } from "@/components/page";
+import { DescriptionList, ResourceIcon, SearchInput, Toolbar } from "@/components/page";
 import {
   Alert,
   Badge,
@@ -421,6 +422,7 @@ export function ConnectionInstances({ clusterId, nodeName }: { clusterId: string
   const t = useT();
   const [adopting, setAdopting] = useState<AdminInstance | null>(null);
   const [tagFilter, setTagFilter] = useState("");
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkAdopting, setBulkAdopting] = useState(false);
   const instances = useQuery({
@@ -430,7 +432,16 @@ export function ConnectionInstances({ clusterId, nodeName }: { clusterId: string
     refetchInterval: 15_000,
   });
 
-  const all = (instances.data ?? []).filter((i) => !nodeName || i.node === nodeName);
+  // the description is how VMs are told apart on servers whose Proxmox has no tags
+  const needle = search.trim().toLowerCase();
+  const matches = (i: AdminInstance) =>
+    !needle ||
+    i.name.toLowerCase().includes(needle) ||
+    i.provider_name.toLowerCase().includes(needle) ||
+    String(i.vmid).includes(needle) ||
+    (i.ipv4?.includes(needle) ?? false) ||
+    (i.description?.toLowerCase().includes(needle) ?? false);
+  const all = (instances.data ?? []).filter((i) => (!nodeName || i.node === nodeName) && matches(i));
   const discovered = all.filter((i) => !i.managed);
   const tagCounts = Object.entries(
     discovered.flatMap((i) => i.tags).reduce<Record<string, number>>((acc, t) => ({ ...acc, [t]: (acc[t] ?? 0) + 1 }), {}),
@@ -451,8 +462,9 @@ export function ConnectionInstances({ clusterId, nodeName }: { clusterId: string
           )
         }
       >
-        {tagCounts.length > 0 && (
-          <Toolbar count={t("infra.common.countOf", { shown: shown.length, total: discovered.length })}>
+        <Toolbar count={t("infra.common.countOf", { shown: shown.length, total: discovered.length })}>
+          <SearchInput value={search} onChange={setSearch} placeholder={t("infra.connection.searchPlaceholder")} />
+          {tagCounts.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="text-slate-500">{t("infra.connection.filterByTag")}</span>
               {tagCounts.map(([tag, n]) => (
@@ -474,8 +486,8 @@ export function ConnectionInstances({ clusterId, nodeName }: { clusterId: string
                 </button>
               )}
             </div>
-          </Toolbar>
-        )}
+          )}
+        </Toolbar>
         {shown.length === 0 ? (
           <Empty icon="checkCircle">{t("infra.connection.nothingToAdopt")}</Empty>
         ) : (
@@ -690,6 +702,7 @@ function InstanceTable({
                 <div className="text-xs text-slate-500">
                   {i.kind === "vm" ? "VM" : t("infra.connection.container")} · {i.node}
                 </div>
+                <GuestDescription text={i.description} title={t("infra.connection.descriptionHint")} />
               </td>
               <td className={tbl.td}>
                 <span className="flex flex-wrap gap-1">

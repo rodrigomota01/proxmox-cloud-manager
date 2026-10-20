@@ -236,6 +236,7 @@ class AdminInstanceOut(BaseModel):
     vmid: int
     node: str
     tags: list[str]
+    description: str | None  # the guest's notes in the provider
     managed: bool
     pool: str | None  # provider pool as last observed
     read_only: bool  # outside the cluster's managed pool: visible, not operable

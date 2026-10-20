@@ -1,9 +1,17 @@
 import ipaddress
+import re
 import uuid
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 
 class IpamStatusOut(BaseModel):
@@ -75,3 +83,70 @@ class IpamReportOut(BaseModel):
     unregistered: list[UnregisteredOut]
     networks: list[NetworkOut]
     suggestions: list[NetworkOut]
+
+
+# --- the registry itself (editing awf_ip_pool rows, ADR-0014) ------------------------------
+
+Short = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)]
+_MAC = re.compile(r"^[0-9a-f]{2}(:[0-9a-f]{2}){5}$")
+
+
+class AddressIn(BaseModel):
+    """One row as the admin fills it. Blank optional fields are stored as NULL."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    address: str  # "177.54.151.42" or "152.236.18.11/31" (the prefix is kept as typed)
+    hypervisor: Short | None = None  # the host, as the registry names it
+    node_name: Short | None = None  # pve_node_owner: ties the row to a server here
+    assigned: bool = False
+    mac: str | None = None
+    hostname: Short | None = None
+    host_owner: Short | None = None
+    ip_block: Short | None = None
+
+    @field_validator("address")
+    @classmethod
+    def _address(cls, value: str) -> str:
+        text = value.strip()
+        try:
+            if "/" in text:
+                iface = ipaddress.ip_interface(text)
+                return f"{iface.ip}/{iface.network.prefixlen}"
+            return str(ipaddress.ip_address(text))
+        except ValueError as exc:
+            raise ValueError("expected an IP address, optionally with /prefix") from exc
+
+    @field_validator("mac")
+    @classmethod
+    def _mac(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        mac = value.strip().lower().replace("-", ":")
+        if not _MAC.match(mac):
+            raise ValueError("expected a MAC like bc:24:11:00:00:01")
+        return mac
+
+    @field_validator("hypervisor", "node_name", "hostname", "host_owner", "ip_block", mode="before")
+    @classmethod
+    def _blank_is_none(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
+
+class RegistryAddressOut(BaseModel):
+    """A row of the registry as last copied, plus the instance of ours created with it."""
+
+    id: uuid.UUID
+    external_id: int
+    address: str
+    prefix: int | None
+    hypervisor: str | None
+    node_name: str | None
+    cluster_id: uuid.UUID | None  # the server here whose node is node_name
+    assigned: bool
+    mac: str | None
+    hostname: str | None
+    host_owner: str | None
+    ip_block: str | None
+    held_by: GuestRef | None  # a live instance the platform created with this address
+    synced_at: datetime

@@ -92,6 +92,7 @@ export const ptBR = {
     members: "Membros",
     infrastructure: "Infraestrutura",
     hypervisors: "Hypervisors",
+    ipRegistry: "Cadastro de IPs",
     regionsAndZones: "Regiões e zonas",
   },
   header: {

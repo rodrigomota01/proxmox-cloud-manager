@@ -130,7 +130,8 @@ def admin_instance_out(
         kind=i.kind, name=i.name, provider_name=i.provider_name, state=i.state,
         power_state=i.power_state, vcpus=i.vcpus, memory_mb=i.memory_mb,
         root_disk_gb=i.root_disk_gb, vmid=int(i.provider_ref["vmid"]),
-        node=str(i.provider_ref["node"]), tags=i.tags, managed=i.managed,
+        node=str(i.provider_ref["node"]), tags=i.tags, description=i.description,
+        managed=i.managed,
         pool=i.provider_pool, read_only=not operable(i, settings.get(i.cluster_id, {})),
         ipv4=ip.address if ip else None, ipv4_source=ip.source if ip else None,
         volumes=[AdminVolumeOut(**{k: d.get(k) for k in AdminVolumeOut.model_fields})

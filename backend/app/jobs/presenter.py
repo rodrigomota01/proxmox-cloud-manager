@@ -13,13 +13,14 @@ from app.compute.models import Instance
 from app.compute.schemas import JobOut
 from app.iam.models import User
 from app.inventory.models import ProviderCluster
+from app.ipam.models import IpamAddress
 from app.jobs.models import Job
 
 
 async def jobs_out(db: AsyncSession, jobs: Sequence[Job]) -> list[JobOut]:
     ids = {
         kind: {j.resource_id for j in jobs if j.resource_type == kind and j.resource_id}
-        for kind in ("instance", "cluster")
+        for kind in ("instance", "cluster", "ipam_address")
     }
     names: dict[object, str] = {}
     if ids["instance"]:
@@ -34,6 +35,18 @@ async def jobs_out(db: AsyncSession, jobs: Sequence[Job]) -> list[JobOut]:
             )
         )
         names.update(dict(rows.all()))
+    if ids["ipam_address"]:
+        rows = await db.execute(
+            select(IpamAddress.id, IpamAddress.address).where(
+                IpamAddress.id.in_(ids["ipam_address"])
+            )
+        )
+        names.update({rid: str(addr) for rid, addr in rows.all()})
+    # a new address has no row yet (and a removed one no longer has): the payload names it
+    for j in jobs:
+        if j.resource_type == "ipam_address" and j.resource_id not in names and \
+                j.payload.get("address"):
+            names[j.resource_id] = str(j.payload["address"])
     requesters = {j.requested_by for j in jobs if j.requested_by}
     people: dict[object, str] = {}
     if requesters:

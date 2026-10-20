@@ -72,6 +72,9 @@ class Instance(UUIDPk, Timestamps, Base):
     # target pool can be operated: the token's write ACLs exist there and nowhere else.
     provider_pool: Mapped[str | None] = mapped_column(Text)
     tags: Mapped[list[str]] = mapped_column(ARRAY(Text), server_default="{}")
+    # the guest's notes in the provider, read with its config: servers whose Proxmox
+    # predates tags identify their VMs here
+    description: Mapped[str | None] = mapped_column(Text)
     managed: Mapped[bool] = mapped_column(server_default="false")
     # live usage, refreshed by the reconciler (one /cluster/resources call per cycle)
     cpu_usage: Mapped[float] = mapped_column(Float, server_default="0")  # 0..1 of vcpus

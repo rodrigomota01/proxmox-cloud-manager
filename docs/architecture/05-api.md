@@ -192,6 +192,12 @@ Fase indica quando entra. Permissão é a checada no serviço de domínio.
 | GET | `/admin/instances?managed=false` | `node:view` (descobertos) |
 | POST | `/admin/instances/{id}/adopt` | `cluster:manage` → atribui tenant/projeto |
 | GET | `/admin/storage` · `/admin/networks` | `cluster:manage` |
+| GET | `/admin/ipam` · `/admin/clusters/{id}/ipam` | `cluster:manage` (cadastro legado vs. VMs; ADR-0014) |
+| POST | `/admin/ipam/sync` | `cluster:manage` → 202 job (`ipam.sync`) |
+| POST/DELETE | `/admin/clusters/{id}/ipam/networks` · `/admin/ipam/networks/{id}` | `cluster:manage` (perfis de rede) |
+| GET | `/admin/ipam/addresses` | `cluster:manage` (todas as linhas do cadastro; a tela agrupa por hypervisor) |
+| POST | `/admin/ipam/addresses` | `cluster:manage` → 202 job (`ipam.address.create`; 409 se o IP já existe) |
+| PATCH/DELETE | `/admin/ipam/addresses/{id}` | `cluster:manage` → 202 job (`ipam.address.update|delete`; 409 se uma VM viva da plataforma usa o IP) |
 | GET/PUT | `/admin/tenants/{id}/quotas` | `quota:manage` (sem linha = padrão da plataforma) |
 | GET | `/admin/clusters/{id}/templates` | `template:publish` (templates visíveis ao token) |
 | GET/POST/PATCH | `/admin/images` · `/admin/images/{id}` | `template:publish` (exige drive de cloud-init) |

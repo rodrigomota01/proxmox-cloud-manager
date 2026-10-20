@@ -470,6 +470,27 @@ async def test_guest_polls_survive_a_sync_that_runs_meanwhile(
     assert [d["volume"] for d in vm.disks] == ["v0"]
 
 
+async def test_description_is_read_with_the_guest_config(client, ctx, app, registry, fake):
+    """Servers whose Proxmox predates tags identify VMs by their notes: shown as is."""
+    root = ctx["root"]
+    await _cluster_with_creds(client, root)
+    fake.descriptions["10001"] = "  Loja virtual da ACME\nResponsável: fulano  "
+    await reconcile_all(app.state.sessionmaker, registry)
+    await poll_guest_config(app.state.sessionmaker, registry)
+    by_vmid = {
+        i["vmid"]: i for i in (await client.get("/api/v1/admin/instances", headers=root)).json()
+    }
+    assert by_vmid[10001]["description"] == "  Loja virtual da ACME\nResponsável: fulano  "
+    assert by_vmid[10002]["description"] is None
+    # cleared in Proxmox: cleared here
+    del fake.descriptions["10001"]
+    await poll_guest_config(app.state.sessionmaker, registry)
+    by_vmid = {
+        i["vmid"]: i for i in (await client.get("/api/v1/admin/instances", headers=root)).json()
+    }
+    assert by_vmid[10001]["description"] is None
+
+
 async def test_version_is_kept_current_without_a_connection_test(
     client, ctx, app, registry, owner_db
 ):

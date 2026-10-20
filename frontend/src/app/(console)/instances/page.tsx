@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Icon } from "@/components/icons";
+import { GuestDescription } from "@/components/guest-description";
 import { volumesSummary } from "@/components/disks";
 import { IpAddress } from "@/components/ip-address";
 import { NoTenant } from "@/components/no-tenant";
@@ -59,7 +60,12 @@ export default function InstancesPage() {
   const loaded = list.data?.pages.flatMap((p) => p.items) ?? [];
   const needle = search.trim().toLowerCase();
   const items = needle
-    ? loaded.filter((i) => i.name.toLowerCase().includes(needle) || i.ipv4?.includes(needle))
+    ? loaded.filter(
+        (i) =>
+          i.name.toLowerCase().includes(needle) ||
+          i.ipv4?.includes(needle) ||
+          i.description?.toLowerCase().includes(needle),
+      )
     : loaded;
   const { sorted, sort, toggle } = useSorted<Instance, SortKey>(
     items,
@@ -162,6 +168,7 @@ export default function InstancesPage() {
                         <div className="mt-0.5 pl-7 text-xs text-slate-500">
                           {projectNames.get(i.project_id) ?? "—"} · {i.vcpus} vCPU
                         </div>
+                        <GuestDescription text={i.description} className="pl-7" />
                       </td>
                       <td className={tbl.td}>
                         {i.state === "active" ? <PowerBadge state={i.power_state} /> : <StateBadge state={i.state} />}

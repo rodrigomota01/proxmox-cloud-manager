@@ -33,3 +33,13 @@ class MysqlDb:
                 return list(await cur.fetchall()), count
         finally:
             conn.close()
+
+    async def _insert(self, sql: str, args: tuple[object, ...] = ()) -> int:
+        """Runs an INSERT and returns the AUTO_INCREMENT id of the new row."""
+        conn = await aiomysql.connect(**self._conn)
+        try:
+            async with conn.cursor() as cur:
+                await cur.execute(sql, args)
+                return int(cur.lastrowid)
+        finally:
+            conn.close()

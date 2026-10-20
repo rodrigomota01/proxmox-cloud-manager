@@ -26,3 +26,11 @@ e quais estão de fato em uso, e passar a reservar/liberar IPs ao criar/excluir 
   reserva no MySQL com `UPDATE ... WHERE id = ? AND assigned = 0` (dois sistemas não
   ganham o mesmo IP), aplica MAC pré-atribuído (MAC virtual de IP failover) e VLAN na
   placa, e libera o IP ao excluir a VM (só se ainda estiver com o hostname dela).
+- **Edição do cadastro pela tela (2026-10-20):** o admin cria, altera e remove linhas do
+  `awf_ip_pool` em *Infraestrutura → Cadastro de IPs*, agrupadas por hypervisor (coluna
+  `hypervisor`, com o servidor daqui ao qual o `pve_node_owner` pertence). Como a API não
+  tem rota até o MySQL, cada alteração vira um job (`ipam.address.create|update|delete`)
+  que o worker grava e, em seguida, reatualiza a cópia local — a tela mostra o resultado
+  quando o job termina. A API recusa (409) liberar, mover ou remover um IP com que a
+  plataforma criou uma VM viva: isso só acontece ao excluir a VM. O usuário MySQL passa
+  a precisar de `SELECT, INSERT, UPDATE, DELETE` na tabela (antes só `SELECT, UPDATE`).

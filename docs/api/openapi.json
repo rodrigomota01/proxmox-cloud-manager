@@ -13,6 +13,102 @@
         "title": "Accepted",
         "type": "object"
       },
+      "AddressIn": {
+        "additionalProperties": false,
+        "description": "One row as the admin fills it. Blank optional fields are stored as NULL.",
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "assigned": {
+            "default": false,
+            "title": "Assigned",
+            "type": "boolean"
+          },
+          "host_owner": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Owner"
+          },
+          "hostname": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hostname"
+          },
+          "hypervisor": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypervisor"
+          },
+          "ip_block": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Block"
+          },
+          "mac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mac"
+          },
+          "node_name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Name"
+          }
+        },
+        "required": [
+          "address"
+        ],
+        "title": "AddressIn",
+        "type": "object"
+      },
       "AddressOut": {
         "properties": {
           "address": {
@@ -337,6 +433,17 @@
             "title": "Cluster Id",
             "type": "string"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -490,6 +597,7 @@
           "vmid",
           "node",
           "tags",
+          "description",
           "managed",
           "pool",
           "read_only",
@@ -3508,6 +3616,17 @@
             "title": "Created At",
             "type": "string"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "disk": {
             "$ref": "#/components/schemas/DiskUsageOut"
           },
@@ -3698,6 +3817,7 @@
           "memory_mb",
           "root_disk_gb",
           "tags",
+          "description",
           "image_id",
           "read_only",
           "k8s_cluster_id",
@@ -8234,6 +8354,150 @@
         "title": "RegionUpdate",
         "type": "object"
       },
+      "RegistryAddressOut": {
+        "description": "A row of the registry as last copied, plus the instance of ours created with it.",
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "assigned": {
+            "title": "Assigned",
+            "type": "boolean"
+          },
+          "cluster_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Id"
+          },
+          "external_id": {
+            "title": "External Id",
+            "type": "integer"
+          },
+          "held_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GuestRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "host_owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host Owner"
+          },
+          "hostname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hostname"
+          },
+          "hypervisor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypervisor"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ip_block": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Block"
+          },
+          "mac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mac"
+          },
+          "node_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Name"
+          },
+          "prefix": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prefix"
+          },
+          "synced_at": {
+            "format": "date-time",
+            "title": "Synced At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "external_id",
+          "address",
+          "prefix",
+          "hypervisor",
+          "node_name",
+          "cluster_id",
+          "assigned",
+          "mac",
+          "hostname",
+          "host_owner",
+          "ip_block",
+          "held_by",
+          "synced_at"
+        ],
+        "title": "RegistryAddressOut",
+        "type": "object"
+      },
       "ResetPasswordRequest": {
         "additionalProperties": false,
         "properties": {
@@ -10825,6 +11089,165 @@
           }
         },
         "summary": "Ipam Status",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/ipam/addresses": {
+      "get": {
+        "description": "Every row of the registry (the screen groups them by hypervisor).",
+        "operationId": "list_registry_api_v1_admin_ipam_addresses_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RegistryAddressOut"
+                  },
+                  "title": "Response List Registry Api V1 Admin Ipam Addresses Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Registry",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "create_registry_address_api_v1_admin_ipam_addresses_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Registry Address",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/ipam/addresses/{address_id}": {
+      "delete": {
+        "operationId": "delete_registry_address_api_v1_admin_ipam_addresses__address_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Address Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Registry Address",
+        "tags": [
+          "admin"
+        ]
+      },
+      "patch": {
+        "operationId": "update_registry_address_api_v1_admin_ipam_addresses__address_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "address_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Address Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Registry Address",
         "tags": [
           "admin"
         ]

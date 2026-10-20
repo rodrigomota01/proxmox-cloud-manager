@@ -1,27 +1,35 @@
-"""/admin/ipam/* and /admin/clusters/{id}/ipam: addresses vs. guests, network profiles."""
+"""/admin/ipam/* and /admin/clusters/{id}/ipam: addresses vs. guests, network profiles,
+and the registry editor (rows of awf_ip_pool, written by the worker through jobs)."""
 
 import uuid
-from typing import Annotated
+from collections.abc import Iterable
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Response, status
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AppSettings, DbSession, Principal, require_platform
+from app.audit import service as audit
+from app.compute.models import Instance
 from app.compute.schemas import Accepted
 from app.core.errors import Conflict, NotFound
 from app.inventory.models import ProviderCluster
 from app.ipam.models import IpamAddress, IpamNetwork
 from app.ipam.report import Guest, report
 from app.ipam.schemas import (
+    AddressIn,
     AddressOut,
     GuestRef,
     IpamReportOut,
     IpamStatusOut,
     NetworkIn,
     NetworkOut,
+    RegistryAddressOut,
     UnregisteredOut,
 )
 from app.ipam.service import source_for
+from app.ipam.sync import parse_address
 from app.jobs.presenter import job_out
 from app.jobs.queue import enqueue
 
@@ -121,3 +129,132 @@ async def delete_network(network_id: uuid.UUID, _: ClusterManager, db: DbSession
     if net is None:
         raise NotFound()
     await db.delete(net)
+
+
+# --- the registry editor -------------------------------------------------------------------
+# MySQL stays the source of truth and only the worker reaches it: each change is a job.
+# The API refuses what would break a running instance of ours (an address it was created
+# with cannot be freed, moved or removed while the instance lives).
+
+
+async def _held_by(db: AsyncSession, external_ids: Iterable[int]) -> dict[int, Guest]:
+    """Live instances created with these registry rows (Instance.network.ipam)."""
+    ids = list(external_ids)
+    if not ids:
+        return {}
+    rows = await db.execute(
+        select(Instance).where(
+            Instance.deleted_at.is_(None),
+            Instance.network["ipam"]["external_id"].as_integer().in_(ids),
+        )
+    )
+    return {
+        int(i.network["ipam"]["external_id"]): Guest(i.id, i.name, i.managed, i.tenant_id)
+        for i in rows.scalars()
+    }
+
+
+def _registry_out(a: IpamAddress, held: dict[int, Guest]) -> RegistryAddressOut:
+    return RegistryAddressOut(
+        id=a.id, external_id=a.external_id, address=str(a.address), prefix=a.prefix,
+        hypervisor=a.hypervisor, node_name=a.node_name, cluster_id=a.cluster_id,
+        assigned=a.assigned, mac=a.mac, hostname=a.hostname, host_owner=a.host_owner,
+        ip_block=a.ip_block, held_by=_guest(held.get(a.external_id)), synced_at=a.synced_at,
+    )
+
+
+@router.get("/ipam/addresses")
+async def list_registry(_: ClusterManager, db: DbSession) -> list[RegistryAddressOut]:
+    """Every row of the registry (the screen groups them by hypervisor)."""
+    addresses = (
+        await db.execute(
+            select(IpamAddress).order_by(IpamAddress.hypervisor, IpamAddress.address)
+        )
+    ).scalars().all()
+    held = await _held_by(db, (a.external_id for a in addresses))
+    return [_registry_out(a, held) for a in addresses]
+
+
+def _require_source(settings: Any) -> None:
+    if source_for(settings) is None:
+        raise Conflict("the IP registry (CM_IPAM_MYSQL_URL) is not configured")
+
+
+async def _check_duplicate(db: AsyncSession, body: AddressIn, *, except_id: int | None) -> None:
+    parsed = parse_address(body.address)
+    if parsed is None:  # the schema already refused anything unparsable
+        raise Conflict("invalid address")
+    other = await db.scalar(
+        select(IpamAddress.external_id).where(
+            IpamAddress.address == parsed[0], IpamAddress.external_id != (except_id or -1)
+        )
+    )
+    if other is not None:
+        raise Conflict(f"{parsed[0]} is already registered (row {other})")
+
+
+async def _accepted(
+    db: AsyncSession, response: Response, principal: Principal, job_type: str,
+    payload: dict[str, Any], resource_id: uuid.UUID | None,
+) -> Accepted:
+    job = await enqueue(
+        db, job_type, tenant_id=None, requested_by=principal.user_id,
+        resource_type="ipam_address", resource_id=resource_id, payload=payload,
+    )
+    await audit.record(
+        db, job_type, actor_user_id=principal.user_id, resource_type="ipam_address",
+        resource_id=resource_id, details={k: v for k, v in payload.items() if v is not None},
+    )
+    await db.refresh(job)
+    response.headers["Location"] = f"/api/v1/admin/jobs/{job.id}"
+    return Accepted(job=await job_out(db, job))
+
+
+@router.post("/ipam/addresses", status_code=status.HTTP_202_ACCEPTED)
+async def create_registry_address(
+    body: AddressIn, principal: ClusterManager, db: DbSession, settings: AppSettings,
+    response: Response,
+) -> Accepted:
+    _require_source(settings)
+    await _check_duplicate(db, body, except_id=None)
+    return await _accepted(
+        db, response, principal, "ipam.address.create", body.model_dump(), None
+    )
+
+
+@router.patch("/ipam/addresses/{address_id}", status_code=status.HTTP_202_ACCEPTED)
+async def update_registry_address(
+    address_id: uuid.UUID, body: AddressIn, principal: ClusterManager, db: DbSession,
+    settings: AppSettings, response: Response,
+) -> Accepted:
+    _require_source(settings)
+    row = await db.get(IpamAddress, address_id)
+    if row is None:
+        raise NotFound()
+    await _check_duplicate(db, body, except_id=row.external_id)
+    holder = (await _held_by(db, [row.external_id])).get(row.external_id)
+    if holder is not None:
+        same_ip = parse_address(body.address) == (str(row.address), row.prefix)
+        if not body.assigned or not same_ip or body.hostname != row.hostname:
+            raise Conflict(
+                f"{row.address} belongs to the instance {holder.name}: it can only be freed "
+                "or changed by deleting the instance"
+            )
+    payload = {**body.model_dump(), "external_id": row.external_id}
+    return await _accepted(db, response, principal, "ipam.address.update", payload, row.id)
+
+
+@router.delete("/ipam/addresses/{address_id}", status_code=status.HTTP_202_ACCEPTED)
+async def delete_registry_address(
+    address_id: uuid.UUID, principal: ClusterManager, db: DbSession, settings: AppSettings,
+    response: Response,
+) -> Accepted:
+    _require_source(settings)
+    row = await db.get(IpamAddress, address_id)
+    if row is None:
+        raise NotFound()
+    holder = (await _held_by(db, [row.external_id])).get(row.external_id)
+    if holder is not None:
+        raise Conflict(f"{row.address} belongs to the instance {holder.name}: delete it first")
+    payload = {"external_id": row.external_id, "address": str(row.address)}
+    return await _accepted(db, response, principal, "ipam.address.delete", payload, row.id)

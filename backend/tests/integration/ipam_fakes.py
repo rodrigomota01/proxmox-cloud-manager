@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field, replace
 
-from app.ipam.source import PoolRow
+from app.ipam.source import PoolFields, PoolRow
 
 
 def row(id_, ip, *, assigned=False, mac=None, host=None, node="tagima") -> PoolRow:
@@ -15,6 +15,7 @@ class FakeIpamSource:
     rows: list[PoolRow] = field(default_factory=list)
     calls: list[tuple] = field(default_factory=list)
     refuse: set[int] = field(default_factory=set)  # reserve() loses the race for these
+    next_id: int = 1000  # ids handed to inserted rows
 
     def _get(self, row_id: int) -> tuple[int, PoolRow]:
         return next((i, r) for i, r in enumerate(self.rows) if r.id == row_id)
@@ -45,3 +46,32 @@ class FakeIpamSource:
             return False
         self.rows[i] = replace(r, assigned=False, hostname=None, mac=None if clear_mac else r.mac)
         return True
+
+    async def insert(self, fields: PoolFields) -> int:
+        self.calls.append(("insert", fields.ip_addr))
+        self.next_id += 1
+        self.rows.append(PoolRow(
+            id=self.next_id, ip_addr=fields.ip_addr, assigned=fields.assigned, mac=fields.mac,
+            host_owner=fields.host_owner, hostname=fields.hostname,
+            hypervisor=fields.hypervisor, node=fields.node, ip_block=fields.ip_block,
+        ))
+        return self.next_id
+
+    async def update(self, row_id: int, fields: PoolFields) -> bool:
+        self.calls.append(("update", row_id, fields.ip_addr))
+        try:
+            i, r = self._get(row_id)
+        except StopIteration:
+            return False
+        self.rows[i] = replace(
+            r, ip_addr=fields.ip_addr, assigned=fields.assigned, mac=fields.mac,
+            host_owner=fields.host_owner, hostname=fields.hostname,
+            hypervisor=fields.hypervisor, node=fields.node, ip_block=fields.ip_block,
+        )
+        return True
+
+    async def delete(self, row_id: int) -> bool:
+        self.calls.append(("delete", row_id))
+        before = len(self.rows)
+        self.rows = [r for r in self.rows if r.id != row_id]
+        return len(self.rows) < before
