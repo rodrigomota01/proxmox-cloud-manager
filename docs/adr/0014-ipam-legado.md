@@ -34,3 +34,10 @@ e quais estão de fato em uso, e passar a reservar/liberar IPs ao criar/excluir 
   quando o job termina. A API recusa (409) liberar, mover ou remover um IP com que a
   plataforma criou uma VM viva: isso só acontece ao excluir a VM. O usuário MySQL passa
   a precisar de `SELECT, INSERT, UPDATE, DELETE` na tabela (antes só `SELECT, UPDATE`).
+
+- **Exclusão de VM adotada (2026-10-20):** além do IP que a plataforma reservou ao criar,
+  o job de exclusão libera as linhas do cadastro, no mesmo servidor, que a VM realmente
+  usava — pela mesma evidência da aba IPs: IP configurado na placa, depois MAC, depois
+  hostname (o cadastro costuma estar defasado em nome e MAC). Marca livre e limpa o
+  hostname; o MAC fica (pode ser o vMAC de um IP failover). Cadastro fora do ar não
+  impede a exclusão: fica um evento `ip_not_released` no job.

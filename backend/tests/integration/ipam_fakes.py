@@ -75,3 +75,11 @@ class FakeIpamSource:
         before = len(self.rows)
         self.rows = [r for r in self.rows if r.id != row_id]
         return len(self.rows) < before
+
+    async def free(self, row_id: int) -> bool:
+        self.calls.append(("free", row_id))
+        i, r = self._get(row_id)
+        if not r.assigned:
+            return False
+        self.rows[i] = replace(r, assigned=False, hostname=None)
+        return True

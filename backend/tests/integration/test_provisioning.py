@@ -19,7 +19,7 @@ from app.ipam.sync import sync_ipam
 from app.jobs import handlers  # noqa: F401 - registers job handlers
 from app.jobs.models import Job, JobEvent
 from app.jobs.queue import run_one
-from app.providers.base import InstanceSpec, ProviderError, ProviderRef, StaticIPv4
+from app.providers.base import GuestNic, InstanceSpec, ProviderError, ProviderRef, StaticIPv4
 from app.providers.fake import FakeProvider
 from app.providers.registry import ProviderRegistry
 from app.worker.main import reconcile_all
@@ -735,3 +735,39 @@ async def test_address_and_typed_ip_are_exclusive(env, ipam):
     neither = env.body(key_id)
     del neither["ipv4"]
     assert (await env.create("alice", neither)).status_code == 422
+
+
+async def test_deleting_an_adopted_guest_frees_the_ips_it_used(client, env, fake, ipam, app):
+    """Adopted guests carry no reservation of ours and the registry's name/MAC may be
+    stale: the rows matched by configured IP (then MAC, then name) are freed anyway."""
+    from app.ipam.sync import poll_guest_config
+
+    root = await env.h("root")
+    fake.add_instance(1110, "atnbr1110", node="tagima")
+    # .140 is registered to "someone" with no MAC; the guest really has it on net0
+    fake.nics["1110"] = [GuestNic("net0", "bc:24:11:d8:4a:75", "vmbr0", 151,
+                                  "177.54.151.140/24", "177.54.151.1")]
+    await client.post(f"/api/v1/admin/clusters/{env.cluster}/sync", headers=root)
+    await env.drain()
+    await poll_guest_config(app.state.sessionmaker, app.state.providers)
+    [guest] = [i for i in (await client.get("/api/v1/admin/instances", headers=root)).json()
+               if i["vmid"] == 1110]
+    r = await client.post(f"/api/v1/admin/instances/{guest['id']}/adopt", headers=root,
+                          json={"tenant_id": str(env.acme.id), "project_id": str(env.web.id)})
+    assert r.status_code == 200, r.text
+
+    h = await env.h("alice", env.acme)
+    r = await client.request("DELETE", f"/api/v1/instances/{guest['id']}", headers=h,
+                             json={"confirm": "atnbr1110"})
+    assert r.status_code == 202, r.text
+    await env.drain()
+    job = (await client.get(f"/api/v1/jobs/{r.json()['job']['id']}", headers=h)).json()
+    assert job["status"] == "succeeded", job
+    assert ("free", 5) in ipam.calls
+    freed = next(x for x in ipam.rows if x.id == 5)
+    assert freed.assigned is False and freed.hostname is None
+    # the other rows are untouched: nothing else matched the guest
+    assert [x.id for x in ipam.rows if x.assigned] == []
+    assert not any(c[0] == "free" and c[1] != 5 for c in ipam.calls)
+    events = (await client.get(f"/api/v1/jobs/{job['id']}", headers=h)).json()["events"]
+    assert any(e["kind"] == "ip_released" and "177.54.151.140" in e["message"] for e in events)

@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import aiomysql
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit import service as audit
@@ -155,6 +155,47 @@ async def _ipam_release(ctx: JobContext, db: AsyncSession, instance: Instance) -
         await ctx.event("ip_released", f"IP {instance.ipv4} released in the IPAM")
     else:  # someone else changed the row since: leave it to them
         await ctx.event("ip_not_released", f"IP {instance.ipv4} no longer carries this name")
+
+
+async def _ipam_release_used(ctx: JobContext, db: AsyncSession, instance: Instance) -> None:
+    """Free the registry rows a guest was really using, whoever registered them: adopted
+    guests have no reservation of ours, and the registry's name/MAC are often stale (the
+    IP configured on the NIC is the evidence the IPs tab trusts, then MAC, then name).
+    Same server only; the MAC stays (a failover vMAC belongs to the IP). Best effort: a
+    registry that is off or unreachable never blocks a deletion."""
+    source = source_for(ctx.providers.settings)
+    if source is None:
+        return
+    reserved = (instance.network.get("ipam") or {}).get("external_id")
+    nics = instance.nics or []
+    ips = {n["ip"].split("/", 1)[0] for n in nics if n.get("ip")}
+    if instance.ipv4:
+        ips.add(str(instance.ipv4))
+    macs = {n["mac"] for n in nics if n.get("mac")}
+    names = {instance.name, instance.provider_name}
+    clauses = [IpamAddress.hostname.in_(names)]
+    if ips:
+        clauses.append(IpamAddress.address.in_(sorted(ips)))
+    if macs:
+        clauses.append(IpamAddress.mac.in_(sorted(macs)))
+    rows = (
+        await db.execute(
+            select(IpamAddress).where(
+                IpamAddress.cluster_id == instance.cluster_id, IpamAddress.assigned.is_(True),
+                IpamAddress.external_id != (reserved or -1), or_(*clauses),
+            )
+        )
+    ).scalars().all()
+    for row in rows:
+        try:
+            freed = await source.free(row.external_id)
+        except (aiomysql.Error, OSError) as exc:
+            await ctx.event("ip_not_released", f"IP {row.address}: registry unreachable ({exc})")
+            continue
+        if freed:
+            row.assigned, row.hostname = False, None
+            await ctx.event("ip_released", f"IP {row.address} freed in the IPAM (was in use by "
+                                           f"{instance.name})")
 
 
 async def _allocate_guest_id(
@@ -342,6 +383,7 @@ async def instance_delete(ctx: JobContext) -> dict[str, Any]:
             async with ctx.providers.open(db, cluster) as provider:
                 await _destroy(provider, ProviderRef(instance.provider_ref), instance.provider_name)
         await _ipam_release(ctx, db, instance)
+        await _ipam_release_used(ctx, db, instance)
         await _lock_fresh(db, instance)
         instance.state, instance.deleted_at = "deleted", datetime.now(UTC)
         instance.power_state = PowerState.UNKNOWN.value

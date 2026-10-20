@@ -62,6 +62,7 @@ class IpamSource(Protocol):
     async def reserve(self, row_id: int, *, hostname: str, mac: str | None) -> bool: ...
     async def set_mac(self, row_id: int, *, hostname: str, mac: str) -> bool: ...
     async def release(self, row_id: int, *, hostname: str, clear_mac: bool) -> bool: ...
+    async def free(self, row_id: int) -> bool: ...
     # registry edits by admins
     async def insert(self, fields: PoolFields) -> int: ...
     async def update(self, row_id: int, fields: PoolFields) -> bool: ...
@@ -118,6 +119,16 @@ class MysqlIpamSource(MysqlDb):
             f"UPDATE awf_ip_pool SET assigned = 0, hostname_lease = NULL{mac} "  # noqa: S608
             "WHERE id = %s AND hostname_lease = %s",
             (row_id, hostname),
+        )
+        return count == 1
+
+    async def free(self, row_id: int) -> bool:
+        """Free a row whatever name it carries: for the IPs a deleted guest was using
+        (matched by IP/MAC/name). The MAC stays: a failover vMAC belongs to the IP."""
+        _, count = await self._execute(
+            "UPDATE awf_ip_pool SET assigned = 0, hostname_lease = NULL "
+            "WHERE id = %s AND assigned = 1",
+            (row_id,),
         )
         return count == 1
 
