@@ -13,7 +13,7 @@ from app.infra.mysql import MysqlDb
 
 COLUMNS = (
     "id, assigned, assigned_to_macaddr, host_owner, hostname_lease, ip_addr, hypervisor, "
-    "pve_node_owner, ipBlock"
+    "pve_node_owner, ipBlock, assigned_load_balancer"
 )
 
 
@@ -28,6 +28,7 @@ class PoolRow:
     hypervisor: str | None
     node: str | None
     ip_block: str | None
+    load_balancer: bool = False  # assigned_load_balancer: in use by a load balancer
 
 
 @dataclass(frozen=True)
@@ -42,18 +43,19 @@ class PoolFields:
     hypervisor: str | None = None
     node: str | None = None
     ip_block: str | None = None
+    load_balancer: bool = False
 
     def values(self) -> tuple[object, ...]:
         """In the column order of _FIELD_COLUMNS."""
         return (
             self.ip_addr, int(self.assigned), self.mac, self.host_owner, self.hostname,
-            self.hypervisor, self.node, self.ip_block,
+            self.hypervisor, self.node, self.ip_block, int(self.load_balancer),
         )
 
 
 _FIELD_COLUMNS = (
     "ip_addr", "assigned", "assigned_to_macaddr", "host_owner", "hostname_lease",
-    "hypervisor", "pve_node_owner", "ipBlock",
+    "hypervisor", "pve_node_owner", "ipBlock", "assigned_load_balancer",
 )
 
 
@@ -88,6 +90,7 @@ class MysqlIpamSource(MysqlDb):
                 id=int(r[0]), assigned=_bit(r[1]), mac=(_text(r[2]) or "").lower() or None,
                 host_owner=_text(r[3]), hostname=_text(r[4]), ip_addr=str(r[5] or "").strip(),
                 hypervisor=_text(r[6]), node=_text(r[7]), ip_block=_text(r[8]),
+                load_balancer=_bit(r[9]),
             )
             for r in rows
         ]

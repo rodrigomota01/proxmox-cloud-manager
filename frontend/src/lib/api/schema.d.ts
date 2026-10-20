@@ -2039,6 +2039,11 @@ export interface components {
             hypervisor?: string | null;
             /** Ip Block */
             ip_block?: string | null;
+            /**
+             * Load Balancer
+             * @default false
+             */
+            load_balancer?: boolean;
             /** Mac */
             mac?: string | null;
             /** Node Name */
@@ -4811,6 +4816,8 @@ export interface components {
             id: string;
             /** Ip Block */
             ip_block: string | null;
+            /** Load Balancer */
+            load_balancer: boolean;
             /** Mac */
             mac: string | null;
             /** Node Name */

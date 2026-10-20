@@ -159,7 +159,8 @@ def _registry_out(a: IpamAddress, held: dict[int, Guest]) -> RegistryAddressOut:
         id=a.id, external_id=a.external_id, address=str(a.address), prefix=a.prefix,
         hypervisor=a.hypervisor, node_name=a.node_name, cluster_id=a.cluster_id,
         assigned=a.assigned, mac=a.mac, hostname=a.hostname, host_owner=a.host_owner,
-        ip_block=a.ip_block, held_by=_guest(held.get(a.external_id)), synced_at=a.synced_at,
+        ip_block=a.ip_block, load_balancer=a.load_balancer,
+        held_by=_guest(held.get(a.external_id)), synced_at=a.synced_at,
     )
 
 

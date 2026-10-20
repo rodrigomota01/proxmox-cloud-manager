@@ -78,6 +78,11 @@
             ],
             "title": "Ip Block"
           },
+          "load_balancer": {
+            "default": false,
+            "title": "Load Balancer",
+            "type": "boolean"
+          },
           "mac": {
             "anyOf": [
               {
@@ -8440,6 +8445,10 @@
             ],
             "title": "Ip Block"
           },
+          "load_balancer": {
+            "title": "Load Balancer",
+            "type": "boolean"
+          },
           "mac": {
             "anyOf": [
               {
@@ -8492,6 +8501,7 @@
           "hostname",
           "host_owner",
           "ip_block",
+          "load_balancer",
           "held_by",
           "synced_at"
         ],

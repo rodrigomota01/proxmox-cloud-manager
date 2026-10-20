@@ -5,9 +5,10 @@ from dataclasses import dataclass, field, replace
 from app.ipam.source import PoolFields, PoolRow
 
 
-def row(id_, ip, *, assigned=False, mac=None, host=None, node="tagima") -> PoolRow:
+def row(id_, ip, *, assigned=False, mac=None, host=None, node="tagima", lb=False) -> PoolRow:
     return PoolRow(id=id_, ip_addr=ip, assigned=assigned, mac=mac, host_owner=None,
-                   hostname=host, hypervisor="hv08.sp02.atena.io", node=node, ip_block=None)
+                   hostname=host, hypervisor="hv08.sp02.atena.io", node=node, ip_block=None,
+                   load_balancer=lb)
 
 
 @dataclass
@@ -54,6 +55,7 @@ class FakeIpamSource:
             id=self.next_id, ip_addr=fields.ip_addr, assigned=fields.assigned, mac=fields.mac,
             host_owner=fields.host_owner, hostname=fields.hostname,
             hypervisor=fields.hypervisor, node=fields.node, ip_block=fields.ip_block,
+            load_balancer=fields.load_balancer,
         ))
         return self.next_id
 
@@ -67,6 +69,7 @@ class FakeIpamSource:
             r, ip_addr=fields.ip_addr, assigned=fields.assigned, mac=fields.mac,
             host_owner=fields.host_owner, hostname=fields.hostname,
             hypervisor=fields.hypervisor, node=fields.node, ip_block=fields.ip_block,
+            load_balancer=fields.load_balancer,
         )
         return True
 

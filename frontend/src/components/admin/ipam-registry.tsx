@@ -41,7 +41,7 @@ function groupRows(rows: Row[]): Group[] {
     const key = r.hypervisor ?? NONE;
     const g = by.get(key) ?? { key, hypervisor: r.hypervisor, nodes: [], clusterIds: [], count: 0, free: 0 };
     g.count += 1;
-    if (!r.assigned) g.free += 1;
+    if (!r.assigned && !r.load_balancer) g.free += 1;
     if (r.node_name && !g.nodes.includes(r.node_name)) g.nodes.push(r.node_name);
     if (r.cluster_id && !g.clusterIds.includes(r.cluster_id)) g.clusterIds.push(r.cluster_id);
     by.set(key, g);
@@ -68,6 +68,7 @@ function toForm(row: Row | null, group: Group | null): AddressIn {
       hostname: row.hostname,
       host_owner: row.host_owner,
       ip_block: row.ip_block,
+      load_balancer: row.load_balancer,
     };
   }
   return {
@@ -79,6 +80,7 @@ function toForm(row: Row | null, group: Group | null): AddressIn {
     hostname: null,
     host_owner: null,
     ip_block: null,
+    load_balancer: false,
   };
 }
 
@@ -184,6 +186,15 @@ function AddressDialog({
             />
             {t("infra.registry.assigned")}
             <span className="text-xs text-slate-500">· {t("infra.registry.assignedHint")}</span>
+          </label>
+          <label className="flex items-center gap-2 self-end pb-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.load_balancer ?? false}
+              onChange={(e) => set({ load_balancer: e.target.checked })}
+            />
+            {t("infra.registry.loadBalancer")}
+            <span className="text-xs text-slate-500">· {t("infra.registry.loadBalancerHint")}</span>
           </label>
         </div>
         <div className="flex justify-end gap-2 pt-2">
@@ -362,7 +373,15 @@ export function IpamRegistry() {
                       <div className="text-slate-400">#{r.external_id}</div>
                     </td>
                     <td className={tbl.td}>
-                      {r.assigned ? <Status tone="info">{t("infra.registry.inUse")}</Status> : <Status tone="ok">{t("infra.registry.free")}</Status>}
+                      {r.load_balancer ? (
+                        <Status tone="info" title={t("infra.registry.inUseLbHint")}>
+                          {t("infra.registry.inUse")} · {t("infra.registry.inUseLb")}
+                        </Status>
+                      ) : r.assigned ? (
+                        <Status tone="info">{t("infra.registry.inUse")}</Status>
+                      ) : (
+                        <Status tone="ok">{t("infra.registry.free")}</Status>
+                      )}
                       {r.held_by && (
                         <div className="mt-1" title={t("infra.registry.heldByHint")}>
                           <Badge tone="brand">{t("infra.registry.heldBy", { name: r.held_by.name })}</Badge>

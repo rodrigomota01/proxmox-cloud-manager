@@ -41,3 +41,13 @@ e quais estão de fato em uso, e passar a reservar/liberar IPs ao criar/excluir 
   hostname (o cadastro costuma estar defasado em nome e MAC). Marca livre e limpa o
   hostname; o MAC fica (pode ser o vMAC de um IP failover). Cadastro fora do ar não
   impede a exclusão: fica um evento `ip_not_released` no job.
+
+- **IPs de load balancer (2026-10-20):** a coluna `assigned_load_balancer` do cadastro passa
+  a ser lida (`ipam_addresses.load_balancer`). Um IP marcado assim tem situação própria,
+  **load balancer**, e conta como em uso haja ou não VM e esteja ou não com `assigned = 1`
+  (no cadastro há IPs de LB com `assigned = 0`, que apareceriam como livres). Nunca é
+  oferecido a VMs novas e nunca é liberado ao excluir uma VM, mesmo quando está registrado
+  com o nome dela (é o backend atrás do balanceador, não o dono do IP). A VM mostrada, se
+  houver, é a que usa o IP (IP/MAC) ou a que tem o nome registrado. O editor do cadastro
+  tem a marcação como campo. O Cloud Manager não altera `assigned` dessas linhas no MySQL:
+  a leitura é que trata o IP como em uso.

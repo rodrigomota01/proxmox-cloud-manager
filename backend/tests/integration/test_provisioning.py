@@ -639,6 +639,9 @@ async def ipam(env, app):
         row(3, "177.54.151.134"),
         row(4, "198.51.100.7"),                                        # no network profile
         row(5, "177.54.151.140", assigned=True, host="someone"),
+        # dedicated to a load balancer, registered to the guest behind it: never offered,
+        # never freed with that guest
+        row(6, "177.54.151.150", host="atnbr1110", lb=True),
     ])
     ipam_service.configure(source)
     root = await env.h("root")
@@ -662,7 +665,8 @@ async def _free(env) -> dict[str, dict]:
 
 async def test_free_addresses_are_offered_configured(env, ipam):
     free = await _free(env)
-    # 198.51.100.7 has no profile (cannot configure it); .140 is taken
+    # 198.51.100.7 has no profile (cannot configure it); .140 is taken; .150 is a load
+    # balancer's (not even marked assigned, still never offered)
     assert sorted(free) == ["152.236.18.25/31", "177.54.151.133/24", "177.54.151.134/24"]
     assert free["152.236.18.25/31"]["gateway"] == "152.236.18.24"
     assert free["177.54.151.133/24"]["gateway"] == "177.54.151.1"
@@ -766,8 +770,10 @@ async def test_deleting_an_adopted_guest_frees_the_ips_it_used(client, env, fake
     assert ("free", 5) in ipam.calls
     freed = next(x for x in ipam.rows if x.id == 5)
     assert freed.assigned is False and freed.hostname is None
-    # the other rows are untouched: nothing else matched the guest
+    # the other rows are untouched: nothing else matched the guest, and the load
+    # balancer's IP (registered under the guest's name) stays with the balancer
     assert [x.id for x in ipam.rows if x.assigned] == []
+    assert next(x for x in ipam.rows if x.id == 6).hostname == "atnbr1110"
     assert not any(c[0] == "free" and c[1] != 5 for c in ipam.calls)
     events = (await client.get(f"/api/v1/jobs/{job['id']}", headers=h)).json()["events"]
     assert any(e["kind"] == "ip_released" and "177.54.151.140" in e["message"] for e in events)

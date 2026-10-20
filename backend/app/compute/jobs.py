@@ -161,8 +161,10 @@ async def _ipam_release_used(ctx: JobContext, db: AsyncSession, instance: Instan
     """Free the registry rows a guest was really using, whoever registered them: adopted
     guests have no reservation of ours, and the registry's name/MAC are often stale (the
     IP configured on the NIC is the evidence the IPs tab trusts, then MAC, then name).
-    Same server only; the MAC stays (a failover vMAC belongs to the IP). Best effort: a
-    registry that is off or unreachable never blocks a deletion."""
+    Same server only; the MAC stays (a failover vMAC belongs to the IP). An address
+    dedicated to a load balancer is never freed: it belongs to the balancer, not to the
+    guest behind it. Best effort: a registry that is off or unreachable never blocks a
+    deletion."""
     source = source_for(ctx.providers.settings)
     if source is None:
         return
@@ -182,6 +184,7 @@ async def _ipam_release_used(ctx: JobContext, db: AsyncSession, instance: Instan
         await db.execute(
             select(IpamAddress).where(
                 IpamAddress.cluster_id == instance.cluster_id, IpamAddress.assigned.is_(True),
+                IpamAddress.load_balancer.is_(False),
                 IpamAddress.external_id != (reserved or -1), or_(*clauses),
             )
         )

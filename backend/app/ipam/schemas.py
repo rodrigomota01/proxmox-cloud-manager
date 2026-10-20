@@ -32,7 +32,7 @@ class AddressOut(BaseModel):
     external_id: int
     address: str
     prefix: int | None
-    status: str  # free|in_use|detached|stale|conflict|unverified
+    status: str  # free|in_use|load_balancer|detached|stale|conflict|unverified
     assigned: bool
     hostname: str | None
     mac: str | None
@@ -104,6 +104,7 @@ class AddressIn(BaseModel):
     hostname: Short | None = None
     host_owner: Short | None = None
     ip_block: Short | None = None
+    load_balancer: bool = False  # dedicated to a load balancer: in use whatever `assigned` says
 
     @field_validator("address")
     @classmethod
@@ -148,5 +149,6 @@ class RegistryAddressOut(BaseModel):
     hostname: str | None
     host_owner: str | None
     ip_block: str | None
+    load_balancer: bool
     held_by: GuestRef | None  # a live instance the platform created with this address
     synced_at: datetime

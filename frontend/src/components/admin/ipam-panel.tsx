@@ -16,12 +16,13 @@ type Address = Schemas["AddressOut"];
 const STATUS: Record<string, { label: MessageKey; tone: StatusTone; hint: MessageKey }> = {
   free: { label: "infra.ipam.status.free", tone: "ok", hint: "infra.ipam.status.freeHint" },
   in_use: { label: "infra.ipam.status.inUse", tone: "info", hint: "infra.ipam.status.inUseHint" },
+  load_balancer: { label: "infra.ipam.status.loadBalancer", tone: "info", hint: "infra.ipam.status.loadBalancerHint" },
   detached: { label: "infra.ipam.status.detached", tone: "warn", hint: "infra.ipam.status.detachedHint" },
   stale: { label: "infra.ipam.status.stale", tone: "warn", hint: "infra.ipam.status.staleHint" },
   conflict: { label: "infra.ipam.status.conflict", tone: "error", hint: "infra.ipam.status.conflictHint" },
   unverified: { label: "infra.ipam.status.unverified", tone: "unknown", hint: "infra.ipam.status.unverifiedHint" },
 };
-const ORDER = ["conflict", "stale", "detached", "free", "in_use", "unverified"];
+const ORDER = ["conflict", "stale", "detached", "free", "in_use", "load_balancer", "unverified"];
 
 /** Sync state of the legacy IPAM (MySQL awf_ip_pool) and a manual refresh. */
 export function IpamSync({ invalidate = [] as readonly (readonly unknown[])[] }: { invalidate?: readonly (readonly unknown[])[] }) {

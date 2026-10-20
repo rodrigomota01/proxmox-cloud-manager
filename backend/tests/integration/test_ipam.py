@@ -64,13 +64,17 @@ async def test_report_matches_ipam_with_guest_nics(client, env, fake):
         row(5, "177.54.151.133", mac="66:84:60:b8:38:61"),              # free (vMAC ready)
         row(6, "177.54.144.198", node="ferrari"),                        # other server
         row(7, "garbage"),
+        # load balancer IPs count as in use whatever `assigned` says: .20 is not even
+        # marked, yet registered under a guest here (the backend behind the balancer)
+        row(9, "152.236.18.20", host="cm-test-2", lb=True),
+        row(10, "152.236.18.21", assigned=True, host="lb-1", lb=True),
     ]
     r = await client.post("/api/v1/admin/ipam/sync", headers=h)
     assert r.status_code == 202
     await env["drain"]()
 
     status = (await client.get("/api/v1/admin/ipam", headers=h)).json()
-    assert status["configured"] and status["addresses"] == 7 and status["integrated"] == 6
+    assert status["configured"] and status["addresses"] == 9 and status["integrated"] == 8
 
     rep = (await client.get(f"/api/v1/admin/clusters/{cid}/ipam", headers=h)).json()
     by_ip = {a["address"]: a for a in rep["addresses"]}
@@ -78,11 +82,15 @@ async def test_report_matches_ipam_with_guest_nics(client, env, fake):
         "152.236.18.11": "stale", "152.236.18.13": "conflict", "152.236.18.25": "free",
         "152.236.18.15": "detached",
         "177.54.151.133": "free", "177.54.151.188": "in_use",
+        "152.236.18.20": "load_balancer", "152.236.18.21": "load_balancer",
     }
     assert by_ip["152.236.18.13"]["guest"]["name"] == "cm-test-1"
     assert by_ip["152.236.18.13"]["mac_mismatch"] == "bc:24:11:00:00:01"
     assert by_ip["152.236.18.15"]["guest"]["name"] == "cm-test-2"
-    assert rep["counts"] == {"stale": 1, "conflict": 1, "free": 2, "in_use": 1, "detached": 1}
+    assert by_ip["152.236.18.20"]["guest"]["name"] == "cm-test-2"
+    assert by_ip["152.236.18.21"]["guest"] is None
+    assert rep["counts"] == {"stale": 1, "conflict": 1, "free": 2, "in_use": 1, "detached": 1,
+                             "load_balancer": 2}
     # the /24 used by guests and holding IPAM addresses is offered as a network profile
     assert [(s["cidr"], s["gateway"], s["vlan"]) for s in rep["suggestions"]] == [
         ("177.54.151.0/24", "177.54.151.1", 151)
@@ -168,6 +176,7 @@ async def test_registry_create_update_delete(client, env):
     job = await _job(client, h, await client.post("/api/v1/admin/ipam/addresses", headers=h, json={
         "address": "177.54.151.42", "hypervisor": "hv08.sp02.atena.io", "node_name": "tagima",
         "mac": "BC-24-11-00-00-01", "ip_block": "177.54.151.0/24", "hostname": "",
+        "load_balancer": True,
     }))
     await drain()
     done = await _status(client, h, job)
@@ -179,8 +188,10 @@ async def test_registry_create_update_delete(client, env):
     assert new["external_id"] == 1001 and new["mac"] == "bc:24:11:00:00:01"
     assert new["hostname"] is None and new["cluster_id"] is not None  # tagima is ours
     assert new["assigned"] is False and new["held_by"] is None
+    assert new["load_balancer"] is True
 
-    # update: mark it in use for a host, with a prefix
+    # update: mark it in use for a host, with a prefix (the form sends the whole row:
+    # a load balancer flag left out is cleared)
     job = await _job(client, h, await client.patch(
         f"/api/v1/admin/ipam/addresses/{new['id']}", headers=h,
         json={"address": "177.54.151.42/24", "hypervisor": "hv08.sp02.atena.io",
@@ -192,6 +203,7 @@ async def test_registry_create_update_delete(client, env):
     edited = next(a for a in rows if a["external_id"] == 1001)
     assert edited["assigned"] and edited["hostname"] == "web-1" and edited["prefix"] == 24
     assert edited["mac"] is None  # the form sends the whole row: a blank MAC clears it
+    assert edited["load_balancer"] is False
 
     # moving it onto another row's address is refused
     clash = await client.patch(f"/api/v1/admin/ipam/addresses/{new['id']}", headers=h,

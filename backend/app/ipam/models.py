@@ -33,6 +33,8 @@ class IpamAddress(UUIDPk, Base):
     hostname: Mapped[str | None] = mapped_column(Text)  # hostname_lease
     host_owner: Mapped[str | None] = mapped_column(Text)
     ip_block: Mapped[str | None] = mapped_column(Text)
+    # assigned_load_balancer: dedicated to a load balancer, in use whatever `assigned` says
+    load_balancer: Mapped[bool] = mapped_column(server_default="false")
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 

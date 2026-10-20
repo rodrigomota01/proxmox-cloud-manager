@@ -68,6 +68,7 @@ async def sync_addresses(db: AsyncSession, rows: list[PoolRow]) -> dict[str, int
         a.cluster_id = clusters.get(row.node or "")
         a.assigned, a.mac, a.hostname = row.assigned, row.mac, row.hostname
         a.host_owner, a.ip_block, a.synced_at = row.host_owner, row.ip_block, now
+        a.load_balancer = row.load_balancer
     gone = set(existing) - seen
     if gone:
         await db.execute(delete(IpamAddress).where(IpamAddress.external_id.in_(gone)))

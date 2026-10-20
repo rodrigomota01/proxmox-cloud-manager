@@ -4,6 +4,10 @@ Per address of the server (awf_ip_pool row tied to it):
 
     free        not assigned, no guest uses it
     in_use      assigned, and a guest uses it (by cloud-init IP or by NIC MAC)
+    load_balancer
+                dedicated to a load balancer (assigned_load_balancer): in use whatever
+                `assigned` says, never offered. The guest, when any, is the one that uses
+                it (by IP/MAC) or carries the registered name (the backend behind it).
     detached    assigned to a guest that exists here (same name) but does not have the
                 IP configured: often a public IP NATed by a load balancer/router to a
                 guest on a private network. Check before freeing.
@@ -112,7 +116,9 @@ async def report(db: AsyncSession, cluster_id: uuid.UUID) -> Report:
         ip = str(a.address)
         hit = by_ip.get(ip)
         guest, guest_mac = hit if hit else (by_mac.get(a.mac) if a.mac else None, a.mac)
-        if guest is not None:
+        if a.load_balancer:
+            status, guest = "load_balancer", guest or by_name.get(a.hostname or "")
+        elif guest is not None:
             status = "in_use" if a.assigned else "conflict"
         elif a.assigned and not out.nics_known:
             status = "unverified"

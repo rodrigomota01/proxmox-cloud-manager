@@ -57,6 +57,7 @@ def _fields(payload: dict[str, Any]) -> PoolFields:
         mac=payload.get("mac"), host_owner=payload.get("host_owner"),
         hostname=payload.get("hostname"), hypervisor=payload.get("hypervisor"),
         node=payload.get("node_name"), ip_block=payload.get("ip_block"),
+        load_balancer=bool(payload.get("load_balancer")),
     )
 
 
