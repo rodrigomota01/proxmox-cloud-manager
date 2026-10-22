@@ -147,7 +147,7 @@ function TableEditor({ table }: { table: Schemas["PriceTableOut"] }) {
                 <tr key={`${h.resource}-${h.effective_from}`} className={tbl.tr}>
                   <td className={tbl.td}>{formatDate(h.effective_from)}</td>
                   <td className={tbl.td}>{resourceLabel(h.resource)}</td>
-                  <td className={`${tbl.td} text-right tabular-nums`}>{money(h.monthly_price, "BRL", true)}</td>
+                  <td className={`${tbl.td} text-right tabular-nums`}>{money(h.monthly_price, undefined, true)}</td>
                 </tr>
               ))}
             </tbody>

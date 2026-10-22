@@ -63,7 +63,7 @@ export function Tabs<K extends string>({
   className?: string;
 }) {
   return (
-    <nav className={`flex gap-1 overflow-x-auto ${className}`} aria-label={translate("common.sections")}>
+    <nav className={`relative flex gap-1 overflow-x-auto ${className}`} aria-label={translate("common.sections")}>
       {tabs.map((t) => (
         <button
           key={t.key}

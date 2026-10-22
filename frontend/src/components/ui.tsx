@@ -280,13 +280,17 @@ export function Empty({
 
 /** Class names for console tables (use inside a flush Card). */
 export const tbl = {
-  wrap: "overflow-x-auto",
+  // relative: it is then the containing block of absolutely positioned children (the
+  // sr-only labels), so the overflow clip applies to them too; otherwise one of them past
+  // the right edge widens the whole document and phones zoom the page out
+  wrap: "relative overflow-x-auto",
   table: "w-full text-left text-sm",
   thead: "border-b border-slate-200 text-xs font-semibold text-slate-600 dark:border-slate-800 dark:text-slate-300",
   th: "whitespace-nowrap px-4 py-3 font-semibold first:pl-5 last:pr-5",
   tbody: "divide-y divide-slate-100 dark:divide-slate-800",
   tr: "align-middle hover:bg-slate-50 dark:hover:bg-slate-800/40",
-  td: "px-4 py-3 first:pl-5 last:pr-5",
+  // the first column (names, ids) never wraps: on narrow screens the table scrolls instead
+  td: "px-4 py-3 first:pl-5 last:pr-5 first:whitespace-nowrap",
   link: "font-medium text-brand-600 hover:underline dark:text-brand-400",
 };
 

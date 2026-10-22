@@ -83,7 +83,7 @@ class Settings(BaseSettings):
     default_quota_storage_gb: int = 200
 
     # Cost (ADR-0015): one currency for the whole platform; months follow this timezone
-    billing_currency: str = Field(default="BRL", pattern=r"^[A-Z]{3}$")
+    billing_currency: str = Field(default="USD", pattern=r"^[A-Z]{3}$")
     billing_timezone: str = "America/Sao_Paulo"
     billing_interval_seconds: float = 60.0
     # a worker outage longer than this is not charged (guest states are unknown there)

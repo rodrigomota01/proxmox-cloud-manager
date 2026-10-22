@@ -5,7 +5,7 @@ import { getLocale, translate, type MessageKey } from "@/lib/i18n";
 
 const formatters = new Map<string, Intl.NumberFormat>();
 
-export function money(value: Money | null | undefined, currency = "BRL", precise = false): string {
+export function money(value: Money | null | undefined, currency = "USD", precise = false): string {
   if (value === null || value === undefined) return "—";
   const key = `${getLocale()}:${currency}:${precise}`;
   let f = formatters.get(key);

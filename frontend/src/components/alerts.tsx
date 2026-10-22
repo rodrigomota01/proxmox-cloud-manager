@@ -495,7 +495,7 @@ export function AlertSettings({ mode }: { mode: Mode }) {
         <ErrorBox message={rules.isError ? errorMessage(rules.error) : null} />
         {rules.data?.length === 0 && <Empty>{t("alerts.settings.noRules")}</Empty>}
         {!!rules.data?.length && (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-left text-sm">
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {rules.data.map((r) => (

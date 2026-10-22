@@ -138,6 +138,7 @@ async def test_pending_firing_resolved_with_hysteresis(client, env, app, owner_d
     assert resolved.event == "resolved" and resolved.alert_id == fired.alert_id
     alert = await owner_db.get(Alert, fired.alert_id)
     assert alert.state == "resolved" and alert.peak == 0.9
+    assert alert.value == 0.5  # what the "resolved" notice reports as the value now
 
     # a spike shorter than the duration never fires and leaves nothing behind
     await _usage(owner_db, env.vm, cpu_usage=0.95)

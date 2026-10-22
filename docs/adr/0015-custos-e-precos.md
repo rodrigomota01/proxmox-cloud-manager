@@ -17,7 +17,7 @@ externo ainda; a arquitetura precisa deixar a integração possível depois.
   instância enquanto ela **existe** (`active`/`deleting`). Instâncias em
   `provisioning`/`error` não são cobradas.
 - **Preço mensal de 730 h, cobrado por segundo.** Uma moeda para a plataforma
-  (`CM_BILLING_CURRENCY`, padrão BRL); meses no fuso `CM_BILLING_TIMEZONE`
+  (`CM_BILLING_CURRENCY`, padrão USD); meses no fuso `CM_BILLING_TIMEZONE`
   (padrão America/Sao_Paulo). Dinheiro é `numeric(18,6)`/`Decimal` ponta a ponta e
   string no JSON — nunca float.
 - **Tabelas de preço versionadas** (`price_tables` + `price_items` com
@@ -34,7 +34,7 @@ externo ainda; a arquitetura precisa deixar a integração possível depois.
   o estado atual; acima disso o excedente não é cobrado (os estados no período são
   desconhecidos; erra-se a favor do cliente) e um aviso vai para o log.
 - **Relatórios**: acumulado no mês (soma de `usage_records`), **custo atual** (as
-  instâncias vivas com os preços de hoje, em R$/mês e R$/hora) e **previsão** (mês
+  instâncias vivas com os preços de hoje, em US$/mês e US$/hora) e **previsão** (mês
   corrente: acumulado + custo atual até o fim do mês). Quebra por recurso, projeto,
   instância e dia; CSV gerado no frontend.
 - **Visibilidade**: `usage_records` com RLS (o cliente lê as suas; só o worker, em

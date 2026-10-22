@@ -72,7 +72,7 @@ function TenantCosts({ tenantId, month }: { tenantId: string; month: string }) {
     retry: denied403,
   });
   const s = summary.data;
-  const cur = s?.currency ?? "BRL";
+  const cur = s?.currency ?? "USD";
   const denied = summary.error instanceof ApiError && summary.error.status === 403;
 
   function exportCsv(data: Schemas["CostSummaryOut"]) {
@@ -586,7 +586,7 @@ function PlatformCosts() {
     refetchInterval: 60_000,
   });
   const s = summary.data;
-  const cur = s?.currency ?? "BRL";
+  const cur = s?.currency ?? "USD";
   const q = filter.trim().toLowerCase();
   const tenants = (s?.tenants ?? []).filter(
     (row) => !q || row.name.toLowerCase().includes(q) || row.slug.toLowerCase().includes(q),

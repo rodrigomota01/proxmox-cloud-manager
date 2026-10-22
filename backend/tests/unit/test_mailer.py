@@ -101,3 +101,18 @@ async def test_send_logged_turns_a_failure_into_one_log_line(caplog):
     (record,) = [r for r in caplog.records if r.message == "e-mail not sent"]
     assert record.error.startswith("SMTPAuthenticationError: (535")
     assert record.exc_info is None and "token" not in record.getMessage()
+
+
+async def test_html_alternative_goes_with_the_plain_text():
+    sent = []
+    FakeSmtp.send_message = lambda self, msg: sent.append(msg)
+    try:
+        await SmtpMailer("mailpit", 1025, "cm@x").send(
+            Mail(to="ana@exemplo.com", subject="Alerta", body="texto", html="<p>html</p>")
+        )
+    finally:
+        del FakeSmtp.send_message
+    (msg,) = sent
+    assert msg.get_content_type() == "multipart/alternative"
+    assert [part.get_content_type() for part in msg.iter_parts()] == ["text/plain", "text/html"]
+    assert msg.get_body(("plain",)).get_content().strip() == "texto"

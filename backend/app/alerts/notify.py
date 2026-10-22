@@ -13,13 +13,16 @@ goes to the address that was checked (no second DNS lookup to rebind).
 import asyncio
 import hashlib
 import hmac
+import html as html_mod
 import ipaddress
 import json
 import logging
 import socket
+import string
 import time
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import urlsplit, urlunsplit
 
@@ -27,6 +30,7 @@ import httpx
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.alerts.evaluator import CLEAR
 from app.alerts.models import RATIO_METRICS, Alert, NotificationChannel
 from app.core.config import Settings
 from app.infra.mailer import Mail, Mailer, build_mailer
@@ -41,6 +45,14 @@ METRIC_LABEL = {
     "net_out": "rede (saída)",
 }
 RESOURCE_LABEL = {"node": "Hypervisor", "storage": "Storage", "instance": "VM"}
+MAIL_TEMPLATE = string.Template(Path(__file__).with_name("mail.html").read_text())
+# tag, text color, background, border — hex colors: mail clients do not share our CSS
+STYLE = {
+    "critical": ("CRITICAL", "#b91c1c", "#fef2f2", "#fca5a5"),
+    "warning": ("WARNING", "#b45309", "#fffbeb", "#fcd34d"),
+    "resolved": ("RESOLVIDO", "#047857", "#ecfdf5", "#6ee7b7"),
+    "test": ("TESTE", "#1d4ed8", "#eff6ff", "#93c5fd"),
+}
 
 
 class WebhookRejected(Exception):
@@ -51,6 +63,15 @@ def format_value(metric: str, value: float) -> str:
     if metric in RATIO_METRICS:
         return f"{value * 100:.0f}%"
     return f"{value * 8 / 1_000_000:.1f} Mbit/s"
+
+
+def _duration(alert: Alert) -> str:
+    seconds = int((alert.resolved_at - alert.started_at).total_seconds())
+    if seconds < 3600:
+        return f"{max(seconds // 60, 1)} min"
+    if seconds < 86400:
+        return f"{seconds // 3600} h {seconds % 3600 // 60:02d} min"
+    return f"{seconds // 86400} d {seconds % 86400 // 3600} h"
 
 
 def check_url(url: str, settings: Settings) -> None:
@@ -157,20 +178,53 @@ class Notifier:
         metric = METRIC_LABEL.get(alert.metric, alert.metric)
         value = format_value(alert.metric, alert.value)
         limit = format_value(alert.metric, alert.threshold)
+        peak = format_value(alert.metric, alert.peak)
+        kind = event if event in ("resolved", "test") else alert.severity
+        tag, color, bg, border = STYLE[kind]
+        # a resolved alert whose value never dropped below the clear line: the resource
+        # stopped, was removed or its rule was disabled, so "now" is unknown
+        gone = event == "resolved" and alert.value > alert.threshold * CLEAR
+        value_label = "Último valor" if gone else "Valor atual"
         if event == "resolved":
             subject = f"[Cloud Manager] RESOLVIDO: {what} — {metric} normalizada"
-            first = f"O alerta \"{alert.rule_name}\" foi resolvido: {metric} agora em {value}."
+            if gone:
+                headline = (
+                    f"O alerta \"{alert.rule_name}\" foi encerrado: {what} deixou de ser "
+                    f"monitorada (desligada, removida ou regra desativada). Último valor: {value}."
+                )
+            else:
+                subject += f" (agora {value})"
+                headline = (
+                    f"O alerta \"{alert.rule_name}\" foi resolvido: {metric} agora em {value}, "
+                    f"abaixo do limite de {limit}."
+                )
         else:
-            tag = "TESTE" if event == "test" else alert.severity.upper()
             subject = f"[Cloud Manager] {tag}: {what} — {metric} {value} (limite {limit})"
-            first = f"{what}: {metric} em {value}, acima do limite de {limit}."
+            headline = f"{what}: {metric} em {value}, acima do limite de {limit}."
+
+        rows = [("Regra", alert.rule_name), ("Recurso", what), ("Severidade", alert.severity),
+                ("Início", f"{alert.started_at:%d/%m/%Y %H:%M} UTC")]
+        if alert.resolved_at:
+            rows.append(("Resolvido", f"{alert.resolved_at:%d/%m/%Y %H:%M} UTC"
+                                      f" (duração {_duration(alert)})"))
+        url = f"{self.settings.public_base_url}/alerts"
+
         body = (
-            f"{first}\n\nRegra: {alert.rule_name}\nSeveridade: {alert.severity}\n"
-            f"Pico: {format_value(alert.metric, alert.peak)}\n"
-            f"Início: {alert.started_at:%d/%m/%Y %H:%M} UTC\n\n"
-            f"Ver alertas: {self.settings.public_base_url}/alerts\n"
+            f"[{tag}] {headline}\n\n"
+            f"{value_label}: {value}\nLimite: {limit}\nPico: {peak}\n\n"
+            + "".join(f"{k}: {v}\n" for k, v in rows)
+            + f"\nVer alertas: {url}\n"
         )
-        return Mail(to=to, subject=subject, body=body)
+        e = html_mod.escape
+        html = MAIL_TEMPLATE.substitute(
+            tag=tag, color=color, bg=bg, border=border, what=e(what), metric=e(metric),
+            headline=e(headline), value_label=value_label, value=e(value), limit=e(limit),
+            peak=e(peak), url=e(url),
+            rows="".join(
+                f'<tr><td class="k">{e(k)}</td><td class="v">{e(v)}</td></tr>\n' for k, v in rows
+            ),
+        )
+        return Mail(to=to, subject=subject, body=body, html=html)
 
     async def send(self, channel: NotificationChannel, alert: Alert, event: str) -> None:
         if channel.type == "email":

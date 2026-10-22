@@ -90,7 +90,7 @@ async def test_accrual_charges_running_compute_and_stopped_disk(client, benv, ap
     r = await client.get("/api/v1/billing/summary", headers=alice)
     assert r.status_code == 200, r.text
     s = r.json()
-    assert s["currency"] == "BRL" and s["current"] and s["prices"]["price_table"] == "Padrão"
+    assert s["currency"] == "USD" and s["current"] and s["prices"]["price_table"] == "Padrão"
     assert money(s["accrued"]["total"]) == Decimal("0.72")
     assert money(s["accrued"]["vcpu"]) == Decimal("0.40")
     assert money(s["run_rate"]["total"]) == Decimal("262.80")  # 240.9 + 21.9 per month

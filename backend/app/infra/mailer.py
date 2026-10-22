@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 class Mail:
     to: str
     subject: str
-    body: str
+    body: str  # plain text: always sent, for clients that do not render HTML
+    html: str | None = None  # richer alternative of the same message
 
 
 class Mailer(Protocol):
@@ -40,6 +41,8 @@ class SmtpMailer:
         msg = EmailMessage()
         msg["From"], msg["To"], msg["Subject"] = self.sender, mail.to, mail.subject
         msg.set_content(mail.body)
+        if mail.html:
+            msg.add_alternative(mail.html, subtype="html")
         context = ssl.create_default_context()
         if self.tls == "ssl":
             smtp = smtplib.SMTP_SSL(self.host, self.port, timeout=10, context=context)

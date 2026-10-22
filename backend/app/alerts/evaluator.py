@@ -118,6 +118,8 @@ async def evaluate(db: AsyncSession, now: datetime | None = None) -> list[Change
             alert = open_alerts.get((rule.id, obs.resource_id))
             limit = rule.threshold * CLEAR if alert and alert.state == "firing" else rule.threshold
             if obs.value <= limit:
+                if alert is not None:  # what the "resolved" notice reports as the value now
+                    alert.value = obs.value
                 continue  # left in open_alerts: cleared below
             open_alerts.pop((rule.id, obs.resource_id), None)
             if alert is None:
